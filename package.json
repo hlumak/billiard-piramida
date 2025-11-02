@@ -1,0 +1,13 @@
+{
+  "name": "billiard-piramida",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {},
+  "keywords": [],
+  "author": "hlumak",
+  "license": "MIT",
+  "packageManager": "pnpm@10.20.0",
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
+}
