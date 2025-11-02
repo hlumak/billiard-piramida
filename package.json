@@ -2,7 +2,12 @@
   "name": "billiard-piramida",
   "version": "1.0.0",
   "description": "",
-  "scripts": {},
+  "scripts": {
+    "dev": "pnpm run --parallel dev",
+    "build": "pnpm run --recursive build",
+    "test": "pnpm run --recursive test",
+    "lint": "pnpm run --recursive lint"
+  },
   "keywords": [],
   "author": "hlumak",
   "license": "MIT",
