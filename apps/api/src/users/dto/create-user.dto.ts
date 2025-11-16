@@ -1,6 +1,6 @@
 import { OmitType } from '@nestjs/swagger';
-import { UserDto } from './user.dto';
 import { Length } from 'class-validator';
+import { UserDto } from './user.dto';
 
 export class CreateUserDto extends OmitType(UserDto, ['id'] as const) {
   @Length(8, 32)

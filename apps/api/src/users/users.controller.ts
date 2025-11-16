@@ -1,8 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { CreateUserDto, FindOneParams, UserDto } from './dto';
 import { UsersService } from './users.service';
-import { UserDto, CreateUserDto } from './dto';
-import { ApiTags, ApiOperation, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
-import { FindOneParams } from './dto/find-one-params.dto';
 
 @ApiTags('users')
 @Controller('users')

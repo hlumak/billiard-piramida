@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DrizzleService } from '../drizzle/drizzle.service';
-import { UserDto, CreateUserDto } from './dto';
-import { users } from '../drizzle/schema';
-import { eq } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
+import { eq } from 'drizzle-orm';
+import { DrizzleService } from '../drizzle/drizzle.service';
+import { users } from '../drizzle/schema';
+import { CreateUserDto, UserDto } from './dto';
 
 @Injectable()
 export class UsersService {
@@ -36,6 +36,6 @@ export class UsersService {
         ...user,
         password
       })
-      .onConflictDoUpdate({ target: users.phone, set: { ...user } });
+      .onConflictDoUpdate({ target: users.phone, set: { ...user, password } });
   }
 }
