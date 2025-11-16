@@ -30,12 +30,16 @@ export class UsersService {
       password = await bcrypt.hash(password, saltOrRounds);
     }
 
+    const newUser = {
+      ...user,
+      password
+    };
+
     await this.drizzle.db
       .insert(users)
       .values({
-        ...user,
-        password
+        ...newUser
       })
-      .onConflictDoUpdate({ target: users.phone, set: { ...user, password } });
+      .onConflictDoUpdate({ target: users.phone, set: { ...newUser } });
   }
 }
