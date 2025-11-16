@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UserDto, CreateUserDto } from './dto';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { FindOneParams } from './dto/find-one-params.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -16,6 +17,16 @@ export class UsersController {
   })
   async findAll(): Promise<UserDto[]> {
     return this.usersService.findAll();
+  }
+
+  @Get(':phone')
+  @ApiOperation({ summary: 'Get one user by phone' })
+  @ApiOkResponse({
+    description: 'One user object',
+    type: UserDto
+  })
+  async findOne(@Param() params: FindOneParams): Promise<UserDto> {
+    return this.usersService.findOne(params.phone);
   }
 
   @Post()

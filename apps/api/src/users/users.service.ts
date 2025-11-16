@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DrizzleService } from '../drizzle/drizzle.service';
 import { UserDto, CreateUserDto } from './dto';
-import { users } from 'src/drizzle/schema';
+import { users } from '../drizzle/schema';
+import { eq } from 'drizzle-orm';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -11,7 +13,29 @@ export class UsersService {
     return this.drizzle.db.query.users.findMany();
   }
 
+  async findOne(phone: string): Promise<UserDto> {
+    const user = await this.drizzle.db.query.users.findFirst({
+      where: eq(users.phone, phone)
+    });
+    if (!user) {
+      throw new NotFoundException();
+    }
+    return user;
+  }
+
   async create(user: CreateUserDto): Promise<void> {
-    await this.drizzle.db.insert(users).values(user);
+    let { password } = user;
+    if (password) {
+      const saltOrRounds = 10;
+      password = await bcrypt.hash(password, saltOrRounds);
+    }
+
+    await this.drizzle.db
+      .insert(users)
+      .values({
+        ...user,
+        password
+      })
+      .onConflictDoUpdate({ target: users.phone, set: { ...user } });
   }
 }

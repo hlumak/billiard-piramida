@@ -14,7 +14,6 @@ export class UserDto {
   @ApiProperty({ description: 'User password', example: 'hashedPassword123' })
   @IsOptional()
   @IsString()
-  @Length(8, 32)
   password: string | null;
 
   @ApiProperty({ description: 'User name', example: 'John', nullable: true })
