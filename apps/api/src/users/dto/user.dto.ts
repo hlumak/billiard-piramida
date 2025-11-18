@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, Length } from 'class-validator';
+import { IsDate, IsOptional, IsString, Length } from 'class-validator';
 
 export class UserDto {
   @ApiProperty({ description: 'User ID', example: 1 })
@@ -11,7 +11,7 @@ export class UserDto {
   @Length(10, 15)
   phone: string;
 
-  @ApiProperty({ description: 'User password', example: 'hashedPassword123' })
+  @ApiProperty({ description: 'User password', example: 'hashedPassword123', nullable: true })
   @IsOptional()
   @IsString()
   password: string | null;
@@ -21,4 +21,12 @@ export class UserDto {
   @IsString()
   @Length(2, 75)
   name: string | null;
+
+  @ApiProperty({ description: 'User creation date' })
+  @IsDate()
+  createdAt: Date;
+
+  @ApiProperty({ description: 'User update date' })
+  @IsDate()
+  updatedAt: Date;
 }
