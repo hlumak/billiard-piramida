@@ -6,10 +6,10 @@ export const tables = pgTable(
   'tables',
   {
     id: serial().primaryKey(),
-    number: integer().notNull().unique(),
+    tableNumber: integer('table_number').notNull().unique(),
     isActive: boolean('is_active').notNull().default(true)
   },
-  table => [check('tables_number_check', sql`${table.number} > 0`)]
+  table => [check('tables_number_check', sql`${table.tableNumber} > 0`)]
 );
 
 export const tablesRelations = relations(tables, ({ many }) => ({

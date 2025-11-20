@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { check, decimal, index, integer, pgTable, serial, timestamp } from 'drizzle-orm/pg-core';
+import { check, index, integer, numeric, pgTable, serial, timestamp } from 'drizzle-orm/pg-core';
 import { bookings } from '../schema';
 
 export const bookingExtensions = pgTable(
@@ -10,7 +10,11 @@ export const bookingExtensions = pgTable(
       .notNull()
       .references(() => bookings.id, { onDelete: 'cascade' }),
     extensionDuration: integer('extension_duration').notNull(),
-    extensionPrice: decimal('extension_price', { precision: 10, scale: 2 }).notNull(),
+    extensionPrice: numeric('extension_price', {
+      mode: 'number',
+      precision: 7,
+      scale: 2
+    }).notNull(),
     extendedAt: timestamp('extended_at').notNull().defaultNow()
   },
   table => [

@@ -1,9 +1,9 @@
 import { relations, sql } from 'drizzle-orm';
 import {
   check,
-  decimal,
   index,
   integer,
+  numeric,
   pgTable,
   serial,
   timestamp,
@@ -24,7 +24,7 @@ export const bookings = pgTable(
     time: timestamp().notNull(),
     originalDuration: integer('original_duration').notNull(),
     currentDuration: integer('current_duration').notNull(),
-    totalPrice: decimal('total_price', { precision: 10, scale: 2 }).notNull(),
+    totalPrice: numeric('total_price', { mode: 'number', precision: 7, scale: 2 }).notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow()
   },

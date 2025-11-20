@@ -8,29 +8,29 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get()
   @ApiOperation({ summary: 'Get all users' })
   @ApiOkResponse({
     description: 'List of all users',
     type: [UserDto]
   })
+  @Get()
   async findAll(): Promise<UserDto[]> {
     return this.usersService.findAll();
   }
 
-  @Get(':phone')
   @ApiOperation({ summary: 'Get one user by phone' })
   @ApiOkResponse({
     description: 'One user object',
     type: UserDto
   })
+  @Get(':phone')
   async findOne(@Param() params: FindOneParams): Promise<UserDto> {
     return this.usersService.findOne(params.phone);
   }
 
-  @Post()
   @ApiOperation({ summary: 'Create user' })
   @ApiCreatedResponse({ description: 'The user has has been successfully created' })
+  @Post()
   async create(@Body() user: CreateUserDto): Promise<void> {
     await this.usersService.create(user);
   }

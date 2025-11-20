@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsDate, IsOptional, IsString, Length } from 'class-validator';
 
 export class UserDto {
-  @ApiProperty({ description: 'User ID', example: 1 })
+  @ApiProperty({ description: 'User ID', example: '01231231-1234-5678-ab90-12a34b567c89' })
   @IsString()
   id: string;
 
@@ -14,13 +14,13 @@ export class UserDto {
   @ApiProperty({ description: 'User password', example: 'hashedPassword123', nullable: true })
   @IsOptional()
   @IsString()
-  password: string | null;
+  password?: string | null;
 
   @ApiProperty({ description: 'User name', example: 'John', nullable: true })
   @IsOptional()
   @IsString()
   @Length(2, 75)
-  name: string | null;
+  name?: string | null;
 
   @ApiProperty({ description: 'User creation date' })
   @IsDate()

@@ -18,7 +18,7 @@ export class UsersService {
       where: eq(users.phone, phone)
     });
     if (!user) {
-      throw new NotFoundException();
+      throw new NotFoundException('User is not found');
     }
     return user;
   }

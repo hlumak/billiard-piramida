@@ -1,9 +1,9 @@
 import { relations, sql } from 'drizzle-orm';
 import {
   check,
-  decimal,
   index,
   integer,
+  numeric,
   pgTable,
   serial,
   timestamp,
@@ -16,7 +16,7 @@ export const food = pgTable(
   {
     id: serial().primaryKey(),
     name: varchar({ length: 100 }).notNull(),
-    price: decimal({ precision: 10, scale: 2 }).notNull(),
+    price: numeric({ mode: 'number', precision: 7, scale: 2 }).notNull(),
     quantity: integer().notNull().default(0),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow()
