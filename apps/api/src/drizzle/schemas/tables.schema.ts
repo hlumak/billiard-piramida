@@ -1,6 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import { boolean, check, integer, pgTable, serial } from 'drizzle-orm/pg-core';
-import { bookings } from '../schema';
+import { bookingExtensions, bookings } from '../schema';
 
 export const tables = pgTable(
   'tables',
@@ -13,5 +13,7 @@ export const tables = pgTable(
 );
 
 export const tablesRelations = relations(tables, ({ many }) => ({
-  bookings: many(bookings)
+  bookings: many(bookings),
+  extensionsAsOldTable: many(bookingExtensions, { relationName: 'oldTable' }),
+  extensionsAsNewTable: many(bookingExtensions, { relationName: 'newTable' })
 }));
