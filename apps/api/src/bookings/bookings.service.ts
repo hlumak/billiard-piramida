@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { eq } from 'drizzle-orm';
+import dayjs from 'dayjs';
+import { and, between, eq } from 'drizzle-orm';
 import { DrizzleService } from 'src/drizzle/drizzle.service';
 import { bookingFood, bookings } from 'src/drizzle/schema';
 import { FoodService } from 'src/food/food.service';
+import { AvailableTimeBody } from './dto/available-time-body.dto';
 import { BookingDto } from './dto/booking.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 
@@ -21,6 +23,66 @@ export class BookingsService {
       throw new Error('BOOKING_PRICE must be a valid number and greater than 0');
     }
     this.bookingPrice = price;
+  }
+
+  async findAvailableBookingTime(availableTimeBody: AvailableTimeBody): Promise<Date[]> {
+    const now = dayjs();
+    const startOfToday = now.startOf('day').toDate();
+    const endOfToday = now.endOf('day').toDate();
+
+    const bookingStartTime = this.configService.getOrThrow<string>('BOOKING_START_TIME');
+    const bookingEndTime = this.configService.getOrThrow<string>('BOOKING_END_TIME');
+
+    const [startHour, startMinute] = bookingStartTime.split(':').map(Number);
+    const [endHour, endMinute] = bookingEndTime.split(':').map(Number);
+
+    const bookingStart = now.hour(startHour).minute(startMinute).second(0).millisecond(0);
+    const bookingEnd = now.hour(endHour).minute(endMinute).second(0).millisecond(0);
+
+    const todayBookings = await this.drizzle.db.query.bookings.findMany({
+      columns: {
+        time: true,
+        currentDuration: true
+      },
+      where: and(
+        eq(bookings.tableId, availableTimeBody.tableId),
+        between(bookings.time, startOfToday, endOfToday)
+      )
+    });
+
+    const occupiedRanges: Array<{ start: Date; end: Date }> = todayBookings.map(booking => {
+      const startTime = dayjs(booking.time);
+      const endTime = startTime.add(booking.currentDuration, 'minute');
+      return {
+        start: startTime.toDate(),
+        end: endTime.toDate()
+      };
+    });
+
+    const availableSlots: Date[] = [];
+    let currentSlot = bookingStart;
+
+    while (currentSlot.isBefore(bookingEnd) || currentSlot.isSame(bookingEnd, 'hour')) {
+      const slotTime = currentSlot.toDate();
+      slotTime.setHours(slotTime.getHours() + 1);
+      const slotStart = dayjs(slotTime);
+      const slotEnd = slotStart.add(1, 'hour');
+
+      const isAvailable = !occupiedRanges.some(range => {
+        const rangeStart = dayjs(range.start);
+        const rangeEnd = dayjs(range.end);
+
+        return slotStart.isBefore(rangeEnd) && slotEnd.isAfter(rangeStart);
+      });
+
+      if (isAvailable) {
+        availableSlots.push(slotTime);
+      }
+
+      currentSlot = currentSlot.add(1, 'hour');
+    }
+
+    return availableSlots;
   }
 
   async findAll(): Promise<BookingDto[]> {

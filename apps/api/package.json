@@ -33,6 +33,7 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "dayjs": "^1.11.19",
     "drizzle-orm": "^0.44.7",
     "nestjs-ultimate-express": "^1.0.0",
     "pg": "^8.16.3",
