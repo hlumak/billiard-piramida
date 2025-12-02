@@ -11,8 +11,8 @@
   "keywords": [],
   "author": "hlumak",
   "license": "MIT",
-  "packageManager": "pnpm@10.23.0",
+  "packageManager": "pnpm@10.24.0",
   "devDependencies": {
-    "prettier": "^3.6.2"
+    "prettier": "^3.7.3"
   }
 }
