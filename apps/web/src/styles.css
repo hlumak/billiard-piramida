@@ -1,0 +1,96 @@
+@import './fonts.css';
+@import 'tailwindcss';
+@import '@heroui/styles';
+
+@theme {
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-brand: 'Galada', cursive;
+  --font-script: 'Great Vibes', cursive;
+  --font-alt: 'Montserrat Alternates', sans-serif;
+
+  --color-golden: #feaa00;
+  --color-golden-hover: #ffb732;
+  --color-creme: #f9f9e1;
+  --color-deep-cream: #dbdabc;
+  --color-club-green: #0b4e31;
+  --color-club-green-light: #176b47;
+  --color-btn-text: #373328;
+  --color-grey-warm: #585650;
+  --color-grey-cool: #b2b2b2;
+}
+
+/* Single dark-green club theme (Figma "pyramida 2" tokens) */
+:root,
+[data-theme='light'],
+[data-theme='dark'] {
+  --radius: 0.625rem; /* 10px per Figma buttons */
+
+  --background: #0b4e31;
+  --foreground: #f9f9e1;
+
+  --surface: #176b47;
+  --surface-foreground: #f9f9e1;
+  --surface-secondary: #135c3d;
+  --surface-secondary-foreground: #f9f9e1;
+  --surface-tertiary: #0f5236;
+  --surface-tertiary-foreground: #f9f9e1;
+
+  --overlay: #135c3d;
+  --overlay-foreground: #f9f9e1;
+
+  --default: #176b47;
+  --default-foreground: #f9f9e1;
+
+  --accent: #feaa00;
+  --accent-foreground: #373328;
+  --accent-hover: #ffb732;
+
+  --muted: #b2b2b2;
+  --scrollbar: #176b47;
+
+  --field-background: #176b47;
+  --field-foreground: #f9f9e1;
+  --field-placeholder: #b2b2b2;
+  --field-border: transparent;
+
+  --segment: #176b47;
+  --segment-foreground: #f9f9e1;
+
+  --border: color-mix(in oklab, #dbdabc 40%, transparent);
+  --separator: color-mix(in oklab, #dbdabc 30%, transparent);
+  --focus: #feaa00;
+  --link: #feaa00;
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --background-inverse: #f9f9e1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Brand wordmark — Galada is Latin-only; "piramida" stays Latin in all locales */
+.brand-title {
+  font-family: var(--font-brand);
+  color: var(--color-golden);
+  text-shadow: 3px 0 1.8px rgba(215, 23, 23, 0.4);
+}
+
+/* Script page titles ("booking", "prices"…) — Great Vibes, Latin-only, English in all locales */
+.page-title {
+  font-family: var(--font-script);
+  color: var(--color-golden);
+  text-shadow: 3px 0 4px rgba(0, 0, 0, 0.4);
+}

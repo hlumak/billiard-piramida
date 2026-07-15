@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "oxc"],
+  "jsPlugins": [{ "name": "react-doctor", "specifier": "oxlint-plugin-react-doctor" }],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "rules": {
+    "no-console": "off",
+    "react/react-in-jsx-scope": "off",
+    "no-await-in-loop": "off",
+    "import/no-named-as-default-member": "off",
+    "oxc/no-async-endpoint-handlers": "off",
+    "react-doctor/no-fetch-in-effect": "warn",
+    "react-doctor/no-derived-state": "warn"
+  },
+  "ignorePatterns": [
+    ".claude/**",
+    "**/routeTree.gen.ts",
+    "**/paraglide/**",
+    "**/dist/**",
+    "**/.output/**",
+    "**/drizzle/**"
+  ]
+}

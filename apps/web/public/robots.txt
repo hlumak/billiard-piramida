@@ -1,0 +1,9 @@
+# Replace piramida-club.example with the production domain before deploy
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /book
+Disallow: /booking/
+Disallow: /bookings
+
+Sitemap: https://piramida-club.example/sitemap.xml

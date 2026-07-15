@@ -1,0 +1,100 @@
+import { useEffect, useState } from 'react';
+import { Button, Spinner } from '@heroui/react';
+import { useQueryClient } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
+import { AnimatePresence, m as motion } from '../components/motion';
+import { PageHeader } from '../components/AppHeader';
+import { AdminBookings } from '../components/admin/AdminBookings';
+import { AdminCustomers } from '../components/admin/AdminCustomers';
+import { AdminLogin } from '../components/admin/AdminLogin';
+import { AdminOverview } from '../components/admin/AdminOverview';
+import { clearAdminToken, storedAdminToken } from '../lib/admin-api';
+import { m } from '../paraglide/messages.js';
+import { noindexMeta } from '../lib/seo';
+
+export const Route = createFileRoute('/admin')({
+  head: () => ({ meta: noindexMeta('admin — piramida') }),
+  component: AdminPage
+});
+
+const TABS = [
+  { id: 'overview', label: m.admin_tab_overview },
+  { id: 'bookings', label: m.admin_tab_bookings },
+  { id: 'customers', label: m.admin_tab_customers }
+] as const;
+
+type TabId = (typeof TABS)[number]['id'];
+
+function AdminPage() {
+  const queryClient = useQueryClient();
+  // sessionStorage is browser-only; read after mount so SSR and hydration agree
+  const [token, setToken] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [tab, setTab] = useState<TabId>('overview');
+
+  useEffect(() => {
+    setToken(storedAdminToken());
+    setReady(true);
+  }, []);
+
+  const logout = () => {
+    clearAdminToken();
+    queryClient.removeQueries({ queryKey: ['admin'] });
+    setToken(null);
+  };
+
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-6 pb-10 pt-14 lg:max-w-5xl">
+      <PageHeader title="admin" />
+      <main className="mt-8 flex-1">
+        {!ready ? (
+          <div className="flex justify-center py-16">
+            <Spinner aria-label={m.loading()} />
+          </div>
+        ) : token == null ? (
+          <AdminLogin onSuccess={setToken} />
+        ) : (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div role="tablist" className="flex gap-2">
+                {TABS.map(entry => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === entry.id}
+                    onClick={() => setTab(entry.id)}
+                    className={`h-10 rounded-[10px] px-4 font-semibold transition-colors ${
+                      tab === entry.id
+                        ? 'bg-golden text-btn-text'
+                        : 'bg-club-green-light text-creme hover:bg-surface-hover'
+                    }`}
+                  >
+                    {entry.label()}
+                  </button>
+                ))}
+              </div>
+              <Button variant="ghost" size="sm" onPress={logout}>
+                {m.admin_logout()}
+              </Button>
+            </div>
+
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                {tab === 'overview' ? <AdminOverview token={token} /> : null}
+                {tab === 'bookings' ? <AdminBookings token={token} /> : null}
+                {tab === 'customers' ? <AdminCustomers token={token} /> : null}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

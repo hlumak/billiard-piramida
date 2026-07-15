@@ -1,0 +1,29 @@
+{
+  "name": "billiard-piramida",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "dev:api": "pnpm --filter @repo/api dev",
+    "dev:web": "pnpm --filter @repo/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "oxlint .",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "db:generate": "pnpm --filter @repo/api db:generate",
+    "db:migrate": "pnpm --filter @repo/api db:migrate",
+    "db:seed": "pnpm --filter @repo/api db:seed"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.59.0",
+    "oxlint": "^1.74.0",
+    "oxlint-plugin-react-doctor": "^0.7.7",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "packageManager": "pnpm@11.13.0"
+}

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.output/
+.nitro/
+.tanstack/
+*.local
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage/
+apps/web/src/routeTree.gen.ts
+apps/web/src/paraglide/
+ts1.txt
+transcript.txt
