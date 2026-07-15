@@ -1,12 +1,16 @@
 import { Type, type Static } from '@sinclair/typebox';
 import type {
+  AdminAnalyticsDto,
   AdminCustomerDto,
+  AdminMenuItemDto,
   AdminStatsDto,
+  AuthResponseDto,
   AvailabilityDto,
   BookingDto,
   IsoDate,
   MenuItemDto,
-  TableDto
+  TableDto,
+  UserProfileDto
 } from '@repo/shared';
 
 /**
@@ -77,7 +81,75 @@ export const BOOKING_RESPONSE = Type.Object({
   ),
   tableTotalGrosz: Type.Integer(),
   foodTotalGrosz: Type.Integer(),
+  discountGrosz: Type.Integer(),
   totalGrosz: Type.Integer()
+});
+
+export const LOCALE_SCHEMA = Type.Union([
+  Type.Literal('uk'),
+  Type.Literal('pl'),
+  Type.Literal('en')
+]);
+
+export const MENU_TRANSLATION = Type.Object({
+  locale: LOCALE_SCHEMA,
+  name: Type.String(),
+  description: Type.Union([Type.String(), Type.Null()])
+});
+
+export const ADMIN_MENU_ITEM_RESPONSE = Type.Object({
+  id: Type.Integer(),
+  slug: Type.String(),
+  category: Type.String(),
+  priceGrosz: Type.Integer(),
+  name: Type.String(),
+  description: Type.Union([Type.String(), Type.Null()]),
+  isAvailable: Type.Boolean(),
+  translations: Type.Array(MENU_TRANSLATION)
+});
+
+export const ADMIN_ANALYTICS_RESPONSE = Type.Object({
+  days: Type.Integer(),
+  daily: Type.Array(
+    Type.Object({
+      date: ISO_DATE,
+      bookings: Type.Integer(),
+      revenueGrosz: Type.Integer()
+    })
+  ),
+  tables: Type.Array(
+    Type.Object({
+      tableId: Type.Integer(),
+      bookedHours: Type.Number(),
+      openHours: Type.Number()
+    })
+  ),
+  startHours: Type.Array(
+    Type.Object({
+      hour: Type.Integer(),
+      bookings: Type.Integer()
+    })
+  )
+});
+
+export const SPORT_CARD_TYPE = Type.Union([
+  Type.Literal('multisport'),
+  Type.Literal('medicover'),
+  Type.Literal('fitprofit')
+]);
+
+export const PROFILE_RESPONSE = Type.Object({
+  id: Type.String(),
+  phone: Type.String(),
+  name: Type.String(),
+  sportCardType: Type.Union([SPORT_CARD_TYPE, Type.Null()]),
+  sportCardNumber: Type.Union([Type.String(), Type.Null()]),
+  clubCardNumber: Type.Union([Type.String(), Type.Null()])
+});
+
+export const AUTH_RESPONSE = Type.Object({
+  token: Type.String(),
+  profile: PROFILE_RESPONSE
 });
 
 export const ADMIN_CUSTOMER_RESPONSE = Type.Object({
@@ -117,5 +189,9 @@ export type SchemaDriftChecks = [
   Expect<Equals<Static<typeof MENU_ITEM_RESPONSE>, MenuItemDto>>,
   Expect<Equals<Static<typeof BOOKING_RESPONSE>, BookingDto>>,
   Expect<Equals<Static<typeof ADMIN_CUSTOMER_RESPONSE>, AdminCustomerDto>>,
-  Expect<Equals<Static<typeof ADMIN_STATS_RESPONSE>, AdminStatsDto>>
+  Expect<Equals<Static<typeof ADMIN_STATS_RESPONSE>, AdminStatsDto>>,
+  Expect<Equals<Static<typeof PROFILE_RESPONSE>, UserProfileDto>>,
+  Expect<Equals<Static<typeof AUTH_RESPONSE>, AuthResponseDto>>,
+  Expect<Equals<Static<typeof ADMIN_ANALYTICS_RESPONSE>, AdminAnalyticsDto>>,
+  Expect<Equals<Static<typeof ADMIN_MENU_ITEM_RESPONSE>, AdminMenuItemDto>>
 ];

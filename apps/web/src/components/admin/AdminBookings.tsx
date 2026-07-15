@@ -1,15 +1,23 @@
-import { useState } from 'react';
-import { Spinner } from '@heroui/react';
-import type { IsoDate } from '@repo/shared';
-import { useQuery } from '@tanstack/react-query';
-import { formatPln, type BookingStatus } from '@repo/shared';
-import { adminBookingsQuery, type AdminBookingFilters } from '../../lib/admin-api';
-import { intlTag, warsawDate, warsawTime } from '../../lib/format';
+import { useEffect, useState } from 'react';
+import { Button, Input, Spinner } from '@heroui/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  formatPln,
+  hoursForDate,
+  type BookingDto,
+  type BookingStatus,
+  type IsoDate
+} from '@repo/shared';
+import { adminApi, adminBookingsQuery, type AdminBookingFilters } from '../../lib/admin-api';
+import { api } from '../../lib/api';
+import { formatPhone } from '@repo/shared/phone';
+import { intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
-import { StaggerGroup, StaggerItem } from '../motion';
 import { QueryError } from '../QueryError';
-import { AdminDatePicker } from './AdminDatePicker';
+import { StaggerGroup, StaggerItem } from '../motion';
 import { PHASE_LABELS, PHASE_STYLES } from '../booking/phase';
+import { AdminDatePicker } from './AdminDatePicker';
+import { AdminNewBooking } from './AdminNewBooking';
 
 const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[] = [
   { value: undefined, label: m.admin_all_statuses },
@@ -17,11 +25,71 @@ const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[
   { value: 'cancelled', label: m.phase_cancelled }
 ];
 
-export function AdminBookings({ token }: { token: string }) {
+function RowActions({ token, booking }: { token: string; booking: BookingDto }) {
+  const queryClient = useQueryClient();
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin'] });
+
+  const extend = useMutation({
+    mutationFn: () => api.extendBooking(booking.id, 1),
+    onSuccess: invalidate
+  });
+  const cancel = useMutation({
+    mutationFn: () => adminApi.cancelBooking(token, booking.id),
+    onSuccess: invalidate
+  });
+
+  if (booking.phase !== 'upcoming' && booking.phase !== 'active') return null;
+  // Hide +1h when it would run past closing time (the API would reject it)
+  const closeHour = hoursForDate(warsawDate(booking.startsAt)).close;
+  const canExtend = warsawHour(booking.endsAt) < closeHour;
+  return (
+    <div className="flex gap-1.5">
+      {canExtend ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-golden text-creme"
+          isPending={extend.isPending}
+          onPress={() => extend.mutate()}
+        >
+          {m.admin_extend_1h()}
+        </Button>
+      ) : null}
+      <Button
+        size="sm"
+        variant="danger-soft"
+        isPending={cancel.isPending}
+        onPress={() => cancel.mutate()}
+      >
+        {m.phase_cancelled()}
+      </Button>
+    </div>
+  );
+}
+
+export function AdminBookings({
+  token,
+  initialPhone = ''
+}: {
+  token: string;
+  initialPhone?: string;
+}) {
   const [date, setDate] = useState<IsoDate | undefined>(undefined);
   const [status, setStatus] = useState<BookingStatus | undefined>(undefined);
+  const [phoneInput, setPhoneInput] = useState(initialPhone);
+  const [phone, setPhone] = useState(initialPhone);
 
-  const filters: AdminBookingFilters = { date, status };
+  // Debounce the phone search so we don't refetch per keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setPhone(phoneInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [phoneInput]);
+
+  const filters: AdminBookingFilters = {
+    date,
+    status,
+    phone: phone !== '' ? phone : undefined
+  };
   const {
     data: bookings,
     isPending,
@@ -49,6 +117,16 @@ export function AdminBookings({ token }: { token: string }) {
               {filter.label()}
             </button>
           ))}
+        </div>
+        <Input
+          aria-label={m.admin_search_phone()}
+          placeholder={m.admin_search_phone()}
+          value={phoneInput}
+          onChange={event => setPhoneInput(event.target.value)}
+          className="w-44"
+        />
+        <div className="ml-auto">
+          <AdminNewBooking token={token} />
         </div>
       </div>
 
@@ -83,23 +161,29 @@ export function AdminBookings({ token }: { token: string }) {
                     </div>
                     <span className="font-bold text-golden">
                       {formatPln(booking.totalGrosz, intlTag())}
+                      {booking.discountGrosz > 0 ? (
+                        <span className="ml-1 text-xs font-medium text-grey-cool">
+                          (−{formatPln(booking.discountGrosz, intlTag())})
+                        </span>
+                      ) : null}
                     </span>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span className="text-creme">
                       {booking.customerName} ·{' '}
                       <a
                         href={`tel:${booking.customerPhone.replaceAll(' ', '')}`}
                         className="text-golden hover:underline"
                       >
-                        {booking.customerPhone}
+                        {formatPhone(booking.customerPhone)}
                       </a>
+                      {booking.items.length > 0 ? (
+                        <span className="ml-2 text-xs text-grey-cool">
+                          {booking.items.map(item => `${item.slug} × ${item.quantity}`).join(', ')}
+                        </span>
+                      ) : null}
                     </span>
-                    {booking.items.length > 0 ? (
-                      <span className="text-xs text-grey-cool">
-                        {booking.items.map(item => `${item.slug} × ${item.quantity}`).join(', ')}
-                      </span>
-                    ) : null}
+                    <RowActions token={token} booking={booking} />
                   </div>
                 </li>
               </StaggerItem>

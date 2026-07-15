@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { ButtonLink } from '../components/ButtonLink';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { Reveal, StaggerGroup, StaggerItem } from '../components/motion';
@@ -11,8 +11,17 @@ export const Route = createFileRoute('/menu')({
 });
 
 function MenuPage() {
+  const navigate = useNavigate();
+
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-club-green">
+    // Tapping empty space closes the menu (links/buttons keep working normally)
+    <div
+      className="relative min-h-dvh overflow-hidden bg-club-green"
+      onClick={event => {
+        if ((event.target as HTMLElement).closest('a, button')) return;
+        navigate({ to: '/' });
+      }}
+    >
       <img
         src="/hero-bg-mobile.webp"
         srcSet="/hero-bg-mobile.webp 428w, /hero-bg-desktop.webp 752w"

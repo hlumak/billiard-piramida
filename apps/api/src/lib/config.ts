@@ -12,6 +12,8 @@ export interface ApiConfig {
   allowedOrigins: string[] | undefined;
   /** Shared secret for /api/admin; admin stays disabled (503) when unset. */
   adminToken: string | undefined;
+  /** JWT signing secret; accounts/auth stay disabled (503) when unset. */
+  jwtSecret: string | undefined;
 }
 
 /** Fail fast: a missing DATABASE_URL must never silently fall back to localhost. */
@@ -26,6 +28,7 @@ export function loadConfig(): ApiConfig {
     host: process.env.API_HOST ?? '0.0.0.0',
     logLevel: process.env.LOG_LEVEL ?? 'info',
     allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()),
-    adminToken: process.env.ADMIN_TOKEN
+    adminToken: process.env.ADMIN_TOKEN,
+    jwtSecret: process.env.JWT_SECRET
   };
 }

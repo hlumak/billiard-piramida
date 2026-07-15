@@ -9,9 +9,11 @@ export function HomeHeader() {
       <Link to="/menu" aria-label={m.nav_menu()} className="text-golden hover:text-golden-hover">
         <Menu className="size-8" strokeWidth={2.5} />
       </Link>
-      <span className="brand-title text-4xl leading-none md:text-5xl">piramida</span>
+      <Link to="/" className="brand-title text-4xl leading-none md:text-5xl">
+        piramida
+      </Link>
       <Link
-        to="/bookings"
+        to="/profile"
         aria-label={m.nav_my_bookings()}
         className="text-golden hover:text-golden-hover"
       >
@@ -41,7 +43,7 @@ export function PageHeader({ title, onBack }: { title: string; onBack?: () => vo
       )}
       <h1 className="page-title text-5xl leading-none md:text-6xl">{title}</h1>
       <Link
-        to="/bookings"
+        to="/profile"
         aria-label={m.nav_my_bookings()}
         className="flex size-8 items-center justify-center rounded-lg bg-creme text-club-green hover:bg-deep-cream"
       >

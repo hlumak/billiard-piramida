@@ -7,7 +7,9 @@ import { PageHeader } from '../components/AppHeader';
 import { AdminBookings } from '../components/admin/AdminBookings';
 import { AdminCustomers } from '../components/admin/AdminCustomers';
 import { AdminLogin } from '../components/admin/AdminLogin';
+import { AdminMenu } from '../components/admin/AdminMenu';
 import { AdminOverview } from '../components/admin/AdminOverview';
+import { AdminStats } from '../components/admin/AdminStats';
 import { clearAdminToken, storedAdminToken } from '../lib/admin-api';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
@@ -19,8 +21,10 @@ export const Route = createFileRoute('/admin')({
 
 const TABS = [
   { id: 'overview', label: m.admin_tab_overview },
+  { id: 'stats', label: m.admin_tab_stats },
   { id: 'bookings', label: m.admin_tab_bookings },
-  { id: 'customers', label: m.admin_tab_customers }
+  { id: 'customers', label: m.admin_tab_customers },
+  { id: 'menu', label: m.admin_tab_menu }
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -31,6 +35,12 @@ function AdminPage() {
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<TabId>('overview');
+  const [bookingsPhone, setBookingsPhone] = useState('');
+
+  const showCustomerBookings = (phone: string) => {
+    setBookingsPhone(phone);
+    setTab('bookings');
+  };
 
   useEffect(() => {
     setToken(storedAdminToken());
@@ -88,8 +98,14 @@ function AdminPage() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
               >
                 {tab === 'overview' ? <AdminOverview token={token} /> : null}
-                {tab === 'bookings' ? <AdminBookings token={token} /> : null}
-                {tab === 'customers' ? <AdminCustomers token={token} /> : null}
+                {tab === 'stats' ? <AdminStats token={token} /> : null}
+                {tab === 'bookings' ? (
+                  <AdminBookings key={bookingsPhone} token={token} initialPhone={bookingsPhone} />
+                ) : null}
+                {tab === 'customers' ? (
+                  <AdminCustomers token={token} onShowBookings={showCustomerBookings} />
+                ) : null}
+                {tab === 'menu' ? <AdminMenu token={token} /> : null}
               </motion.div>
             </AnimatePresence>
           </div>

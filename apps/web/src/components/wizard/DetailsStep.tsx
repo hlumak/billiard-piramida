@@ -3,16 +3,17 @@ import { useForm } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { formatPln, tablePriceGrosz, type IsoDate } from '@repo/shared';
+import { discountGroszFor, formatPln, tablePriceGrosz, type IsoDate } from '@repo/shared';
+import { isValidPhone } from '@repo/shared/phone';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { ApiError, api } from '../../lib/api';
 import { formatDayLong, formatHour, intlTag } from '../../lib/format';
 import { availabilityQuery, bookingQuery, menuQuery } from '../../lib/queries';
 import { rememberBooking } from '../../lib/recent-bookings';
+import { profileQuery } from '../../lib/auth';
+import { Link } from '@tanstack/react-router';
 import { goToStep, resetWizard, wizardStore } from '../../store/booking-wizard';
-
-const PHONE_RE = /^\+?[\d\s()-]{5,24}$/;
 
 /** All picks made in earlier steps — non-null by construction (see book.tsx). */
 export interface BookingDraft {
@@ -27,6 +28,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const queryClient = useQueryClient();
   const items = useStore(wizardStore, state => state.items);
   const { data: menu } = useQuery(menuQuery(getLocale()));
+  const { data: profile } = useQuery(profileQuery());
 
   const orderLines = Object.entries(items)
     .map(([foodItemId, quantity]) => {
@@ -37,6 +39,8 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
   const tableTotal = tablePriceGrosz(draft.durationHours);
   const foodTotal = orderLines.reduce((sum, line) => sum + line.item.priceGrosz * line.quantity, 0);
+  // Preview only — the server recomputes and locks the discount in
+  const discount = profile ? discountGroszFor(profile, tableTotal) : 0;
 
   const createBooking = useMutation({
     mutationFn: api.createBooking,
@@ -55,7 +59,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   });
 
   const form = useForm({
-    defaultValues: { customerName: '', customerPhone: '' },
+    defaultValues: { customerName: profile?.name ?? '', customerPhone: profile?.phone ?? '' },
     onSubmit: ({ value }) => {
       createBooking.mutate({
         ...draft,
@@ -78,6 +82,11 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   return (
     <section>
       <h2 className="mb-4 text-xl font-semibold text-creme">{m.step_details_title()}</h2>
+      {!profile ? (
+        <Link to="/profile" className="mb-4 block text-sm text-golden hover:underline">
+          {m.auth_promo()}
+        </Link>
+      ) : null}
 
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-6">
         <div className="mb-6 rounded-[10px] bg-club-green-light p-4 md:mb-0">
@@ -114,9 +123,15 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
                 <span>{formatPln(line.item.priceGrosz * line.quantity, intlTag())}</span>
               </div>
             ))}
+            {discount > 0 ? (
+              <div className="flex justify-between text-creme">
+                <span className="text-grey-cool">{m.discount_label()}</span>
+                <span className="text-golden">−{formatPln(discount, intlTag())}</span>
+              </div>
+            ) : null}
             <div className="mt-2 flex justify-between text-base font-bold text-golden">
               <span>{m.total()}</span>
-              <span>{formatPln(tableTotal + foodTotal, intlTag())}</span>
+              <span>{formatPln(tableTotal + foodTotal - discount, intlTag())}</span>
             </div>
           </div>
         </div>
@@ -152,8 +167,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
           <form.Field
             name="customerPhone"
             validators={{
-              onSubmit: ({ value }) =>
-                PHONE_RE.test(value.trim()) ? undefined : m.err_phone_invalid()
+              onSubmit: ({ value }) => (isValidPhone(value) ? undefined : m.err_phone_invalid())
             }}
           >
             {field => (

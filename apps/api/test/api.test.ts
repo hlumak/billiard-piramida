@@ -34,7 +34,12 @@ before(async () => {
   await pool.end();
   await seed(TEST_URL);
 
-  app = await buildApp({ databaseUrl: TEST_URL, logger: false, adminToken: 'test-admin-token' });
+  app = await buildApp({
+    databaseUrl: TEST_URL,
+    logger: false,
+    adminToken: 'test-admin-token',
+    jwtSecret: 'test-jwt-secret'
+  });
   await app.ready();
 });
 
@@ -293,7 +298,7 @@ test('admin stats, bookings and customers respond with data', async () => {
 
   const customers = await app.inject({ method: 'GET', url: '/api/admin/customers', headers });
   assert.equal(customers.statusCode, 200);
-  const customer = customers.json().find((c: { phone: string }) => c.phone === '+48 700 800 900');
+  const customer = customers.json().find((c: { phone: string }) => c.phone === '+48700800900');
   assert.ok(customer);
   assert.equal(customer.name, 'Admin Test');
   assert.ok(customer.bookingsCount >= 1);
@@ -340,4 +345,338 @@ test('websocket subscribers hear availability changes', async () => {
 
   assert.ok(messages.length >= 1, 'expected an availability_changed message');
   assert.deepEqual(messages[0], { type: 'availability_changed', date: SATURDAY });
+});
+
+test('auth: register, login, profile update', async () => {
+  const registered = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: { phone: '+48 600 700 800', name: 'Auth Test', password: 'secret-pass-1' }
+  });
+  assert.equal(registered.statusCode, 201);
+  const { token, profile } = registered.json();
+  assert.ok(token.length > 20);
+  assert.equal(profile.sportCardType, null);
+
+  const dupe = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: { phone: '+48 600 700 800', name: 'Dupe', password: 'secret-pass-1' }
+  });
+  assert.equal(dupe.statusCode, 409);
+
+  const badLogin = await app.inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    payload: { phone: '+48 600 700 800', password: 'wrong-password' }
+  });
+  assert.equal(badLogin.statusCode, 401);
+
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    payload: { phone: '+48 600 700 800', password: 'secret-pass-1' }
+  });
+  assert.equal(login.statusCode, 200);
+
+  const auth = { authorization: `Bearer ${login.json().token}` };
+  const updated = await app.inject({
+    method: 'PATCH',
+    url: '/api/auth/me',
+    headers: auth,
+    payload: { sportCardType: 'multisport', sportCardNumber: 'MS-123456' }
+  });
+  assert.equal(updated.statusCode, 200);
+  assert.equal(updated.json().sportCardType, 'multisport');
+
+  const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: auth });
+  assert.equal(me.statusCode, 200);
+  assert.equal(me.json().sportCardNumber, 'MS-123456');
+
+  const anon = await app.inject({ method: 'GET', url: '/api/auth/me' });
+  assert.equal(anon.statusCode, 401);
+});
+
+test('discounts: sport card takes 15 zl off, club card 10%, guests none', async () => {
+  // Sport card holder — flat 15 zł off
+  const sport = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: {
+      phone: '+48 111 000 111',
+      name: 'Sport Card',
+      password: 'secret-pass-2',
+      sportCardType: 'medicover',
+      sportCardNumber: 'MC-1'
+    }
+  });
+  const sportToken = sport.json().token;
+  const sportBooking = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: { authorization: `Bearer ${sportToken}` },
+    payload: {
+      tableId: 4,
+      date: MONDAY,
+      startHour: 16,
+      durationHours: 2,
+      customerName: 'Sport Card',
+      customerPhone: '+48 111 000 111'
+    }
+  });
+  assert.equal(sportBooking.statusCode, 201);
+  const sportDto = sportBooking.json();
+  assert.equal(sportDto.discountGrosz, 15_00);
+  assert.equal(sportDto.totalGrosz, 2 * 40_00 - 15_00);
+
+  // Club card holder — 10% of table rental (3h × 40 = 120 → 12 zł < 15 zł flat...
+  // wait: club-only holder gets the 10%)
+  const club = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: {
+      phone: '+48 222 000 222',
+      name: 'Club Card',
+      password: 'secret-pass-3',
+      clubCardNumber: '0005'
+    }
+  });
+  const clubBooking = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: { authorization: `Bearer ${club.json().token}` },
+    payload: {
+      tableId: 4,
+      date: MONDAY,
+      startHour: 18,
+      durationHours: 3,
+      customerName: 'Club Card',
+      customerPhone: '+48 222 000 222'
+    }
+  });
+  assert.equal(clubBooking.statusCode, 201);
+  const clubDto = clubBooking.json();
+  assert.equal(clubDto.discountGrosz, Math.round(3 * 40_00 * 0.1));
+  assert.equal(clubDto.totalGrosz, 3 * 40_00 - 12_00);
+
+  // Guest — no discount
+  const guest = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 5,
+      date: MONDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Guest',
+      customerPhone: '+48 333 000 333'
+    }
+  });
+  assert.equal(guest.statusCode, 201);
+  assert.equal(guest.json().discountGrosz, 0);
+  assert.equal(guest.json().totalGrosz, 40_00);
+});
+
+test('admin CRM: create walk-in booking, staff cancel, analytics, menu patch', async () => {
+  const headers = { 'x-admin-token': 'test-admin-token' };
+
+  // Create a walk-in booking from the reception desk
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: 2,
+      date: SATURDAY,
+      startHour: 20,
+      durationHours: 1,
+      customerName: 'Walk In',
+      customerPhone: '+48 444 555 666'
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const dto = created.json();
+  assert.equal(dto.tableId, 2);
+
+  // Phone search finds it
+  const searched = await app.inject({
+    method: 'GET',
+    url: '/api/admin/bookings?phone=444555',
+    headers
+  });
+  assert.equal(searched.statusCode, 200);
+  assert.ok(searched.json().some((b: { id: string }) => b.id === dto.id));
+
+  // Staff cancel works on an upcoming booking
+  const cancelled = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${dto.id}/cancel`,
+    headers
+  });
+  assert.equal(cancelled.statusCode, 200);
+  assert.equal(cancelled.json().status, 'cancelled');
+
+  // Analytics: dense daily series + utilization + start hours
+  const analytics = await app.inject({
+    method: 'GET',
+    url: '/api/admin/analytics?days=14',
+    headers
+  });
+  assert.equal(analytics.statusCode, 200);
+  const stats = analytics.json();
+  assert.equal(stats.days, 14);
+  assert.equal(stats.daily.length, 14);
+  assert.equal(stats.tables.length, 5);
+  assert.ok(stats.tables.every((t: { openHours: number }) => t.openHours > 0));
+
+  // Menu management: price + availability round-trip
+  const menuBefore = await app.inject({ method: 'GET', url: '/api/menu?locale=uk' });
+  const fries = menuBefore.json().find((i: { slug: string }) => i.slug === 'fries');
+  const patched = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/menu/${fries.id}`,
+    headers,
+    payload: { priceGrosz: 17_00, isAvailable: false }
+  });
+  assert.equal(patched.statusCode, 200);
+  assert.equal(patched.json().priceGrosz, 17_00);
+
+  const menuAfter = await app.inject({ method: 'GET', url: '/api/menu?locale=uk' });
+  assert.ok(!menuAfter.json().some((i: { slug: string }) => i.slug === 'fries'));
+
+  // restore
+  await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/menu/${fries.id}`,
+    headers,
+    payload: { priceGrosz: 15_00, isAvailable: true }
+  });
+});
+
+test('admin menu CRUD: create with translations, edit, delete guard', async () => {
+  const headers = { 'x-admin-token': 'test-admin-token' };
+
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/menu',
+    headers,
+    payload: {
+      category: 'dessert',
+      priceGrosz: 22_00,
+      translations: [
+        { locale: 'uk', name: 'Тірамісу', description: 'Класичний десерт' },
+        { locale: 'pl', name: 'Tiramisu' },
+        { locale: 'en', name: 'Tiramisu' }
+      ]
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const dish = created.json();
+  assert.equal(dish.slug, 'tiramisu');
+  assert.equal(dish.translations.length, 3);
+
+  // Localized storefront picks it up
+  const menuPl = await app.inject({ method: 'GET', url: '/api/menu?locale=pl' });
+  assert.ok(menuPl.json().some((i: { name: string }) => i.name === 'Tiramisu'));
+
+  // Edit a translation + category
+  const patched = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/menu/${dish.id}`,
+    headers,
+    payload: {
+      category: 'snack',
+      translations: [{ locale: 'pl', name: 'Tiramisu klasyczne', description: 'Deser włoski' }]
+    }
+  });
+  assert.equal(patched.statusCode, 200);
+  assert.equal(patched.json().category, 'snack');
+  const plRow = patched.json().translations.find((t: { locale: string }) => t.locale === 'pl');
+  assert.equal(plRow.name, 'Tiramisu klasyczne');
+
+  // Fresh dish deletes cleanly
+  const deleted = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/menu/${dish.id}`,
+    headers
+  });
+  assert.equal(deleted.statusCode, 200);
+  assert.deepEqual(deleted.json(), { deleted: true });
+
+  // A dish present in orders is protected (fries were ordered in earlier tests)
+  const menuUk = await app.inject({ method: 'GET', url: '/api/menu?locale=uk' });
+  const fries = menuUk.json().find((i: { slug: string }) => i.slug === 'fries');
+  const blocked = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/menu/${fries.id}`,
+    headers
+  });
+  assert.equal(blocked.statusCode, 409);
+  assert.equal(blocked.json().error, 'has_orders');
+});
+
+test('phones are validated and normalized to E.164', async () => {
+  // Garbage rejected
+  const bad = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 5,
+      date: MONDAY,
+      startHour: 17,
+      durationHours: 1,
+      customerName: 'Bad Phone',
+      customerPhone: '12345'
+    }
+  });
+  assert.equal(bad.statusCode, 422);
+  assert.equal(bad.json().error, 'invalid_phone');
+
+  // Polish national format normalized with the +48 prefix
+  const national = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 5,
+      date: MONDAY,
+      startHour: 17,
+      durationHours: 1,
+      customerName: 'National Format',
+      customerPhone: '601 234 567'
+    }
+  });
+  assert.equal(national.statusCode, 201);
+  assert.equal(national.json().customerPhone, '+48601234567');
+
+  // Ukrainian international number accepted as-is
+  const ua = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 5,
+      date: MONDAY,
+      startHour: 18,
+      durationHours: 1,
+      customerName: 'UA Guest',
+      customerPhone: '+380 67 123 45 67'
+    }
+  });
+  assert.equal(ua.statusCode, 201);
+  assert.equal(ua.json().customerPhone, '+380671234567');
+
+  // Registration normalizes too, and login matches any input format
+  const reg = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: { phone: '601-777-888', name: 'Norm User', password: 'password-123' }
+  });
+  assert.equal(reg.statusCode, 201);
+  assert.equal(reg.json().profile.phone, '+48601777888');
+
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    payload: { phone: '+48 601 777 888', password: 'password-123' }
+  });
+  assert.equal(login.statusCode, 200);
 });

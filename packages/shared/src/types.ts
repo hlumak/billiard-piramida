@@ -58,7 +58,25 @@ export interface BookingDto {
   items: OrderItemDto[];
   tableTotalGrosz: number;
   foodTotalGrosz: number;
+  /** Loyalty/sport-card discount locked in at booking time */
+  discountGrosz: number;
   totalGrosz: number;
+}
+
+export type SportCardType = 'multisport' | 'medicover' | 'fitprofit';
+
+export interface UserProfileDto {
+  id: string;
+  phone: string;
+  name: string;
+  sportCardType: SportCardType | null;
+  sportCardNumber: string | null;
+  clubCardNumber: string | null;
+}
+
+export interface AuthResponseDto {
+  token: string;
+  profile: UserProfileDto;
 }
 
 /** Derived from the DTOs (Pick, not re-declared) so drift breaks the build. */
@@ -81,6 +99,43 @@ export interface AdminTopItemDto {
   foodItemId: MenuItemDto['id'];
   slug: MenuItemDto['slug'];
   totalQuantity: number;
+}
+
+export interface MenuTranslationDto {
+  locale: Locale;
+  name: string;
+  description: string | null;
+}
+
+/** Menu row for staff: includes hidden items (uk display name) + all translations. */
+export interface AdminMenuItemDto extends MenuItemDto {
+  isAvailable: boolean;
+  translations: MenuTranslationDto[];
+}
+
+export interface AdminDailyStatDto {
+  date: IsoDate;
+  bookings: number;
+  /** Net revenue: table rental + food − discounts, confirmed bookings only */
+  revenueGrosz: number;
+}
+
+export interface AdminTableUtilizationDto {
+  tableId: TableDto['id'];
+  bookedHours: number;
+  openHours: number;
+}
+
+export interface AdminStartHourDto {
+  hour: number;
+  bookings: number;
+}
+
+export interface AdminAnalyticsDto {
+  days: number;
+  daily: AdminDailyStatDto[];
+  tables: AdminTableUtilizationDto[];
+  startHours: AdminStartHourDto[];
 }
 
 export interface AdminStatsDto {

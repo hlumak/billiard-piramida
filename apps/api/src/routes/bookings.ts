@@ -1,18 +1,25 @@
 import assert from 'node:assert';
 import { Type } from '@sinclair/typebox';
 import {
+  discountGroszFor,
+  HOURLY_RATE_GROSZ,
   hoursForDate,
   isIsoDate,
   isValidBookingWindow,
-  TABLES_COUNT,
-  type NewOrderItem
+  TABLES_COUNT
 } from '@repo/shared';
-import { eq, inArray } from 'drizzle-orm';
-import { bookings, foodItems, orderItems } from '../db/schema.ts';
+import { normalizePhone } from '@repo/shared/phone';
+import { eq } from 'drizzle-orm';
+import { bookings } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BOOKING_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
-import { loadBookingDto, mustLoadBookingDto, phaseOf } from '../services/bookings.ts';
+import {
+  insertOrderItems,
+  loadBookingDto,
+  mustLoadBookingDto,
+  phaseOf
+} from '../services/bookings.ts';
 import type { AppInstance } from '../app.ts';
 
 const BOOKING_ID_PARAM = Type.Object({
@@ -46,35 +53,6 @@ const CREATE_BOOKING_BODY = Type.Object(
 /** Allow bookings that start at most 5 minutes ago ("book the table right now"). */
 const START_GRACE_MS = 5 * 60_000;
 
-async function insertOrderItems(
-  tx: Pick<AppInstance['db'], 'select' | 'insert'>,
-  bookingId: string,
-  items: NewOrderItem[]
-): Promise<'unknown_food_item' | null> {
-  if (items.length === 0) return null;
-  const ids = [...new Set(items.map(i => i.foodItemId))];
-  const found = await tx
-    .select({ id: foodItems.id, priceGrosz: foodItems.priceGrosz })
-    .from(foodItems)
-    .where(inArray(foodItems.id, ids));
-  const priceById = new Map(found.map(f => [f.id, f.priceGrosz]));
-  if (ids.some(id => !priceById.has(id))) return 'unknown_food_item';
-
-  await tx.insert(orderItems).values(
-    items.map(i => {
-      const unitPriceGrosz = priceById.get(i.foodItemId);
-      assert(unitPriceGrosz !== undefined);
-      return {
-        bookingId,
-        foodItemId: i.foodItemId,
-        quantity: i.quantity,
-        unitPriceGrosz
-      };
-    })
-  );
-  return null;
-}
-
 export function bookingRoutes(app: AppInstance) {
   app.post(
     '/api/bookings',
@@ -85,11 +63,15 @@ export function bookingRoutes(app: AppInstance) {
       }
     },
     async (request, reply) => {
-      const { tableId, date, startHour, durationHours, customerName, customerPhone } = request.body;
+      const { tableId, date, startHour, durationHours, customerName } = request.body;
       const items = request.body.items ?? [];
 
       if (!isIsoDate(date)) {
         return reply.code(400).send({ error: 'invalid_date' });
+      }
+      const customerPhone = normalizePhone(request.body.customerPhone);
+      if (customerPhone === null) {
+        return reply.code(422).send({ error: 'invalid_phone' });
       }
       if (!isValidBookingWindow(date, startHour, durationHours)) {
         return reply.code(422).send({ error: 'outside_operating_hours' });
@@ -101,11 +83,23 @@ export function bookingRoutes(app: AppInstance) {
         return reply.code(422).send({ error: 'start_in_past' });
       }
 
+      // Optional sign-in: guests book exactly the same way, just without discounts
+      const user = await app.authenticatedUser(request);
+      const discountGrosz = user ? discountGroszFor(user, durationHours * HOURLY_RATE_GROSZ) : 0;
+
       try {
         const bookingId = await app.db.transaction(async tx => {
           const [created] = await tx
             .insert(bookings)
-            .values({ tableId, customerName, customerPhone, startsAt, endsAt })
+            .values({
+              tableId,
+              customerName,
+              customerPhone,
+              startsAt,
+              endsAt,
+              userId: user?.id ?? null,
+              discountGrosz
+            })
             .returning({ id: bookings.id });
           assert(created, 'insert returned no row');
           const itemError = await insertOrderItems(tx, created.id, items);

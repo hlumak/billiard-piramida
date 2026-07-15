@@ -2,6 +2,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
+import jwt from '@fastify/jwt';
 import { Type } from '@sinclair/typebox';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { sql } from 'drizzle-orm';
@@ -10,8 +11,12 @@ import { createDb, type Db } from './db/client.ts';
 import { AvailabilityHub } from './lib/availability-hub.ts';
 import { ERROR_RESPONSE } from './lib/schemas.ts';
 import { adminRoutes } from './routes/admin.ts';
+import { authRoutes } from './routes/auth.ts';
 import { liveRoutes } from './routes/live.ts';
 import { availabilityRoutes } from './routes/availability.ts';
+import { users } from './db/schema.ts';
+import { eq } from 'drizzle-orm';
+import type { FastifyRequest } from 'fastify';
 import { bookingRoutes } from './routes/bookings.ts';
 import { menuRoutes } from './routes/menu.ts';
 import { tableRoutes } from './routes/tables.ts';
@@ -20,6 +25,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     db: Db;
     availabilityHub: AvailabilityHub;
+    /** Resolves the signed-in user from the Authorization header, or null. */
+    authenticatedUser: (request: FastifyRequest) => Promise<typeof users.$inferSelect | null>;
   }
 }
 
@@ -30,13 +37,16 @@ export interface AppOptions {
   allowedOrigins?: string[] | undefined;
   /** Shared secret for /api/admin; admin routes 503 when unset. */
   adminToken?: string | undefined;
+  /** JWT signing secret; auth routes 503 when unset (accounts stay optional). */
+  jwtSecret?: string | undefined;
 }
 
 export async function buildApp({
   databaseUrl,
   logger = true,
   allowedOrigins,
-  adminToken
+  adminToken,
+  jwtSecret
 }: AppOptions) {
   const app = Fastify({
     logger:
@@ -57,13 +67,30 @@ export async function buildApp({
   // Await plugin registration so their hooks exist BEFORE routes are defined —
   // hooks only apply to routes registered after them.
   await app.register(helmet);
-  await app.register(cors, { origin: allowedOrigins ?? true });
+  await app.register(cors, {
+    origin: allowedOrigins ?? true,
+    // PATCH is used by profile and admin menu updates
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']
+  });
   await app.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute'
   });
   await app.register(websocket, {
     options: { maxPayload: 1024 }
+  });
+  // Registered even when auth is disabled (routes 503) so jwtSign/jwtVerify exist
+  await app.register(jwt, { secret: jwtSecret ?? 'auth-disabled-placeholder' });
+
+  app.decorate('authenticatedUser', async (request: FastifyRequest) => {
+    if (jwtSecret === undefined) return null;
+    try {
+      const payload = await request.jwtVerify<{ sub: string }>();
+      const [user] = await app.db.select().from(users).where(eq(users.id, payload.sub));
+      return user ?? null;
+    } catch {
+      return null;
+    }
   });
 
   // Keep handler-emitted machine-readable codes ({ error: 'slot_taken' }) intact;
@@ -111,6 +138,7 @@ export async function buildApp({
   menuRoutes(app);
   bookingRoutes(app);
   liveRoutes(app);
+  authRoutes(app, jwtSecret !== undefined);
   await adminRoutes(app, adminToken);
 
   return app;

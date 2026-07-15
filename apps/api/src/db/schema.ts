@@ -11,6 +11,24 @@ import {
 
 export const bookingStatusEnum = pgEnum('booking_status', ['confirmed', 'cancelled']);
 
+export const sportCardTypeEnum = pgEnum('sport_card_type', [
+  'multisport',
+  'medicover',
+  'fitprofit'
+]);
+
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  phone: text('phone').notNull().unique(),
+  name: text('name').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  /** Self-declared; staff verifies the physical card at the reception desk */
+  sportCardType: sportCardTypeEnum('sport_card_type'),
+  sportCardNumber: text('sport_card_number'),
+  clubCardNumber: text('club_card_number'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+});
+
 export const tables = pgTable('tables', {
   id: integer('id').primaryKey(),
   label: text('label').notNull()
@@ -26,6 +44,9 @@ export const bookings = pgTable('bookings', {
   startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
   endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
   status: bookingStatusEnum('status').notNull().default('confirmed'),
+  /** Set when a signed-in client booked — enables discounts and history */
+  userId: uuid('user_id').references(() => users.id),
+  discountGrosz: integer('discount_grosz').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
 

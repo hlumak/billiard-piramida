@@ -7,7 +7,8 @@ const app = await buildApp({
   databaseUrl: config.databaseUrl,
   logger: { level: config.logLevel },
   allowedOrigins: config.allowedOrigins,
-  adminToken: config.adminToken
+  adminToken: config.adminToken,
+  jwtSecret: config.jwtSecret
 });
 
 // Graceful shutdown: drain in-flight requests and close the pg pool (onClose hook)

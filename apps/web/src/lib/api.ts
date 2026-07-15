@@ -9,6 +9,19 @@ import type {
 
 const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 
+const TOKEN_KEY = 'piramida.token';
+
+/** Optional-auth session token (null for guests / during SSR). */
+export function authToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+export function persistAuthToken(token: string | null): void {
+  if (token === null) window.localStorage.removeItem(TOKEN_KEY);
+  else window.localStorage.setItem(TOKEN_KEY, token);
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -33,10 +46,13 @@ export async function request<T>(
   path: string,
   { method, body, headers, signal }: RequestOptions = {}
 ): Promise<T> {
+  const token = authToken();
   const response = await fetch(`${API_URL}${path}`, {
     ...(method !== undefined ? { method } : {}),
     signal: signal ?? null,
     headers: {
+      // Signed-in clients get discounts on booking creation; harmless elsewhere
+      ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
       ...headers,
       // Fastify rejects an application/json content-type with an empty body
       ...(body !== undefined ? { 'content-type': 'application/json' } : {})

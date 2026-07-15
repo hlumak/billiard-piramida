@@ -1,10 +1,11 @@
-import { Button, Spinner } from '@heroui/react';
+import { Button, ListBox, Select, Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import type { IsoDate } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
 import { formatHour } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { useLiveAvailability } from '../../lib/availability-live';
+import { Reveal } from '../motion';
 import { QueryError } from '../QueryError';
 import { goToStep, selectTable } from '../../store/booking-wizard';
 import { FloorPlan } from './FloorPlan';
@@ -42,6 +43,7 @@ export function TableStep({
       })
       .map(table => table.tableId)
   );
+  const freeTables = availability.tables.filter(table => freeTableIds.has(table.tableId));
 
   return (
     <section>
@@ -51,6 +53,40 @@ export function TableStep({
       </p>
 
       <FloorPlan freeTableIds={freeTableIds} onSelect={selectTable} />
+
+      {/* Narrow screens: the plan is a map; picking happens in the select below */}
+      {freeTables.length > 0 ? (
+        <Reveal className="mt-4 md:hidden">
+          <Select
+            aria-label={m.step_table_title()}
+            placeholder={m.step_table_title()}
+            className="w-full"
+            onSelectionChange={key => {
+              const tableId = Number(key);
+              if (freeTableIds.has(tableId)) selectTable(tableId);
+            }}
+          >
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {freeTables.map(table => (
+                  <ListBox.Item
+                    key={table.tableId}
+                    id={String(table.tableId)}
+                    textValue={m.table_n({ n: table.tableId })}
+                  >
+                    🎱 {m.table_n({ n: table.tableId })}
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+        </Reveal>
+      ) : null}
 
       {freeTableIds.size === 0 ? (
         <div className="mt-4 flex flex-col items-center gap-4">

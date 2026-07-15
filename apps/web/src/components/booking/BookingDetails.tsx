@@ -86,6 +86,12 @@ export function BookingDetails({
               <span>{formatPln(item.unitPriceGrosz * item.quantity, intlTag())}</span>
             </div>
           ))}
+          {booking.discountGrosz > 0 ? (
+            <div className="flex justify-between">
+              <span className="text-grey-cool">{m.discount_label()}</span>
+              <span className="text-golden">−{formatPln(booking.discountGrosz, intlTag())}</span>
+            </div>
+          ) : null}
           <div className="mt-2 flex justify-between border-t border-deep-cream/30 pt-2 text-base font-bold text-golden">
             <span>{m.total()}</span>
             <span>{formatPln(booking.totalGrosz, intlTag())}</span>

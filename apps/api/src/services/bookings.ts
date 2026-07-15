@@ -1,6 +1,7 @@
-import type { BookingDto, BookingPhase, BookingStatus } from '@repo/shared';
+import assert from 'node:assert';
+import type { BookingDto, BookingPhase, BookingStatus, NewOrderItem } from '@repo/shared';
 import { HOURLY_RATE_GROSZ } from '@repo/shared';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.ts';
 import { bookings, foodItems, orderItems } from '../db/schema.ts';
 import { HOUR_MS } from '../lib/time.ts';
@@ -58,6 +59,37 @@ export async function loadBookingDto(db: Db, id: string): Promise<BookingDto | n
     items,
     tableTotalGrosz,
     foodTotalGrosz,
-    totalGrosz: tableTotalGrosz + foodTotalGrosz
+    discountGrosz: booking.discountGrosz,
+    totalGrosz: tableTotalGrosz + foodTotalGrosz - booking.discountGrosz
   };
+}
+
+/** Validates food ids and inserts order rows; returns an error code or null. */
+export async function insertOrderItems(
+  tx: Pick<Db, 'select' | 'insert'>,
+  bookingId: string,
+  items: NewOrderItem[]
+): Promise<'unknown_food_item' | null> {
+  if (items.length === 0) return null;
+  const ids = [...new Set(items.map(i => i.foodItemId))];
+  const found = await tx
+    .select({ id: foodItems.id, priceGrosz: foodItems.priceGrosz })
+    .from(foodItems)
+    .where(inArray(foodItems.id, ids));
+  const priceById = new Map(found.map(f => [f.id, f.priceGrosz]));
+  if (ids.some(id => !priceById.has(id))) return 'unknown_food_item';
+
+  await tx.insert(orderItems).values(
+    items.map(i => {
+      const unitPriceGrosz = priceById.get(i.foodItemId);
+      assert(unitPriceGrosz !== undefined);
+      return {
+        bookingId,
+        foodItemId: i.foodItemId,
+        quantity: i.quantity,
+        unitPriceGrosz
+      };
+    })
+  );
+  return null;
 }
