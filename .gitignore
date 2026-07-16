@@ -11,5 +11,3 @@ dist/
 coverage/
 apps/web/src/routeTree.gen.ts
 apps/web/src/paraglide/
-ts1.txt
-transcript.txt
