@@ -31,7 +31,15 @@ pnpm db:migrate && pnpm db:seed
 pnpm dev                    # api :3001 + web :3000
 ```
 
-Production web build: `pnpm --filter web build && pnpm --filter web start` (srvx serves
-`dist/` with SSR).
+## Production
+
+```sh
+pnpm build   # builds the web app (the API runs TS natively, no build step)
+pnpm start   # api :3001 + web :3000 (srvx serving dist/ with SSR), both behind nginx :8080
+```
+
+`pnpm start:api` / `pnpm start:web` run them individually. Set real values for
+`JWT_SECRET`, `ADMIN_TOKEN`, `ALLOWED_ORIGINS`, `VITE_SITE_URL` (build-time) and the
+domain in `public/robots.txt` / `sitemap.xml` before deploying.
 
 Checks: `pnpm typecheck` · `pnpm test` · `pnpm lint` · `pnpm fmt:check`
