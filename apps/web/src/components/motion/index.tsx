@@ -1,6 +1,6 @@
 import { LazyMotion, MotionConfig, m } from 'motion/react';
 import type { ReactNode } from 'react';
-import type { Variants } from 'motion/react';
+import { fadeUpChild, staggerParent } from './variants';
 
 export { AnimatePresence, m } from 'motion/react';
 
@@ -18,18 +18,6 @@ export function MotionProvider({ children }: { children: ReactNode }) {
     </LazyMotion>
   );
 }
-
-/* Shared variants: parents set `hidden`/`visible`, children inherit the timing. */
-
-export const staggerParent: Variants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.045 } }
-};
-
-export const fadeUpChild: Variants = {
-  hidden: { opacity: 0, y: 14 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } }
-};
 
 /** One-off entrance for a standalone block. */
 export function Reveal({
@@ -81,6 +69,3 @@ export function StaggerItem({
     </m.div>
   );
 }
-
-/** Tap feedback for chip-style buttons. */
-export const tapScale = { scale: 0.95 } as const;

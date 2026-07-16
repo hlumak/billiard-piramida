@@ -31,18 +31,19 @@ export function TableStep({
     );
   }
 
-  const freeTableIds = new Set(
-    availability.tables
-      .filter(table => {
-        const free = new Set<number>();
-        for (const slot of table.slots) if (slot.available) free.add(slot.hour);
-        for (let hour = startHour; hour < startHour + durationHours; hour++) {
-          if (!free.has(hour)) return false;
-        }
-        return true;
-      })
-      .map(table => table.tableId)
-  );
+  const freeTableIds = new Set<number>();
+  for (const table of availability.tables) {
+    const free = new Set<number>();
+    for (const slot of table.slots) if (slot.available) free.add(slot.hour);
+    let wholeWindowFree = true;
+    for (let hour = startHour; hour < startHour + durationHours; hour++) {
+      if (!free.has(hour)) {
+        wholeWindowFree = false;
+        break;
+      }
+    }
+    if (wholeWindowFree) freeTableIds.add(table.tableId);
+  }
   const freeTables = availability.tables.filter(table => freeTableIds.has(table.tableId));
 
   return (

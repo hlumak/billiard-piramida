@@ -23,7 +23,7 @@ const chip = (selected: boolean, disabled = false) =>
 export function AdminNewBooking({ token }: { token: string }) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
-  const [date, setDate] = useState<IsoDate>(warsawToday());
+  const [date, setDate] = useState<IsoDate>(() => warsawToday());
   const [startHour, setStartHour] = useState<number | null>(null);
   const [duration, setDuration] = useState(1);
   const [tableId, setTableId] = useState<number | null>(null);
@@ -60,7 +60,8 @@ export function AdminNewBooking({ token }: { token: string }) {
     slots: { hour: number; available: boolean }[];
   }) => {
     if (startHour === null) return false;
-    const free = new Set(candidateTable.slots.filter(s => s.available).map(s => s.hour));
+    const free = new Set<number>();
+    for (const s of candidateTable.slots) if (s.available) free.add(s.hour);
     for (let h = startHour; h < startHour + duration; h++) if (!free.has(h)) return false;
     return true;
   };

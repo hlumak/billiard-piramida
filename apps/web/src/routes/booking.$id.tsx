@@ -10,7 +10,8 @@ import { noindexMeta } from '../lib/seo';
 import { getLocale } from '../paraglide/runtime.js';
 
 export const Route = createFileRoute('/booking/$id')({
-  head: () => ({ meta: noindexMeta(m.booking_title()) }),
+  // Canonical property order (validateSearch → loader → head): each step feeds
+  // the next one's inferred types
   validateSearch: (search: Record<string, unknown>): { new?: boolean } =>
     search.new === true || search.new === 'true' ? { new: true } : {},
   // Prefetch for SSR and hover-preload; errors (404) are owned by the component
@@ -19,6 +20,7 @@ export const Route = createFileRoute('/booking/$id')({
       context.queryClient.ensureQueryData(bookingQuery(params.id)),
       context.queryClient.ensureQueryData(menuQuery(getLocale()))
     ]),
+  head: () => ({ meta: noindexMeta(m.booking_title()) }),
   component: BookingPage
 });
 

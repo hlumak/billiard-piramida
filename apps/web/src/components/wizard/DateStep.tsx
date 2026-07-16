@@ -1,6 +1,7 @@
 import { m as msg } from '../../paraglide/messages.js';
 import { addDays, formatDay, warsawToday } from '../../lib/format';
-import { fadeUpChild, m, staggerParent, tapScale } from '../motion';
+import { m } from '../motion';
+import { fadeUpChild, staggerParent, tapScale } from '../motion/variants';
 import { selectDate } from '../../store/booking-wizard';
 
 const DAYS_AHEAD = 14;

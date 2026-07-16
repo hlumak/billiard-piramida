@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react';
 import { m as msg } from '../../paraglide/messages.js';
-import { fadeUpChild, m, staggerParent } from '../motion';
+import { m } from '../motion';
+import { fadeUpChild, staggerParent } from '../motion/variants';
 
 /**
  * Interactive venue floor plan (owner's blueprint): entrance and reception

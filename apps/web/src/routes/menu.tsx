@@ -14,7 +14,9 @@ function MenuPage() {
   const navigate = useNavigate();
 
   return (
-    // Tapping empty space closes the menu (links/buttons keep working normally)
+    // Pointer-only backdrop convenience: tapping empty space closes the menu.
+    // Every real target inside is a native link, so this wrapper needs no role.
+    // oxlint-disable-next-line react-doctor/no-static-element-interactions
     <div
       className="relative min-h-dvh overflow-hidden bg-club-green"
       onClick={event => {
