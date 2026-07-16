@@ -80,6 +80,8 @@ export const api = {
     request<MenuItemDto[]>(`/api/menu?locale=${locale}`, { signal }),
   booking: (id: string, signal?: AbortSignal) =>
     request<BookingDto>(`/api/bookings/${id}`, { signal }),
+  lookupBookings: (phone: string, signal?: AbortSignal) =>
+    request<BookingDto[]>(`/api/bookings/lookup?phone=${encodeURIComponent(phone)}`, { signal }),
   createBooking: (input: CreateBookingInput) =>
     request<BookingDto>('/api/bookings', { method: 'POST', body: input }),
   extendBooking: (id: string, additionalHours: number) =>

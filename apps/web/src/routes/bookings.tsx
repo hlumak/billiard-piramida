@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Spinner } from '@heroui/react';
-import { useQueries } from '@tanstack/react-query';
+import { Button, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { formatPln } from '@repo/shared';
+import { isValidPhone } from '@repo/shared/phone';
 import { PageHeader } from '../components/AppHeader';
 import { PHASE_LABELS } from '../components/booking/phase';
 import { StaggerGroup, StaggerItem } from '../components/motion';
 import { formatDayLong, intlTag, warsawDate, warsawTime } from '../lib/format';
 import { bookingQuery } from '../lib/queries';
-import { recentBookingIds } from '../lib/recent-bookings';
+import { api } from '../lib/api';
+import { recentBookingIds, rememberBooking } from '../lib/recent-bookings';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 
@@ -80,7 +82,78 @@ function MyBookingsPage() {
             </ul>
           </StaggerGroup>
         )}
+
+        <LookupSection onFound={() => setIds(recentBookingIds())} />
       </main>
     </div>
+  );
+}
+
+/** Recover bookings made on another device/browser by the phone used to book. */
+function LookupSection({ onFound }: { onFound: () => void }) {
+  const queryClient = useQueryClient();
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  const lookup = useMutation({
+    mutationFn: (value: string) => api.lookupBookings(value),
+    onSuccess: found => {
+      for (const booking of found) {
+        rememberBooking(booking.id);
+        // Seed the per-booking cache so the list above renders without refetching
+        queryClient.setQueryData(bookingQuery(booking.id).queryKey, booking);
+      }
+      if (found.length > 0) onFound();
+    }
+  });
+
+  const statusMessage = lookup.isError
+    ? m.err_generic()
+    : lookup.data?.length === 0
+      ? m.find_booking_none()
+      : null;
+
+  return (
+    <section className="mt-12 flex flex-col items-center text-center">
+      <h2 className="mb-2 text-xl font-semibold text-creme">{m.find_booking_title()}</h2>
+      <p className="mb-4 text-sm text-grey-cool">{m.find_booking_hint()}</p>
+      <form
+        className="flex w-full flex-col gap-3 text-left md:max-w-sm"
+        onSubmit={event => {
+          event.preventDefault();
+          if (!isValidPhone(phone)) {
+            setPhoneError(m.err_phone_invalid());
+            return;
+          }
+          lookup.mutate(phone.trim());
+        }}
+      >
+        <TextField
+          name="phone"
+          type="tel"
+          value={phone}
+          onChange={value => {
+            setPhone(value);
+            // A stuck isInvalid blocks native resubmission — clear on change
+            setPhoneError(null);
+            lookup.reset();
+          }}
+          isInvalid={phoneError != null}
+        >
+          <Label>{m.phone_label()}</Label>
+          <Input placeholder={m.phone_placeholder()} />
+          <FieldError>{phoneError}</FieldError>
+        </TextField>
+        {statusMessage ? <p className="text-sm text-grey-cool">{statusMessage}</p> : null}
+        <Button
+          type="submit"
+          size="lg"
+          className="h-[45px] w-full text-lg font-bold"
+          isPending={lookup.isPending}
+        >
+          {m.btn_find()}
+        </Button>
+      </form>
+    </section>
   );
 }

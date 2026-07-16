@@ -28,7 +28,7 @@ function ContactsPage() {
           <StaggerItem>
             <a
               href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
-              className="flex items-center gap-3 rounded-[10px] bg-club-green-light p-4 transition-colors hover:bg-surface-hover"
+              className="flex h-full items-center gap-3 rounded-[10px] bg-club-green-light p-4 transition-colors hover:bg-surface-hover"
             >
               <Phone className="size-6 shrink-0 text-golden" />
               <div>

@@ -47,6 +47,11 @@ function MenuPage() {
               <ButtonLink to="/book">{m.menu_booking()}</ButtonLink>
             </StaggerItem>
             <StaggerItem>
+              <ButtonLink to="/bookings" variant="outline">
+                {m.nav_my_bookings()}
+              </ButtonLink>
+            </StaggerItem>
+            <StaggerItem>
               <ButtonLink to="/contacts" variant="outline">
                 {m.menu_contacts()}
               </ButtonLink>

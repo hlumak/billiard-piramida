@@ -9,7 +9,7 @@ import {
   TABLES_COUNT
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq, gt } from 'drizzle-orm';
 import { bookings } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BOOKING_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
@@ -118,6 +118,40 @@ export function bookingRoutes(app: AppInstance) {
         }
         throw err;
       }
+    }
+  );
+
+  app.get(
+    '/api/bookings/lookup',
+    {
+      // Tighter than the global limit: this endpoint is phone-enumerable
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: {
+        querystring: Type.Object(
+          { phone: Type.String({ minLength: 5, maxLength: 25 }) },
+          { additionalProperties: false }
+        ),
+        response: { 200: Type.Array(BOOKING_RESPONSE), '4xx': ERROR_RESPONSE }
+      }
+    },
+    async (request, reply) => {
+      const phone = normalizePhone(request.query.phone);
+      if (phone === null) return reply.code(422).send({ error: 'invalid_phone' });
+
+      // Only bookings the guest can still use; finished history stays private
+      const rows = await app.db
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.customerPhone, phone),
+            eq(bookings.status, 'confirmed'),
+            gt(bookings.endsAt, new Date())
+          )
+        )
+        .orderBy(asc(bookings.startsAt))
+        .limit(20);
+      return Promise.all(rows.map(row => mustLoadBookingDto(app.db, row.id)));
     }
   );
 

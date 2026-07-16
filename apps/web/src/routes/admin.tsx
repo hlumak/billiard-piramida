@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { AnimatePresence, m as motion } from '../components/motion';
 import { PageHeader } from '../components/AppHeader';
+import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { AdminBookings } from '../components/admin/AdminBookings';
 import { AdminCustomers } from '../components/admin/AdminCustomers';
 import { AdminLogin } from '../components/admin/AdminLogin';
@@ -62,7 +63,12 @@ function AdminPage() {
             <Spinner aria-label={m.loading()} />
           </div>
         ) : token == null ? (
-          <AdminLogin onSuccess={setToken} />
+          <>
+            <AdminLogin onSuccess={setToken} />
+            <div className="mt-8">
+              <LocaleSwitcher />
+            </div>
+          </>
         ) : (
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -84,9 +90,12 @@ function AdminPage() {
                   </button>
                 ))}
               </div>
-              <Button variant="ghost" size="sm" onPress={logout}>
-                {m.admin_logout()}
-              </Button>
+              <div className="flex items-center gap-3">
+                <LocaleSwitcher />
+                <Button variant="ghost" size="sm" onPress={logout}>
+                  {m.admin_logout()}
+                </Button>
+              </div>
             </div>
 
             <AnimatePresence mode="popLayout" initial={false}>

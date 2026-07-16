@@ -74,6 +74,12 @@ body,
   min-height: 100%;
 }
 
+/* Reserve scrollbar space so centered pages don't shift when content
+ * height crosses the viewport (e.g. switching admin tabs) */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
