@@ -11,13 +11,7 @@ import { QueryError } from '../QueryError';
 
 const PAGE_SIZE = 50;
 
-export function AdminCustomers({
-  token,
-  onShowBookings
-}: {
-  token: string;
-  onShowBookings: (phone: string) => void;
-}) {
+export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: string) => void }) {
   const [phoneInput, setPhoneInput] = useState('');
   const [phone, setPhone] = useState('');
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -36,7 +30,7 @@ export function AdminCustomers({
     isPending,
     isError,
     refetch
-  } = useQuery(adminCustomersQuery(token, { limit, phone: phone || undefined }));
+  } = useQuery(adminCustomersQuery({ limit, phone: phone || undefined }));
 
   const search = (
     <Input

@@ -9,27 +9,11 @@ import type {
 
 const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 
-const TOKEN_KEY = 'piramida.token';
-
-/** Optional-auth session token (null for guests / during SSR). */
-export function authToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  // localStorage access throws in storage-blocked contexts (Safari private
-  // mode, disabled cookies) — a guest without a token must not crash the app.
-  try {
-    return window.localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function persistAuthToken(token: string | null): void {
-  try {
-    if (token === null) window.localStorage.removeItem(TOKEN_KEY);
-    else window.localStorage.setItem(TOKEN_KEY, token);
-  } catch {
-    /* storage blocked — the session simply won't persist across reloads */
-  }
+/** Non-sensitive flag cookie the server sets alongside the HttpOnly session
+ *  cookie, so the client can gate its UI without ever reading the token. */
+export function hasFlagCookie(name: string): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.cookie.split('; ').some(entry => entry.startsWith(`${name}=`));
 }
 
 export class ApiError extends Error {
@@ -56,13 +40,12 @@ export async function request<T>(
   path: string,
   { method, body, headers, signal }: RequestOptions = {}
 ): Promise<T> {
-  const token = authToken();
   const response = await fetch(`${API_URL}${path}`, {
     ...(method !== undefined ? { method } : {}),
     signal: signal ?? null,
+    // Send the HttpOnly session cookie (same-origin in prod, same-site in dev)
+    credentials: 'include',
     headers: {
-      // Signed-in clients get discounts on booking creation; harmless elsewhere
-      ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
       ...headers,
       // Fastify rejects an application/json content-type with an empty body
       ...(body !== undefined ? { 'content-type': 'application/json' } : {})

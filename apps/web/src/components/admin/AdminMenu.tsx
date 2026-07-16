@@ -11,8 +11,10 @@ import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
 import { AdminDishModal } from './AdminDishModal';
 
-function MenuRow({ token, item }: { token: string; item: AdminMenuItemDto }) {
+function MenuRow({ item }: { item: AdminMenuItemDto }) {
   const queryClient = useQueryClient();
+  // Seeded from the server price; the parent remounts this row (via key) when
+  // the server price changes, so the input never shows a stale value.
   const [price, setPrice] = useState(String(item.priceGrosz / 100));
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['admin', 'menu'] });
@@ -21,12 +23,12 @@ function MenuRow({ token, item }: { token: string; item: AdminMenuItemDto }) {
 
   const update = useMutation({
     mutationFn: (patch: { isAvailable?: boolean; priceGrosz?: number }) =>
-      adminApi.updateMenuItem(token, item.id, patch),
+      adminApi.updateMenuItem(item.id, patch),
     onSuccess: invalidate
   });
 
   const remove = useMutation({
-    mutationFn: () => adminApi.deleteMenuItem(token, item.id),
+    mutationFn: () => adminApi.deleteMenuItem(item.id),
     onSuccess: invalidate
   });
 
@@ -73,7 +75,7 @@ function MenuRow({ token, item }: { token: string; item: AdminMenuItemDto }) {
           >
             {item.isAvailable ? m.admin_in_menu() : m.admin_hidden()}
           </Button>
-          <AdminDishModal token={token} item={item} />
+          <AdminDishModal item={item} />
           <Button
             size="sm"
             variant="danger-soft"
@@ -93,8 +95,8 @@ function MenuRow({ token, item }: { token: string; item: AdminMenuItemDto }) {
   );
 }
 
-export function AdminMenu({ token }: { token: string }) {
-  const { data: items, isPending, isError, refetch } = useQuery(adminMenuQuery(token));
+export function AdminMenu() {
+  const { data: items, isPending, isError, refetch } = useQuery(adminMenuQuery());
 
   if (isError) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !items) {
@@ -108,13 +110,14 @@ export function AdminMenu({ token }: { token: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
-        <AdminDishModal token={token} item={null} />
+        <AdminDishModal item={null} />
       </div>
       <StaggerGroup>
         <ul className="flex flex-col gap-2">
           {items.map(item => (
             <StaggerItem key={item.id}>
-              <MenuRow token={token} item={item} />
+              {/* Remount the row when the server price changes so its input re-seeds */}
+              <MenuRow key={item.priceGrosz} item={item} />
             </StaggerItem>
           ))}
         </ul>

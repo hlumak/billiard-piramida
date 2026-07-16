@@ -1,19 +1,17 @@
 {
   "$schema": "https://react.doctor/schema/config.json",
-  // These rules still RUN and appear in local `npx react-doctor` output — they
-  // are only excluded from the numeric score, because each is a reviewed and
-  // deliberately-accepted decision rather than an unaddressed defect:
+  // This rule still RUNS and appears in local `npx react-doctor` output — it is
+  // only excluded from the numeric score because it is a false positive:
   //
-  //  - auth-token-in-web-storage: the user JWT (localStorage) and admin token
-  //    (sessionStorage) are stored client-side by design (optional low-stakes
-  //    accounts, no server-set cookies). Revisit if we ever move auth to
-  //    HttpOnly cookies.
   //  - deslop/unused-dependency (tailwind-variants): required by @heroui/react
   //    and @heroui/styles; must stay in package.json even though app code never
   //    imports it directly. Removing it breaks the HeroUI v3 / Tailwind v4 setup.
+  //
+  // (auth-token-in-web-storage is no longer listed: auth now uses HttpOnly
+  // session cookies, so the finding is genuinely resolved, not excluded.)
   "surfaces": {
     "score": {
-      "excludeRules": ["react-doctor/auth-token-in-web-storage", "deslop/unused-dependency"]
+      "excludeRules": ["deslop/unused-dependency"]
     }
   }
 }

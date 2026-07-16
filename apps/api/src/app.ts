@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -25,7 +26,9 @@ declare module 'fastify' {
   interface FastifyInstance {
     db: Db;
     availabilityHub: AvailabilityHub;
-    /** Resolves the signed-in user from the Authorization header, or null. */
+    /** Secure flag for auth cookies (true in prod/https). */
+    cookieSecure: boolean;
+    /** Resolves the signed-in user from the JWT (Authorization header or cookie), or null. */
     authenticatedUser: (request: FastifyRequest) => Promise<typeof users.$inferSelect | null>;
   }
 }
@@ -39,6 +42,8 @@ export interface AppOptions {
   adminToken?: string | undefined;
   /** JWT signing secret; auth routes 503 when unset (accounts stay optional). */
   jwtSecret?: string | undefined;
+  /** Secure flag on auth cookies — on in prod (https), off in dev (http). */
+  cookieSecure?: boolean | undefined;
 }
 
 export async function buildApp({
@@ -46,7 +51,8 @@ export async function buildApp({
   logger = true,
   allowedOrigins,
   adminToken,
-  jwtSecret
+  jwtSecret,
+  cookieSecure = false
 }: AppOptions) {
   const app = Fastify({
     logger:
@@ -66,6 +72,7 @@ export async function buildApp({
   pool.on('error', err => app.log.error({ err }, 'idle postgres client error'));
   app.decorate('db', db);
   app.decorate('availabilityHub', new AvailabilityHub());
+  app.decorate('cookieSecure', cookieSecure);
   app.addHook('onClose', async () => {
     await pool.end();
   });
@@ -76,7 +83,9 @@ export async function buildApp({
   await app.register(cors, {
     origin: allowedOrigins ?? true,
     // PATCH is used by profile and admin menu updates
-    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    // Auth rides in cookies now, so cross-origin requests must send credentials
+    credentials: true
   });
   await app.register(rateLimit, {
     max: 100,
@@ -85,12 +94,17 @@ export async function buildApp({
   await app.register(websocket, {
     options: { maxPayload: 1024 }
   });
+  // Parses request.cookies and enables reply.setCookie/clearCookie; must load
+  // before jwt so jwt can read the token from the cookie.
+  await app.register(cookie);
   // Registered even when auth is disabled (routes 503) so jwtSign/jwtVerify exist.
   // Tokens expire (low-stakes accounts, no server-side revocation) — jwtVerify
-  // rejects expired ones and the web client treats 401 as signed-out.
+  // rejects expired ones and the web client treats 401 as signed-out. The token
+  // is read from the HttpOnly cookie, falling back to the Authorization header.
   await app.register(jwt, {
     secret: jwtSecret ?? 'auth-disabled-placeholder',
-    sign: { expiresIn: '30d' }
+    sign: { expiresIn: '30d' },
+    cookie: { cookieName: 'token', signed: false }
   });
 
   app.decorate('authenticatedUser', async (request: FastifyRequest) => {

@@ -32,7 +32,7 @@ function draftFrom(item: AdminMenuItemDto | null): DishDraft {
 }
 
 /** Create (item === null) or edit a dish, names and descriptions in all locales. */
-export function AdminDishModal({ token, item }: { token: string; item: AdminMenuItemDto | null }) {
+export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
   const [draft, setDraft] = useState<DishDraft>(() => draftFrom(item));
@@ -56,8 +56,8 @@ export function AdminDishModal({ token, item }: { token: string; item: AdminMenu
   const save = useMutation({
     mutationFn: () =>
       item === null
-        ? adminApi.createMenuItem(token, { category: draft.category, priceGrosz, translations })
-        : adminApi.updateMenuItem(token, item.id, {
+        ? adminApi.createMenuItem({ category: draft.category, priceGrosz, translations })
+        : adminApi.updateMenuItem(item.id, {
             category: draft.category,
             priceGrosz,
             translations

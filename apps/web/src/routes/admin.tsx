@@ -11,7 +11,7 @@ import { AdminLogin } from '../components/admin/AdminLogin';
 import { AdminMenu } from '../components/admin/AdminMenu';
 import { AdminOverview } from '../components/admin/AdminOverview';
 import { AdminStats } from '../components/admin/AdminStats';
-import { clearAdminToken, storedAdminToken } from '../lib/admin-api';
+import { adminApi, isAdminSignedIn } from '../lib/admin-api';
 import { ApiError } from '../lib/api';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
@@ -33,8 +33,8 @@ type TabId = (typeof TABS)[number]['id'];
 
 function AdminPage() {
   const queryClient = useQueryClient();
-  // sessionStorage is browser-only; read after mount so SSR and hydration agree
-  const [token, setToken] = useState<string | null>(null);
+  // The session flag cookie is browser-only; read after mount so SSR agrees
+  const [signedIn, setSignedIn] = useState(false);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<TabId>('overview');
   const [bookingsPhone, setBookingsPhone] = useState('');
@@ -45,18 +45,18 @@ function AdminPage() {
   };
 
   useEffect(() => {
-    setToken(storedAdminToken());
+    setSignedIn(isAdminSignedIn());
     setReady(true);
   }, []);
 
   const logout = () => {
-    clearAdminToken();
+    void adminApi.logout();
     queryClient.removeQueries({ queryKey: ['admin'] });
-    setToken(null);
+    setSignedIn(false);
   };
 
-  // A rotated ADMIN_TOKEN (401) or disabled admin (503) invalidates the stored
-  // token; any admin query hitting that must drop back to the login gate instead
+  // A rotated ADMIN_TOKEN (401) or disabled admin (503) invalidates the session
+  // cookie; any admin query hitting that must drop back to the login gate instead
   // of dead-ending in per-tab retry errors.
   useEffect(() => {
     const unsubscribe = queryClient.getQueryCache().subscribe(event => {
@@ -81,9 +81,9 @@ function AdminPage() {
           <div className="flex justify-center py-16">
             <Spinner aria-label={m.loading()} />
           </div>
-        ) : token == null ? (
+        ) : !signedIn ? (
           <>
-            <AdminLogin onSuccess={setToken} />
+            <AdminLogin onSuccess={() => setSignedIn(true)} />
             <div className="mt-8">
               <LocaleSwitcher />
             </div>
@@ -125,15 +125,15 @@ function AdminPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
               >
-                {tab === 'overview' ? <AdminOverview token={token} /> : null}
-                {tab === 'stats' ? <AdminStats token={token} /> : null}
+                {tab === 'overview' ? <AdminOverview /> : null}
+                {tab === 'stats' ? <AdminStats /> : null}
                 {tab === 'bookings' ? (
-                  <AdminBookings key={bookingsPhone} token={token} initialPhone={bookingsPhone} />
+                  <AdminBookings key={bookingsPhone} initialPhone={bookingsPhone} />
                 ) : null}
                 {tab === 'customers' ? (
-                  <AdminCustomers token={token} onShowBookings={showCustomerBookings} />
+                  <AdminCustomers onShowBookings={showCustomerBookings} />
                 ) : null}
-                {tab === 'menu' ? <AdminMenu token={token} /> : null}
+                {tab === 'menu' ? <AdminMenu /> : null}
               </motion.div>
             </AnimatePresence>
           </div>

@@ -46,7 +46,9 @@ export function BarChart({
           strokeWidth={1}
         />
         {data.map((d, i) => {
-          const barHeight = d.value === 0 ? 0 : Math.max((d.value / max) * plotHeight, 3);
+          // Floor at 4px, not 3: the path's 4px corner radius needs barHeight ≥ 4,
+          // or the `v${barHeight - 4}` segments go negative and dip below the baseline.
+          const barHeight = d.value === 0 ? 0 : Math.max((d.value / max) * plotHeight, 4);
           const x = i * step + (step - barWidth) / 2;
           const y = height - paddingBottom - barHeight;
           return (

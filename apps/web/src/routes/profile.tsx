@@ -4,7 +4,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { PageHeader } from '../components/AppHeader';
 import { AuthForms } from '../components/profile/AuthForms';
 import { ProfileView } from '../components/profile/ProfileView';
-import { authToken } from '../lib/auth';
+import { isSignedIn } from '../lib/auth';
 import { noindexMeta } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 
@@ -14,11 +14,11 @@ export const Route = createFileRoute('/profile')({
 });
 
 function ProfilePage() {
-  // localStorage token is browser-only; decide after mount so SSR agrees
+  // The signed-in flag cookie is browser-only; decide after mount so SSR agrees
   const [ready, setReady] = useState(false);
   const [hasToken, setHasToken] = useState(false);
   useEffect(() => {
-    setHasToken(authToken() !== null);
+    setHasToken(isSignedIn());
     setReady(true);
   }, []);
 

@@ -3,6 +3,7 @@ import type { UserProfileDto } from '@repo/shared';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.ts';
 import { normalizePhone } from '@repo/shared/phone';
+import { clearUserCookies, setUserCookies } from '../lib/cookies.ts';
 import { pgErrorCode, UNIQUE_VIOLATION } from '../lib/errors.ts';
 import { hashPassword, verifyPassword } from '../lib/passwords.ts';
 import {
@@ -109,6 +110,7 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
       if (!created) throw new Error('insert returned no row');
 
       const token = await reply.jwtSign({ sub: created.id });
+      setUserCookies(reply, token, app.cookieSecure);
       return reply.code(201).send({ token, profile: toProfile(created) });
     }
   );
@@ -132,7 +134,19 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
       if (!user || !valid) return reply.code(401).send({ error: 'invalid_credentials' });
 
       const token = await reply.jwtSign({ sub: user.id });
+      setUserCookies(reply, token, app.cookieSecure);
       return { token, profile: toProfile(user) };
+    }
+  );
+
+  app.post(
+    '/api/auth/logout',
+    { schema: { response: { 200: Type.Object({ ok: Type.Boolean() }) } } },
+    async (_request, reply) => {
+      // Clearing the HttpOnly cookie must go through the server (JS can't).
+      // Not gated on authEnabled — clearing cookies is always safe.
+      clearUserCookies(reply, app.cookieSecure);
+      return { ok: true };
     }
   );
 

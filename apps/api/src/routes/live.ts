@@ -14,8 +14,21 @@ export function liveRoutes(app: AppInstance) {
   app.get('/api/ws', { websocket: true }, (socket, request) => {
     const subscribed = new Set<IsoDate>();
 
-    // Keep the connection alive through nginx and reap dead peers
-    const ping = setInterval(() => socket.ping(), PING_INTERVAL_MS);
+    // Heartbeat: ping keeps the connection alive through nginx, and a missed pong
+    // reaps a dead-but-TCP-alive peer (sleep/partition) so its subscription can't
+    // leak. terminate() fires 'close', which clears the timer and drops the socket.
+    let isAlive = true;
+    socket.on('pong', () => {
+      isAlive = true;
+    });
+    const ping = setInterval(() => {
+      if (!isAlive) {
+        socket.terminate();
+        return;
+      }
+      isAlive = false;
+      socket.ping();
+    }, PING_INTERVAL_MS);
 
     socket.on('message', (raw: unknown) => {
       let message: ClientMessage;

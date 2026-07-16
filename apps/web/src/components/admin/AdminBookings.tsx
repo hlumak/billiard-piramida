@@ -25,7 +25,7 @@ const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[
   { value: 'cancelled', label: m.phase_cancelled }
 ];
 
-function RowActions({ token, booking }: { token: string; booking: BookingDto }) {
+function RowActions({ booking }: { booking: BookingDto }) {
   const queryClient = useQueryClient();
   // Cancel/extend free or move a slot, so the New-Booking picker (availability
   // query) must refresh too, not just the admin lists.
@@ -39,7 +39,7 @@ function RowActions({ token, booking }: { token: string; booking: BookingDto }) 
     onSuccess: invalidate
   });
   const cancel = useMutation({
-    mutationFn: () => adminApi.cancelBooking(token, booking.id),
+    mutationFn: () => adminApi.cancelBooking(booking.id),
     onSuccess: invalidate
   });
 
@@ -80,13 +80,7 @@ function RowActions({ token, booking }: { token: string; booking: BookingDto }) 
   );
 }
 
-export function AdminBookings({
-  token,
-  initialPhone = ''
-}: {
-  token: string;
-  initialPhone?: string;
-}) {
+export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) {
   const [date, setDate] = useState<IsoDate | undefined>(undefined);
   const [status, setStatus] = useState<BookingStatus | undefined>(undefined);
   const [phoneInput, setPhoneInput] = useState(initialPhone);
@@ -103,12 +97,7 @@ export function AdminBookings({
     status,
     phone: phone !== '' ? phone : undefined
   };
-  const {
-    data: bookings,
-    isPending,
-    isError,
-    refetch
-  } = useQuery(adminBookingsQuery(token, filters));
+  const { data: bookings, isPending, isError, refetch } = useQuery(adminBookingsQuery(filters));
 
   return (
     <div className="flex flex-col gap-4">
@@ -139,7 +128,7 @@ export function AdminBookings({
           className="w-44"
         />
         <div className="ml-auto">
-          <AdminNewBooking token={token} />
+          <AdminNewBooking />
         </div>
       </div>
 
@@ -196,7 +185,7 @@ export function AdminBookings({
                         </span>
                       ) : null}
                     </span>
-                    <RowActions token={token} booking={booking} />
+                    <RowActions booking={booking} />
                   </div>
                 </li>
               </StaggerItem>

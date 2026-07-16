@@ -17,3 +17,6 @@ export const EXCLUSION_VIOLATION = '23P01';
 
 /** Postgres unique_violation — a UNIQUE constraint (e.g. users.phone) was hit. */
 export const UNIQUE_VIOLATION = '23505';
+
+/** Postgres foreign_key_violation — a referenced/ referencing row blocked the write. */
+export const FOREIGN_KEY_VIOLATION = '23503';

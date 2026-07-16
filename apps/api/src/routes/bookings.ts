@@ -6,6 +6,7 @@ import {
   hoursForDate,
   isIsoDate,
   isValidBookingWindow,
+  MAX_ORDER_ITEM_QUANTITY,
   TABLES_COUNT
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
@@ -35,7 +36,7 @@ const NEW_ITEMS = Type.Array(
   Type.Object(
     {
       foodItemId: Type.Integer({ minimum: 1 }),
-      quantity: Type.Integer({ minimum: 1, maximum: 50 })
+      quantity: Type.Integer({ minimum: 1, maximum: MAX_ORDER_ITEM_QUANTITY })
     },
     { additionalProperties: false }
   ),

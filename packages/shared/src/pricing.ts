@@ -1,6 +1,9 @@
 /** All money amounts are integer grosze (1 PLN = 100 gr). */
 export const HOURLY_RATE_GROSZ = 40_00;
 
+/** Max quantity per order line (the API rejects more; the UI caps at this). */
+export const MAX_ORDER_ITEM_QUANTITY = 50;
+
 export const CURRENCY = 'PLN';
 
 export function tablePriceGrosz(durationHours: number): number {

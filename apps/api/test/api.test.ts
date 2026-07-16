@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 import { buildApp } from '../src/app.ts';
@@ -42,7 +43,7 @@ before(async () => {
   await admin.end();
 
   const { db, pool } = createDb(TEST_URL);
-  await migrate(db, { migrationsFolder: new URL('../drizzle', import.meta.url).pathname });
+  await migrate(db, { migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)) });
   await pool.end();
   await seed(TEST_URL);
 
@@ -911,4 +912,148 @@ test('active booking: public cancel is rejected, admin cancel succeeds', async (
   });
   assert.equal(admin.statusCode, 200);
   assert.equal(admin.json().phase, 'cancelled');
+});
+
+test('auth-disabled mode: auth/admin return 503 but guest booking still works', async () => {
+  // No adminToken and no jwtSecret → accounts + admin are fully optional/off
+  const disabled = await buildApp({ databaseUrl: TEST_URL, logger: false });
+  await disabled.ready();
+  try {
+    const ip = { 'x-forwarded-for': '198.51.100.7' };
+
+    const login = await disabled.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: ip,
+      payload: { phone: '+48600000009', password: 'whatever-pass' }
+    });
+    assert.equal(login.statusCode, 503);
+    assert.equal(login.json().error, 'auth_disabled');
+
+    const register = await disabled.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      headers: ip,
+      payload: { phone: '+48600000010', name: 'Nobody', password: 'whatever-pass' }
+    });
+    assert.equal(register.statusCode, 503);
+
+    const adminStats = await disabled.inject({
+      method: 'GET',
+      url: '/api/admin/stats',
+      headers: ip
+    });
+    assert.equal(adminStats.statusCode, 503);
+    assert.equal(adminStats.json().error, 'admin_disabled');
+
+    // Booking without auth is unaffected — guests never needed accounts
+    const guest = await disabled.inject({
+      method: 'POST',
+      url: '/api/bookings',
+      headers: ip,
+      payload: {
+        tableId: 1,
+        date: SATURDAY,
+        startHour: 15,
+        durationHours: 1,
+        customerName: 'No Auth Guest',
+        customerPhone: '+48600000011'
+      }
+    });
+    assert.equal(guest.statusCode, 201);
+    assert.equal(guest.json().discountGrosz, 0);
+  } finally {
+    await disabled.close();
+  }
+});
+
+test('auth cookies: login sets an HttpOnly token + flag, the cookie authenticates, logout clears', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.9' };
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/auth/login',
+    headers: ip,
+    payload: { phone: '+48 600 700 800', password: 'secret-pass-1' }
+  });
+  assert.equal(login.statusCode, 200);
+
+  const tokenCookie = login.cookies.find(c => c.name === 'token');
+  const flagCookie = login.cookies.find(c => c.name === 'piramida.auth');
+  assert.ok(tokenCookie, 'token cookie set');
+  assert.equal(tokenCookie.httpOnly, true);
+  assert.ok(flagCookie, 'readable flag cookie set');
+  assert.notEqual(flagCookie.httpOnly, true);
+
+  // The cookie alone (no Authorization header) authenticates
+  const me = await app.inject({
+    method: 'GET',
+    url: '/api/auth/me',
+    headers: ip,
+    cookies: { token: tokenCookie.value }
+  });
+  assert.equal(me.statusCode, 200);
+  assert.equal(me.json().phone, '+48600700800');
+
+  // Logout clears both cookies (expired Set-Cookie)
+  const logout = await app.inject({ method: 'POST', url: '/api/auth/logout', headers: ip });
+  assert.equal(logout.statusCode, 200);
+  const cleared = logout.cookies.find(c => c.name === 'token');
+  assert.ok(cleared && (cleared.value === '' || cleared.maxAge === 0 || cleared.expires));
+});
+
+test('admin session cookie authenticates admin requests; bad token is rejected', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.10' };
+
+  const bad = await app.inject({
+    method: 'POST',
+    url: '/api/admin/session',
+    headers: ip,
+    payload: { token: 'wrong-token' }
+  });
+  assert.equal(bad.statusCode, 401);
+
+  const session = await app.inject({
+    method: 'POST',
+    url: '/api/admin/session',
+    headers: ip,
+    payload: { token: 'test-admin-token' }
+  });
+  assert.equal(session.statusCode, 200);
+  const adminCookie = session.cookies.find(c => c.name === 'admin_token');
+  assert.ok(adminCookie && adminCookie.httpOnly === true, 'HttpOnly admin cookie set');
+
+  // The cookie authenticates an admin request without the x-admin-token header
+  const stats = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: ip,
+    cookies: { admin_token: adminCookie.value }
+  });
+  assert.equal(stats.statusCode, 200);
+});
+
+test('booking on a DST fall-back date computes correct Warsaw instants', async () => {
+  // 2026-10-25 is the EU fall-back Sunday (25-hour day); 15:00 Warsaw is CET
+  // (UTC+1) that afternoon, so the stored instant must be 14:00Z — not 13:00Z.
+  const avail = await app.inject({ method: 'GET', url: '/api/availability?date=2026-10-25' });
+  assert.equal(avail.statusCode, 200);
+  assert.equal(avail.json().open, 15);
+  assert.equal(avail.json().close, 23);
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: { 'x-forwarded-for': '198.51.100.8' },
+    payload: {
+      tableId: 1,
+      date: '2026-10-25',
+      startHour: 15,
+      durationHours: 2,
+      customerName: 'DST Guest',
+      customerPhone: '+48512600600'
+    }
+  });
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.json().startsAt, '2026-10-25T14:00:00.000Z');
+  assert.equal(res.json().endsAt, '2026-10-25T16:00:00.000Z');
 });

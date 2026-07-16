@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { createDb } from './client.ts';
 
@@ -8,6 +9,10 @@ if (!databaseUrl) {
 }
 
 const { db, pool } = createDb(databaseUrl);
-await migrate(db, { migrationsFolder: new URL('../../drizzle', import.meta.url).pathname });
+// fileURLToPath (not URL.pathname) so a deploy path with spaces or non-ASCII
+// characters — which arrive percent-encoded in .pathname — still resolves.
+await migrate(db, {
+  migrationsFolder: fileURLToPath(new URL('../../drizzle', import.meta.url))
+});
 console.log('Migrations applied');
 await pool.end();

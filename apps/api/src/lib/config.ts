@@ -14,6 +14,8 @@ export interface ApiConfig {
   adminToken: string | undefined;
   /** JWT signing secret; accounts/auth stay disabled (503) when unset. */
   jwtSecret: string | undefined;
+  /** Set the Secure flag on auth cookies — on in prod (https), off in dev (http). */
+  cookieSecure: boolean;
 }
 
 /** Fail fast: a missing DATABASE_URL must never silently fall back to localhost. */
@@ -29,6 +31,7 @@ export function loadConfig(): ApiConfig {
     logLevel: process.env.LOG_LEVEL ?? 'info',
     allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()),
     adminToken: process.env.ADMIN_TOKEN,
-    jwtSecret: process.env.JWT_SECRET
+    jwtSecret: process.env.JWT_SECRET,
+    cookieSecure: process.env.NODE_ENV === 'production'
   };
 }

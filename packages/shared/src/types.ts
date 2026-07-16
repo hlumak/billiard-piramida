@@ -162,5 +162,4 @@ export interface CreateBookingInput {
   customerName: BookingDto['customerName'];
   customerPhone: BookingDto['customerPhone'];
   items?: NewOrderItem[];
-  locale?: Locale;
 }

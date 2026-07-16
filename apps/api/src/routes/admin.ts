@@ -22,7 +22,8 @@ import {
   ERROR_RESPONSE,
   LOCALE_SCHEMA
 } from '../lib/schemas.ts';
-import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
+import { ADMIN_TOKEN_COOKIE, clearAdminCookies, setAdminCookies } from '../lib/cookies.ts';
+import { EXCLUSION_VIOLATION, FOREIGN_KEY_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
 import { normalizePhone } from '@repo/shared/phone';
 import { mustLoadBookingDto, phaseOf, toBookingDtos } from '../services/bookings.ts';
@@ -97,6 +98,40 @@ function slugify(name: string): string {
 }
 
 export async function adminRoutes(app: AppInstance, adminToken: string | undefined) {
+  // Session endpoints live OUTSIDE the guarded scope so they manage their own auth:
+  // login validates the token and sets the HttpOnly cookie; logout just clears it.
+  app.post(
+    '/api/admin/session',
+    {
+      // Throttle brute-force on the shared admin secret
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: {
+        body: Type.Object(
+          { token: Type.String({ minLength: 1 }) },
+          { additionalProperties: false }
+        ),
+        response: { 200: Type.Object({ ok: Type.Boolean() }), '4xx': ERROR_RESPONSE }
+      }
+    },
+    async (request, reply) => {
+      if (!adminToken) return reply.code(503).send({ error: 'admin_disabled' });
+      if (!tokenMatches(request.body.token, adminToken)) {
+        return reply.code(401).send({ error: 'unauthorized' });
+      }
+      setAdminCookies(reply, request.body.token, app.cookieSecure);
+      return { ok: true };
+    }
+  );
+
+  app.post(
+    '/api/admin/logout',
+    { schema: { response: { 200: Type.Object({ ok: Type.Boolean() }) } } },
+    async (_request, reply) => {
+      clearAdminCookies(reply, app.cookieSecure);
+      return { ok: true };
+    }
+  );
+
   await app.register(async scope => {
     // Encapsulated scope: the auth hook applies to /api/admin routes only
     const admin = scope.withTypeProvider<TypeBoxTypeProvider>();
@@ -105,8 +140,11 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       if (!adminToken) {
         return reply.code(503).send({ error: 'admin_disabled' });
       }
+      // Accept the token from the HttpOnly cookie (browser) or the x-admin-token
+      // header (API clients / tests).
       const header = request.headers['x-admin-token'];
-      if (typeof header !== 'string' || !tokenMatches(header, adminToken)) {
+      const provided = typeof header === 'string' ? header : request.cookies[ADMIN_TOKEN_COOKIE];
+      if (typeof provided !== 'string' || !tokenMatches(provided, adminToken)) {
         return reply.code(401).send({ error: 'unauthorized' });
       }
     });
@@ -659,11 +697,20 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         if (n > 0) return reply.code(409).send({ error: 'has_orders' });
 
         // Translations cascade via FK
-        const [deleted] = await admin.db
-          .delete(foodItems)
-          .where(eq(foodItems.id, request.params.id))
-          .returning({ id: foodItems.id });
-        if (!deleted) return reply.code(404).send({ error: 'not_found' });
+        try {
+          const [deleted] = await admin.db
+            .delete(foodItems)
+            .where(eq(foodItems.id, request.params.id))
+            .returning({ id: foodItems.id });
+          if (!deleted) return reply.code(404).send({ error: 'not_found' });
+        } catch (err) {
+          // An order inserted between the count() and the delete makes the delete
+          // violate order_items' FK — report it as has_orders, not a 500.
+          if (pgErrorCode(err) === FOREIGN_KEY_VIOLATION) {
+            return reply.code(409).send({ error: 'has_orders' });
+          }
+          throw err;
+        }
         return { deleted: true };
       }
     );

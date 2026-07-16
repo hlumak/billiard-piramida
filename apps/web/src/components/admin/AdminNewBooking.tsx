@@ -20,7 +20,7 @@ const chip = (selected: boolean, disabled = false) =>
   }`;
 
 /** Reception desk: create a booking for a walk-in / phone client. */
-export function AdminNewBooking({ token }: { token: string }) {
+export function AdminNewBooking() {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
   const [date, setDate] = useState<IsoDate>(() => warsawToday());
@@ -34,7 +34,7 @@ export function AdminNewBooking({ token }: { token: string }) {
 
   const create = useMutation({
     mutationFn: () =>
-      adminApi.createBooking(token, {
+      adminApi.createBooking({
         tableId: tableId!,
         date,
         startHour: startHour!,

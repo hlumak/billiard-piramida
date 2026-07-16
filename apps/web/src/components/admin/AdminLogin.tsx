@@ -1,23 +1,17 @@
 import { useState } from 'react';
 import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
-import { adminApi, storeAdminToken } from '../../lib/admin-api';
+import { adminApi } from '../../lib/admin-api';
 import { m as motion } from '../motion';
 import { m } from '../../paraglide/messages.js';
 
-export function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
+export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   const [token, setToken] = useState('');
 
   const login = useMutation({
-    // Verifying the token = making any authenticated call
-    mutationFn: async (candidate: string) => {
-      await adminApi.stats(candidate);
-      return candidate;
-    },
-    onSuccess: verified => {
-      storeAdminToken(verified);
-      onSuccess(verified);
-    }
+    // Exchanges the token for an HttpOnly session cookie (nothing stored in JS)
+    mutationFn: (candidate: string) => adminApi.session(candidate),
+    onSuccess: () => onSuccess()
   });
 
   return (

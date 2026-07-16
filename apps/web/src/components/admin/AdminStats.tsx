@@ -11,8 +11,8 @@ import { UtilizationBars } from './charts/UtilizationBars';
 
 const DAYS = 30;
 
-export function AdminStats({ token }: { token: string }) {
-  const { data, isPending, isError, refetch } = useQuery(adminAnalyticsQuery(token, DAYS));
+export function AdminStats() {
+  const { data, isPending, isError, refetch } = useQuery(adminAnalyticsQuery(DAYS));
 
   if (isError) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !data) {

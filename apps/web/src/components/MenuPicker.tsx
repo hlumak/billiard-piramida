@@ -1,6 +1,6 @@
 import { Button } from '@heroui/react';
 import { Minus, Plus } from 'lucide-react';
-import { formatPln, type MenuItemDto } from '@repo/shared';
+import { formatPln, MAX_ORDER_ITEM_QUANTITY, type MenuItemDto } from '@repo/shared';
 import { intlTag } from '../lib/format';
 import { categoryLabel, groupMenu } from '../lib/menu';
 import { m } from '../paraglide/messages.js';
@@ -66,7 +66,10 @@ export function MenuPicker({
                         variant="outline"
                         aria-label={`${m.btn_add()}: ${item.name}`}
                         className="border-golden text-golden"
-                        onPress={() => onQuantityChange(item.id, quantity + 1)}
+                        isDisabled={quantity >= MAX_ORDER_ITEM_QUANTITY}
+                        onPress={() =>
+                          onQuantityChange(item.id, Math.min(quantity + 1, MAX_ORDER_ITEM_QUANTITY))
+                        }
                       >
                         <Plus className="size-4" />
                       </Button>

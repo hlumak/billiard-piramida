@@ -19,8 +19,8 @@ function StatCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function AdminOverview({ token }: { token: string }) {
-  const { data: stats, isPending, isError, refetch } = useQuery(adminStatsQuery(token));
+export function AdminOverview() {
+  const { data: stats, isPending, isError, refetch } = useQuery(adminStatsQuery());
   const { data: menu } = useQuery(menuQuery(getLocale()));
 
   if (isError) return <QueryError onRetry={() => refetch()} />;
