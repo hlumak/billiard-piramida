@@ -12,6 +12,8 @@ import { adminApi, adminBookingsQuery, type AdminBookingFilters } from '../../li
 import { api } from '../../lib/api';
 import { formatPhone } from '@repo/shared/phone';
 import { intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
+import { menuQuery } from '../../lib/queries';
+import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
@@ -98,6 +100,9 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
     phone: phone !== '' ? phone : undefined
   };
   const { data: bookings, isPending, isError, refetch } = useQuery(adminBookingsQuery(filters));
+  // Localized dish names for the order summary (items carry only a slug)
+  const { data: menu } = useQuery(menuQuery(getLocale()));
+  const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
 
   return (
     <div className="flex flex-col gap-4">
@@ -181,7 +186,11 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
                       </a>
                       {booking.items.length > 0 ? (
                         <span className="ml-2 text-xs text-grey-cool">
-                          {booking.items.map(item => `${item.slug} × ${item.quantity}`).join(', ')}
+                          {booking.items
+                            .map(
+                              item => `${nameBySlug.get(item.slug) ?? item.slug} × ${item.quantity}`
+                            )
+                            .join(', ')}
                         </span>
                       ) : null}
                     </span>
