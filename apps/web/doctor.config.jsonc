@@ -7,8 +7,6 @@
   //    and @heroui/styles; must stay in package.json even though app code never
   //    imports it directly. Removing it breaks the HeroUI v3 / Tailwind v4 setup.
   //
-  // (auth-token-in-web-storage is no longer listed: auth now uses HttpOnly
-  // session cookies, so the finding is genuinely resolved, not excluded.)
   "surfaces": {
     "score": {
       "excludeRules": ["deslop/unused-dependency"]
