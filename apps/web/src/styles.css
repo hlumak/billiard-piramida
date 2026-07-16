@@ -16,7 +16,9 @@
   --color-club-green-light: #176b47;
   --color-btn-text: #373328;
   --color-grey-warm: #585650;
-  --color-grey-cool: #b2b2b2;
+  /* Secondary text: lightened from #b2b2b2 to clear WCAG AA (4.5:1) on the
+     club-green-light card surface (#176b47), where the old value was ~3.05:1. */
+  --color-grey-cool: #d9d9d9;
 }
 
 /* Single dark-green club theme (Figma "pyramida 2" tokens) */

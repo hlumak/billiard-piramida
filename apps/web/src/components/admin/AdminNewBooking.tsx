@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { slotStartsForDate, type IsoDate } from '@repo/shared';
+import { slotStartsForDate, type IsoDate, type TableAvailabilityDto } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
 import { adminApi } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
@@ -53,16 +53,18 @@ export function AdminNewBooking({ token }: { token: string }) {
     }
   });
 
-  // Staff may log games from earlier today, so offer every operating hour
+  // Staff may log games from earlier today, so a table is free for the window
+  // when every hour is a valid slot that isn't already booked — using `booked`
+  // (not `available`, which also hides past hours) is what makes past-today
+  // walk-ins selectable.
   const hours = slotStartsForDate(date);
-  const freeForWindow = (candidateTable: {
-    tableId: number;
-    slots: { hour: number; available: boolean }[];
-  }) => {
+  const freeForWindow = (candidateTable: TableAvailabilityDto) => {
     if (startHour === null) return false;
-    const free = new Set<number>();
-    for (const s of candidateTable.slots) if (s.available) free.add(s.hour);
-    for (let h = startHour; h < startHour + duration; h++) if (!free.has(h)) return false;
+    const slotByHour = new Map(candidateTable.slots.map(s => [s.hour, s]));
+    for (let h = startHour; h < startHour + duration; h++) {
+      const slot = slotByHour.get(h);
+      if (!slot || slot.booked) return false;
+    }
     return true;
   };
 

@@ -5,13 +5,18 @@ import { Link } from '@tanstack/react-router';
 import { formatPhone } from '@repo/shared/phone';
 import { CardFields, type CardsState } from './CardFields';
 import { Reveal } from '../motion';
+import { QueryError } from '../QueryError';
+import { ApiError } from '../../lib/api';
 import { authApi, clearSession, profileQuery } from '../../lib/auth';
 import { m } from '../../paraglide/messages.js';
 
 export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
   const queryClient = useQueryClient();
-  const { data: profile, isPending, isError } = useQuery(profileQuery());
+  const { data: profile, isPending, error, refetch } = useQuery(profileQuery());
   const [cards, setCards] = useState<CardsState | null>(null);
+  // Only an auth failure means the token is dead; a network blip / 5xx must not
+  // silently sign the user out and delete their token.
+  const isAuthError = error instanceof ApiError && error.status === 401;
 
   useEffect(() => {
     if (profile && cards === null) {
@@ -40,11 +45,14 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
     onSignedOut();
   };
 
-  // A dead/expired token would loop on 401 — treat it as signed out
+  // A dead/expired token (401) would loop — treat it as signed out
   useEffect(() => {
-    if (isError) signOut();
+    if (isAuthError) signOut();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isError]);
+  }, [isAuthError]);
+
+  // Non-auth failure: keep the session, offer a retry instead of signing out
+  if (error && !isAuthError) return <QueryError onRetry={() => refetch()} />;
 
   if (isPending || !profile || cards === null) {
     return (

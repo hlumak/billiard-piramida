@@ -60,7 +60,11 @@ export function TimeStep({ date }: { date: IsoDate }) {
   }
 
   const hours = freeHours(availability);
-  const maxHours = start == null ? 0 : maxDuration(availability, start);
+  // Live availability can drop the selected hour out from under the user (someone
+  // else books it). Trust the refreshed list, not the stale local selection, so
+  // Next disables and the empty Duration section doesn't render.
+  const validStart = start != null && hours.includes(start) ? start : null;
+  const maxHours = validStart == null ? 0 : maxDuration(availability, validStart);
   const durations = Array.from({ length: maxHours }, (_, i) => i + 1);
   const effectiveDuration = Math.min(duration, Math.max(maxHours, 1));
 
@@ -85,16 +89,16 @@ export function TimeStep({ date }: { date: IsoDate }) {
                 type="button"
                 variants={fadeUpChild}
                 whileTap={tapScale}
-                aria-pressed={start === hour}
+                aria-pressed={validStart === hour}
                 onClick={() => setStart(hour)}
-                className={chip(start === hour)}
+                className={chip(validStart === hour)}
               >
                 {formatHour(hour)}
               </motion.button>
             ))}
           </motion.div>
 
-          {start != null ? (
+          {validStart != null ? (
             <>
               <p className="mb-2 mt-6 text-sm text-grey-cool">{m.time_duration()}</p>
               <motion.div
@@ -124,9 +128,9 @@ export function TimeStep({ date }: { date: IsoDate }) {
           <Button
             size="lg"
             className="mt-8 h-[45px] w-full text-lg font-bold"
-            isDisabled={start == null}
+            isDisabled={validStart == null}
             onPress={() => {
-              if (start != null) selectTime(start, effectiveDuration);
+              if (validStart != null) selectTime(validStart, effectiveDuration);
             }}
           >
             {m.btn_next()}

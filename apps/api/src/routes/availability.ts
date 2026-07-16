@@ -55,7 +55,9 @@ export function availabilityRoutes(app: AppInstance) {
           const slotEnd = new Date(slotStart.getTime() + HOUR_MS);
           const overlaps = busy.some(b => b.startsAt < slotEnd && b.endsAt > slotStart);
           const inPast = slotStart.getTime() < now.getTime() - 5 * 60_000;
-          slots.push({ hour, available: !overlaps && !inPast });
+          // `booked` = taken (staff can still log past-but-free hours today);
+          // `available` also excludes past hours for the public wizard.
+          slots.push({ hour, available: !overlaps && !inPast, booked: overlaps });
         }
         return { tableId: table.id, slots };
       });

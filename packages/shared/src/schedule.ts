@@ -26,7 +26,13 @@ const OPERATING_HOURS = [
 const ISO_DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
 export function isIsoDate(value: string): value is IsoDate {
-  return ISO_DATE_RE.test(value);
+  if (!ISO_DATE_RE.test(value)) return false;
+  // The regex allows day 31 for every month, so reject overflow dates
+  // (2026-02-31, 2026-04-31, Feb 29 in non-leap years) that would otherwise
+  // roll over silently in Date.UTC and land a booking on the wrong day.
+  const [y, m, d] = value.split('-').map(Number) as [number, number, number];
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
 /**

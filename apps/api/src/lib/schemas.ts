@@ -40,7 +40,8 @@ export const AVAILABILITY_RESPONSE = Type.Object({
       slots: Type.Array(
         Type.Object({
           hour: Type.Integer(),
-          available: Type.Boolean()
+          available: Type.Boolean(),
+          booked: Type.Boolean()
         })
       )
     })

@@ -10,7 +10,7 @@ import {
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, asc, eq, gt } from 'drizzle-orm';
-import { bookings } from '../db/schema.ts';
+import { bookings, users } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BOOKING_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
@@ -18,12 +18,17 @@ import {
   insertOrderItems,
   loadBookingDto,
   mustLoadBookingDto,
-  phaseOf
+  phaseOf,
+  toBookingDtos
 } from '../services/bookings.ts';
 import type { AppInstance } from '../app.ts';
 
+// Strict UUID shape: a loose 36-char pattern lets malformed ids reach Postgres
+// as a uuid cast and surface as a logged 500 (22P02) instead of a clean 404.
 const BOOKING_ID_PARAM = Type.Object({
-  id: Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
+  id: Type.String({
+    pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+  })
 });
 
 const NEW_ITEMS = Type.Array(
@@ -140,7 +145,7 @@ export function bookingRoutes(app: AppInstance) {
 
       // Only bookings the guest can still use; finished history stays private
       const rows = await app.db
-        .select({ id: bookings.id })
+        .select()
         .from(bookings)
         .where(
           and(
@@ -151,7 +156,8 @@ export function bookingRoutes(app: AppInstance) {
         )
         .orderBy(asc(bookings.startsAt))
         .limit(20);
-      return Promise.all(rows.map(row => mustLoadBookingDto(app.db, row.id)));
+      // Batch-load order items in one query instead of N+1 per booking
+      return toBookingDtos(app.db, rows);
     }
   );
 
@@ -202,8 +208,24 @@ export function bookingRoutes(app: AppInstance) {
         return reply.code(422).send({ error: 'past_closing_time' });
       }
 
+      // Discount is a fraction of table rental, so a longer rental changes it —
+      // recompute for signed-in bookings (guests always have discount 0).
+      let discountGrosz = booking.discountGrosz;
+      if (booking.userId !== null) {
+        const [user] = await app.db.select().from(users).where(eq(users.id, booking.userId));
+        if (user) {
+          const newDurationHours = Math.round(
+            (newEndsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
+          );
+          discountGrosz = discountGroszFor(user, newDurationHours * HOURLY_RATE_GROSZ);
+        }
+      }
+
       try {
-        await app.db.update(bookings).set({ endsAt: newEndsAt }).where(eq(bookings.id, booking.id));
+        await app.db
+          .update(bookings)
+          .set({ endsAt: newEndsAt, discountGrosz })
+          .where(eq(bookings.id, booking.id));
       } catch (err) {
         if (pgErrorCode(err) === EXCLUSION_VIOLATION) {
           return reply.code(409).send({ error: 'slot_taken' });

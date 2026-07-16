@@ -15,7 +15,7 @@ import { intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
-import { PHASE_LABELS, PHASE_STYLES } from '../booking/phase';
+import { PHASE_LABELS, PHASE_STYLES, mutationErrorText } from '../booking/phase';
 import { AdminDatePicker } from './AdminDatePicker';
 import { AdminNewBooking } from './AdminNewBooking';
 
@@ -27,7 +27,12 @@ const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[
 
 function RowActions({ token, booking }: { token: string; booking: BookingDto }) {
   const queryClient = useQueryClient();
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin'] });
+  // Cancel/extend free or move a slot, so the New-Booking picker (availability
+  // query) must refresh too, not just the admin lists.
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin'] });
+    queryClient.invalidateQueries({ queryKey: ['availability'] });
+  };
 
   const extend = useMutation({
     mutationFn: () => api.extendBooking(booking.id, 1),
@@ -42,27 +47,35 @@ function RowActions({ token, booking }: { token: string; booking: BookingDto }) 
   // Hide +1h when it would run past closing time (the API would reject it)
   const closeHour = hoursForDate(warsawDate(booking.startsAt)).close;
   const canExtend = warsawHour(booking.endsAt) < closeHour;
+  const actionError = extend.error ?? cancel.error;
   return (
-    <div className="flex gap-1.5">
-      {canExtend ? (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex gap-1.5">
+        {canExtend ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-golden text-creme"
+            isPending={extend.isPending}
+            onPress={() => extend.mutate()}
+          >
+            {m.admin_extend_1h()}
+          </Button>
+        ) : null}
         <Button
           size="sm"
-          variant="outline"
-          className="border-golden text-creme"
-          isPending={extend.isPending}
-          onPress={() => extend.mutate()}
+          variant="danger-soft"
+          isPending={cancel.isPending}
+          onPress={() => cancel.mutate()}
         >
-          {m.admin_extend_1h()}
+          {m.phase_cancelled()}
         </Button>
+      </div>
+      {actionError ? (
+        <span className="text-xs text-danger-soft-foreground">
+          {mutationErrorText(actionError)}
+        </span>
       ) : null}
-      <Button
-        size="sm"
-        variant="danger-soft"
-        isPending={cancel.isPending}
-        onPress={() => cancel.mutate()}
-      >
-        {m.phase_cancelled()}
-      </Button>
     </div>
   );
 }

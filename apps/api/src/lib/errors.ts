@@ -14,3 +14,6 @@ export function pgErrorCode(err: unknown): string | undefined {
 
 /** Postgres exclusion_violation — our booking overlap guard fired. */
 export const EXCLUSION_VIOLATION = '23P01';
+
+/** Postgres unique_violation — a UNIQUE constraint (e.g. users.phone) was hit. */
+export const UNIQUE_VIOLATION = '23505';

@@ -106,21 +106,26 @@ export async function seed(url: string) {
       .onConflictDoNothing();
 
     for (const food of FOOD) {
-      const [existing] = await db
-        .insert(foodItems)
-        .values({ slug: food.slug, category: food.category, priceGrosz: food.priceGrosz })
-        .onConflictDoNothing()
-        .returning({ id: foodItems.id });
-      if (!existing) continue; // already seeded
+      // One transaction per item: a crash between the item insert and its
+      // translations must not leave a permanently untranslated dish that a
+      // re-run (blocked by onConflictDoNothing on the slug) could never repair.
+      await db.transaction(async tx => {
+        const [existing] = await tx
+          .insert(foodItems)
+          .values({ slug: food.slug, category: food.category, priceGrosz: food.priceGrosz })
+          .onConflictDoNothing()
+          .returning({ id: foodItems.id });
+        if (!existing) return; // already seeded
 
-      await db.insert(foodItemTranslations).values(
-        (['uk', 'pl', 'en'] as const).map(locale => ({
-          foodItemId: existing.id,
-          locale,
-          name: food[locale][0],
-          description: food[locale][1]
-        }))
-      );
+        await tx.insert(foodItemTranslations).values(
+          (['uk', 'pl', 'en'] as const).map(locale => ({
+            foodItemId: existing.id,
+            locale,
+            name: food[locale][0],
+            description: food[locale][1]
+          }))
+        );
+      });
     }
   } finally {
     await pool.end();

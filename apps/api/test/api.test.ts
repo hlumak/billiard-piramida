@@ -5,15 +5,27 @@ import pg from 'pg';
 import { buildApp } from '../src/app.ts';
 import { LOCAL_DATABASE_URL } from '../src/lib/config.ts';
 import { createDb } from '../src/db/client.ts';
+import { bookings } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
 
 const ADMIN_URL = process.env.DATABASE_URL ?? LOCAL_DATABASE_URL;
 const TEST_URL = ADMIN_URL.replace(/\/[^/]+$/, '/piramida_test');
 
-/** Next date (≥ 7 days out, so always in the future) falling on `weekday`. */
+/**
+ * Next date (≥ 7 days out, so always in the future) falling on `weekday`.
+ * Computed entirely in UTC so the weekday matches the toISOString() date string
+ * (a local getDay()/UTC-slice mix picks the wrong day near the date boundary).
+ */
 function nextDate(weekday: number): string {
   const d = new Date();
-  d.setDate(d.getDate() + 7 + ((weekday - d.getDay() + 7) % 7));
+  d.setUTCDate(d.getUTCDate() + 7 + ((weekday - d.getUTCDay() + 7) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+/** A past date on `weekday` (≥ 7 days ago), for start-in-past assertions. */
+function pastDate(weekday: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 7 - ((d.getUTCDay() - weekday + 7) % 7));
   return d.toISOString().slice(0, 10);
 }
 
@@ -679,4 +691,224 @@ test('phones are validated and normalized to E.164', async () => {
     payload: { phone: '+48 601 777 888', password: 'password-123' }
   });
   assert.equal(login.statusCode, 200);
+});
+
+// Each of the tests below runs behind its own X-Forwarded-For IP (honored by
+// trustProxy: 1) so their requests get isolated rate-limit buckets and never
+// exhaust the shared 127.0.0.1 quota the other tests rely on.
+
+test('guest phone lookup returns only active bookings and normalizes the query', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.1' };
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: 3,
+      date: MONDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Lookup Guest',
+      customerPhone: '+48 512 100 100'
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id;
+
+  // National-format query must match the E.164-stored number
+  const found = await app.inject({
+    method: 'GET',
+    url: '/api/bookings/lookup?phone=512100100',
+    headers: ip
+  });
+  assert.equal(found.statusCode, 200);
+  assert.ok(found.json().some((b: { id: string }) => b.id === id));
+
+  // Cancelled bookings drop out of the recovery list
+  await app.inject({ method: 'POST', url: `/api/bookings/${id}/cancel`, headers: ip });
+  const afterCancel = await app.inject({
+    method: 'GET',
+    url: '/api/bookings/lookup?phone=512100100',
+    headers: ip
+  });
+  assert.equal(afterCancel.json().length, 0);
+
+  // A number with no bookings returns an empty list, not an error
+  const none = await app.inject({
+    method: 'GET',
+    url: '/api/bookings/lookup?phone=999888777',
+    headers: ip
+  });
+  assert.equal(none.statusCode, 200);
+  assert.deepEqual(none.json(), []);
+});
+
+test('lookup is rate limited to 10 requests per minute', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.2' };
+  let limited = false;
+  for (let i = 0; i < 11; i++) {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/bookings/lookup?phone=500500500',
+      headers: ip
+    });
+    if (res.statusCode === 429) limited = true;
+  }
+  assert.ok(limited, 'expected a 429 within 11 rapid lookups');
+});
+
+test('failed create with an unknown food item leaves no phantom booking', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.3' };
+  const slot = { tableId: 3, date: MONDAY, startHour: 17, durationHours: 1 };
+
+  const bad = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      ...slot,
+      customerName: 'Rollback',
+      customerPhone: '+48 512 200 200',
+      items: [{ foodItemId: 99999, quantity: 1 }]
+    }
+  });
+  assert.equal(bad.statusCode, 422);
+  assert.equal(bad.json().error, 'unknown_food_item');
+
+  // The rolled-back attempt must not have held the slot
+  const good = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: { ...slot, customerName: 'After Rollback', customerPhone: '+48 512 200 201' }
+  });
+  assert.equal(good.statusCode, 201);
+});
+
+test('extend colliding with a later booking on the same table returns 409', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.4' };
+  const first = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: 3,
+      date: MONDAY,
+      startHour: 18,
+      durationHours: 1,
+      customerName: 'Extend A',
+      customerPhone: '+48 512 300 300'
+    }
+  });
+  assert.equal(first.statusCode, 201);
+  const firstId = first.json().id;
+
+  // A later booking leaves a 19–20 gap after the first (18–19)
+  const later = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: 3,
+      date: MONDAY,
+      startHour: 20,
+      durationHours: 1,
+      customerName: 'Extend B',
+      customerPhone: '+48 512 300 301'
+    }
+  });
+  assert.equal(later.statusCode, 201);
+
+  // Extending the first to 18–21 overlaps the 20–21 booking → EXCLUDE fires
+  const collide = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${firstId}/extend`,
+    headers: ip,
+    payload: { additionalHours: 2 }
+  });
+  assert.equal(collide.statusCode, 409);
+  assert.equal(collide.json().error, 'slot_taken');
+
+  // Extending into the free gap (18–20) still succeeds
+  const ok = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${firstId}/extend`,
+    headers: ip,
+    payload: { additionalHours: 1 }
+  });
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.json().tableTotalGrosz, 2 * 40_00);
+});
+
+test('bookings in the past are rejected on public and admin create', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.5' };
+  const lastMonday = pastDate(1);
+
+  const pub = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: 1,
+      date: lastMonday,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Past',
+      customerPhone: '+48 512 400 400'
+    }
+  });
+  assert.equal(pub.statusCode, 422);
+  assert.equal(pub.json().error, 'start_in_past');
+
+  const admin = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers: { ...ip, 'x-admin-token': 'test-admin-token' },
+    payload: {
+      tableId: 1,
+      date: lastMonday,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Past Admin',
+      customerPhone: '+48 512 400 401'
+    }
+  });
+  assert.equal(admin.statusCode, 422);
+  assert.equal(admin.json().error, 'start_in_past');
+});
+
+test('active booking: public cancel is rejected, admin cancel succeeds', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.6' };
+  const { db, pool } = createDb(TEST_URL);
+  const now = Date.now();
+  const [row] = await db
+    .insert(bookings)
+    .values({
+      tableId: 1,
+      customerName: 'Active Now',
+      customerPhone: '+48512500500',
+      startsAt: new Date(now - 30 * 60_000),
+      endsAt: new Date(now + 90 * 60_000)
+    })
+    .returning({ id: bookings.id });
+  await pool.end();
+  assert.ok(row);
+
+  // Public cancel only allows upcoming bookings
+  const pub = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${row.id}/cancel`,
+    headers: ip
+  });
+  assert.equal(pub.statusCode, 409);
+  assert.equal(pub.json().error, 'only_upcoming_can_be_cancelled');
+
+  // Staff may cancel an in-progress booking
+  const admin = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${row.id}/cancel`,
+    headers: { ...ip, 'x-admin-token': 'test-admin-token' }
+  });
+  assert.equal(admin.statusCode, 200);
+  assert.equal(admin.json().phase, 'cancelled');
 });

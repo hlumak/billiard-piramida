@@ -12,6 +12,7 @@ import { AdminMenu } from '../components/admin/AdminMenu';
 import { AdminOverview } from '../components/admin/AdminOverview';
 import { AdminStats } from '../components/admin/AdminStats';
 import { clearAdminToken, storedAdminToken } from '../lib/admin-api';
+import { ApiError } from '../lib/api';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 
@@ -53,6 +54,24 @@ function AdminPage() {
     queryClient.removeQueries({ queryKey: ['admin'] });
     setToken(null);
   };
+
+  // A rotated ADMIN_TOKEN (401) or disabled admin (503) invalidates the stored
+  // token; any admin query hitting that must drop back to the login gate instead
+  // of dead-ending in per-tab retry errors.
+  useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe(event => {
+      const error = event.query.state.error;
+      if (
+        event.query.queryKey[0] === 'admin' &&
+        error instanceof ApiError &&
+        (error.status === 401 || error.status === 503)
+      ) {
+        logout();
+      }
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryClient]);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-6 pb-10 pt-14 lg:max-w-5xl">

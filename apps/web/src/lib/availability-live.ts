@@ -72,6 +72,11 @@ class AvailabilityLive {
     });
 
     socket.addEventListener('close', () => {
+      // Ignore the close of a socket we already replaced (a disconnect()
+      // during a step/date transition creates a fresh socket synchronously,
+      // and the old one's close event fires afterwards). Without this guard it
+      // would null out the live socket, leak it, and schedule a spurious retry.
+      if (this.socket !== socket) return;
       this.socket = null;
       if (this.listeners.size === 0) return;
       this.retryTimer = setTimeout(() => {

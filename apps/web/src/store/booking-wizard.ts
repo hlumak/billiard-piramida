@@ -31,6 +31,15 @@ export function resetWizard(): void {
   wizardStore.setState(() => initialState);
 }
 
+/**
+ * The store is a long-lived SPA singleton, so an abandoned wizard can resume days
+ * later on a stale (now past) date. Called on wizard mount to start fresh instead.
+ */
+export function resetIfDateStale(today: IsoDate): void {
+  const { date } = wizardStore.state;
+  if (date !== null && date < today) resetWizard();
+}
+
 export function stepIndex(step: WizardStep): number {
   return WIZARD_STEPS.indexOf(step);
 }

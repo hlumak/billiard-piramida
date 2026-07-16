@@ -12,8 +12,12 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
   const [isOpen, setOpen] = useState(false);
   const [hours, setHours] = useState(1);
 
+  // Clamp against the current remaining window: after a prior extend, maxExtend
+  // shrinks, and a stale `hours` would otherwise submit more than fits and 422.
+  const effectiveHours = Math.min(hours, maxExtend);
+
   const extend = useMutation({
-    mutationFn: () => api.extendBooking(booking.id, hours),
+    mutationFn: () => api.extendBooking(booking.id, effectiveHours),
     onSuccess: updated => {
       queryClient.setQueryData(bookingQuery(booking.id).queryKey, updated);
       setOpen(false);
@@ -22,7 +26,15 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
 
   return (
     <Modal>
-      <Button size="lg" className="h-[45px] w-full text-lg font-bold" onPress={() => setOpen(true)}>
+      <Button
+        size="lg"
+        className="h-[45px] w-full text-lg font-bold"
+        onPress={() => {
+          setHours(1);
+          extend.reset();
+          setOpen(true);
+        }}
+      >
         {m.extend()}
       </Button>
       <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
@@ -38,10 +50,10 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
                   <button
                     key={count}
                     type="button"
-                    aria-pressed={hours === count}
+                    aria-pressed={effectiveHours === count}
                     onClick={() => setHours(count)}
                     className={`h-10 min-w-[64px] rounded-[10px] px-3 font-semibold transition-colors ${
-                      hours === count
+                      effectiveHours === count
                         ? 'bg-golden text-btn-text'
                         : 'bg-club-green text-creme hover:bg-surface-hover'
                     }`}
@@ -63,7 +75,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
                 isPending={extend.isPending}
                 onPress={() => extend.mutate()}
               >
-                {m.extend()} · {m.hours_n({ n: hours })}
+                {m.extend()} · {m.hours_n({ n: effectiveHours })}
               </Button>
             </Modal.Footer>
           </Modal.Dialog>

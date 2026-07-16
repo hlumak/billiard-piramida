@@ -41,6 +41,12 @@ export interface AdminBookingFilters {
   phone?: string | undefined;
 }
 
+export interface CustomerListParams {
+  limit?: number | undefined;
+  offset?: number | undefined;
+  phone?: string | undefined;
+}
+
 function authHeaders(token: string): Record<string, string> {
   return { 'x-admin-token': token };
 }
@@ -59,8 +65,17 @@ export const adminApi = {
       signal
     });
   },
-  customers: (token: string, signal?: AbortSignal) =>
-    request<AdminCustomerDto[]>('/api/admin/customers', { headers: authHeaders(token), signal }),
+  customers: (token: string, params: CustomerListParams = {}, signal?: AbortSignal) => {
+    const query = new URLSearchParams();
+    if (params.limit !== undefined) query.set('limit', String(params.limit));
+    if (params.offset !== undefined) query.set('offset', String(params.offset));
+    if (params.phone) query.set('phone', params.phone);
+    const suffix = query.toString();
+    return request<AdminCustomerDto[]>(`/api/admin/customers${suffix ? `?${suffix}` : ''}`, {
+      headers: authHeaders(token),
+      signal
+    });
+  },
   createBooking: (token: string, input: AdminCreateBookingInput) =>
     request<BookingDto>('/api/admin/bookings', {
       method: 'POST',
@@ -132,13 +147,27 @@ export const adminStatsQuery = (token: string) =>
 
 export const adminBookingsQuery = (token: string, filters: AdminBookingFilters) =>
   queryOptions({
-    queryKey: ['admin', 'bookings', filters.date ?? null, filters.status ?? null],
+    // Every filter the queryFn reads must be in the key, or the phone search
+    // reuses a stale cache entry and never refetches.
+    queryKey: [
+      'admin',
+      'bookings',
+      filters.date ?? null,
+      filters.status ?? null,
+      filters.phone ?? null
+    ],
     queryFn: ({ signal }) => adminApi.bookings(token, filters, signal),
     refetchInterval: 60_000
   });
 
-export const adminCustomersQuery = (token: string) =>
+export const adminCustomersQuery = (token: string, params: CustomerListParams = {}) =>
   queryOptions({
-    queryKey: ['admin', 'customers'],
-    queryFn: ({ signal }) => adminApi.customers(token, signal)
+    queryKey: [
+      'admin',
+      'customers',
+      params.limit ?? null,
+      params.offset ?? null,
+      params.phone ?? null
+    ],
+    queryFn: ({ signal }) => adminApi.customers(token, params, signal)
   });

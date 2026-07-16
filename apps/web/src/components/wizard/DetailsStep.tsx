@@ -73,10 +73,19 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
     }
   });
 
-  const errorMessage = createBooking.error
-    ? createBooking.error instanceof ApiError && createBooking.error.code === 'slot_taken'
+  // Errors the user can only fix by returning to the time step and re-picking
+  const err = createBooking.error;
+  const isTimeError =
+    err instanceof ApiError &&
+    (err.code === 'slot_taken' ||
+      err.code === 'start_in_past' ||
+      err.code === 'outside_operating_hours');
+  const errorMessage = err
+    ? err instanceof ApiError && err.code === 'slot_taken'
       ? m.err_slot_taken()
-      : m.err_generic()
+      : isTimeError
+        ? m.err_slot_expired()
+        : m.err_generic()
     : null;
 
   return (
@@ -188,8 +197,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
           {errorMessage ? (
             <div className="rounded-[10px] bg-danger-soft p-3 text-sm text-creme">
               {errorMessage}
-              {createBooking.error instanceof ApiError &&
-              createBooking.error.code === 'slot_taken' ? (
+              {isTimeError ? (
                 <Button
                   size="sm"
                   variant="outline"

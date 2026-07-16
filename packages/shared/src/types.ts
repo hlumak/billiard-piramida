@@ -14,7 +14,11 @@ export interface TableDto {
 export interface SlotDto {
   /** Local Warsaw hour, e.g. 16 for 16:00 */
   hour: number;
+  /** Bookable by the public: not taken AND not in the past. */
   available: boolean;
+  /** Occupied by a confirmed booking, regardless of pastness. Lets staff log
+   *  walk-in games that already started today (which `available` hides). */
+  booked: boolean;
 }
 
 export interface TableAvailabilityDto {

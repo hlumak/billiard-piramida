@@ -9,8 +9,7 @@ import {
   TABLES_COUNT,
   type AdminAnalyticsDto,
   type AdminCustomerDto,
-  type AdminStatsDto,
-  type BookingDto
+  type AdminStatsDto
 } from '@repo/shared';
 import { and, count, desc, eq, gte, ilike, inArray, lt, lte, max, min, sql } from 'drizzle-orm';
 import { bookings, foodItems, foodItemTranslations, orderItems, tables } from '../db/schema.ts';
@@ -26,7 +25,7 @@ import {
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
 import { normalizePhone } from '@repo/shared/phone';
-import { mustLoadBookingDto, phaseOf } from '../services/bookings.ts';
+import { mustLoadBookingDto, phaseOf, toBookingDtos } from '../services/bookings.ts';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import type { Db } from '../db/client.ts';
 import type { AppInstance } from '../app.ts';
@@ -50,7 +49,8 @@ async function revenueBetween(db: Db, from: Date, to: Date): Promise<number> {
   const [[tablePart], [foodPart]] = await Promise.all([
     db
       .select({
-        grosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${HOURLY_RATE_GROSZ}), 0)::int`
+        // Net of discounts so /stats agrees with /analytics for the same day
+        grosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${HOURLY_RATE_GROSZ}), 0)::int - coalesce(sum(${bookings.discountGrosz}), 0)::int`
       })
       .from(bookings)
       .where(inRange),
@@ -63,56 +63,6 @@ async function revenueBetween(db: Db, from: Date, to: Date): Promise<number> {
       .where(inRange)
   ]);
   return (tablePart?.grosz ?? 0) + (foodPart?.grosz ?? 0);
-}
-
-/** Compose BookingDto[] for a set of rows without per-booking queries. */
-async function toBookingDtos(
-  db: Db,
-  rows: (typeof bookings.$inferSelect)[]
-): Promise<BookingDto[]> {
-  const ids = rows.map(b => b.id);
-  const items =
-    ids.length === 0
-      ? []
-      : await db
-          .select({
-            id: orderItems.id,
-            bookingId: orderItems.bookingId,
-            foodItemId: orderItems.foodItemId,
-            slug: foodItems.slug,
-            quantity: orderItems.quantity,
-            unitPriceGrosz: orderItems.unitPriceGrosz
-          })
-          .from(orderItems)
-          .innerJoin(foodItems, eq(orderItems.foodItemId, foodItems.id))
-          .where(inArray(orderItems.bookingId, ids));
-
-  const now = new Date();
-  return rows.map(booking => {
-    const bookingItems = items
-      .filter(item => item.bookingId === booking.id)
-      .map(({ bookingId: _bookingId, ...item }) => item);
-    const durationHours = Math.round(
-      (booking.endsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
-    );
-    const tableTotalGrosz = durationHours * HOURLY_RATE_GROSZ;
-    const foodTotalGrosz = bookingItems.reduce((sum, i) => sum + i.quantity * i.unitPriceGrosz, 0);
-    return {
-      id: booking.id,
-      tableId: booking.tableId,
-      customerName: booking.customerName,
-      customerPhone: booking.customerPhone,
-      startsAt: booking.startsAt.toISOString(),
-      endsAt: booking.endsAt.toISOString(),
-      status: booking.status,
-      phase: phaseOf(booking.status, booking.startsAt, booking.endsAt, now),
-      items: bookingItems,
-      tableTotalGrosz,
-      foodTotalGrosz,
-      discountGrosz: booking.discountGrosz,
-      totalGrosz: tableTotalGrosz + foodTotalGrosz - booking.discountGrosz
-    };
-  });
 }
 
 type FoodItemRow = typeof foodItems.$inferSelect;
@@ -204,53 +154,85 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
 
     admin.get(
       '/api/admin/customers',
-      { schema: { response: { 200: Type.Array(ADMIN_CUSTOMER_RESPONSE) } } },
-      async (): Promise<AdminCustomerDto[]> => {
+      {
+        schema: {
+          querystring: Type.Object(
+            {
+              limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })),
+              offset: Type.Optional(Type.Integer({ minimum: 0 })),
+              phone: Type.Optional(Type.String({ maxLength: 25 }))
+            },
+            { additionalProperties: false }
+          ),
+          response: { 200: Type.Array(ADMIN_CUSTOMER_RESPONSE) }
+        }
+      },
+      async (request): Promise<AdminCustomerDto[]> => {
         const db = admin.db;
-        const [aggregates, foodByPhone, latestNames] = await Promise.all([
-          db
-            .select({
-              phone: bookings.customerPhone,
-              bookingsCount: count(),
-              cancelledCount: sql<number>`count(*) filter (where ${bookings.status} = 'cancelled')::int`,
-              firstSeen: min(bookings.startsAt),
-              lastSeen: max(bookings.startsAt),
-              tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${HOURLY_RATE_GROSZ}) filter (where ${bookings.status} = 'confirmed'), 0)::int`
-            })
-            .from(bookings)
-            .groupBy(bookings.customerPhone),
-          db
-            .select({
-              phone: bookings.customerPhone,
-              foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPriceGrosz}), 0)::int`
-            })
-            .from(orderItems)
-            .innerJoin(bookings, eq(orderItems.bookingId, bookings.id))
-            .where(eq(bookings.status, 'confirmed'))
-            .groupBy(bookings.customerPhone),
-          db
-            .selectDistinctOn([bookings.customerPhone], {
-              phone: bookings.customerPhone,
-              name: bookings.customerName
-            })
-            .from(bookings)
-            .orderBy(bookings.customerPhone, desc(bookings.startsAt))
-        ]);
+        const limit = request.query.limit ?? 100;
+        const offset = request.query.offset ?? 0;
+        const phoneFilter =
+          request.query.phone && request.query.phone.trim() !== ''
+            ? ilike(bookings.customerPhone, `%${request.query.phone.trim()}%`)
+            : undefined;
+
+        // Page the customer set first (newest visit first), then compute food
+        // totals and latest names only for the returned phones — so all three
+        // queries stay bounded instead of scanning the whole bookings table.
+        const aggregates = await db
+          .select({
+            phone: bookings.customerPhone,
+            bookingsCount: count(),
+            cancelledCount: sql<number>`count(*) filter (where ${bookings.status} = 'cancelled')::int`,
+            firstSeen: min(bookings.startsAt),
+            lastSeen: max(bookings.startsAt),
+            tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${HOURLY_RATE_GROSZ}) filter (where ${bookings.status} = 'confirmed'), 0)::int`
+          })
+          .from(bookings)
+          .where(phoneFilter)
+          .groupBy(bookings.customerPhone)
+          .orderBy(desc(max(bookings.startsAt)))
+          .limit(limit)
+          .offset(offset);
+
+        const phones = aggregates.map(a => a.phone);
+        const [foodByPhone, latestNames] =
+          phones.length === 0
+            ? [[], []]
+            : await Promise.all([
+                db
+                  .select({
+                    phone: bookings.customerPhone,
+                    foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPriceGrosz}), 0)::int`
+                  })
+                  .from(orderItems)
+                  .innerJoin(bookings, eq(orderItems.bookingId, bookings.id))
+                  .where(
+                    and(eq(bookings.status, 'confirmed'), inArray(bookings.customerPhone, phones))
+                  )
+                  .groupBy(bookings.customerPhone),
+                db
+                  .selectDistinctOn([bookings.customerPhone], {
+                    phone: bookings.customerPhone,
+                    name: bookings.customerName
+                  })
+                  .from(bookings)
+                  .where(inArray(bookings.customerPhone, phones))
+                  .orderBy(bookings.customerPhone, desc(bookings.startsAt))
+              ]);
 
         const foodMap = new Map(foodByPhone.map(f => [f.phone, f.foodGrosz]));
         const nameMap = new Map(latestNames.map(n => [n.phone, n.name]));
 
-        return aggregates
-          .map(agg => ({
-            phone: agg.phone,
-            name: nameMap.get(agg.phone) ?? '',
-            bookingsCount: agg.bookingsCount,
-            cancelledCount: agg.cancelledCount,
-            firstSeen: agg.firstSeen?.toISOString() ?? '',
-            lastSeen: agg.lastSeen?.toISOString() ?? '',
-            totalSpentGrosz: agg.tableGrosz + (foodMap.get(agg.phone) ?? 0)
-          }))
-          .sort((a, b) => b.lastSeen.localeCompare(a.lastSeen));
+        return aggregates.map(agg => ({
+          phone: agg.phone,
+          name: nameMap.get(agg.phone) ?? '',
+          bookingsCount: agg.bookingsCount,
+          cancelledCount: agg.cancelledCount,
+          firstSeen: agg.firstSeen?.toISOString() ?? '',
+          lastSeen: agg.lastSeen?.toISOString() ?? '',
+          totalSpentGrosz: agg.tableGrosz + (foodMap.get(agg.phone) ?? 0)
+        }));
       }
     );
 

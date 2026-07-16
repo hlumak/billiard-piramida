@@ -14,12 +14,22 @@ const TOKEN_KEY = 'piramida.token';
 /** Optional-auth session token (null for guests / during SSR). */
 export function authToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+  // localStorage access throws in storage-blocked contexts (Safari private
+  // mode, disabled cookies) — a guest without a token must not crash the app.
+  try {
+    return window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export function persistAuthToken(token: string | null): void {
-  if (token === null) window.localStorage.removeItem(TOKEN_KEY);
-  else window.localStorage.setItem(TOKEN_KEY, token);
+  try {
+    if (token === null) window.localStorage.removeItem(TOKEN_KEY);
+    else window.localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    /* storage blocked — the session simply won't persist across reloads */
+  }
 }
 
 export class ApiError extends Error {

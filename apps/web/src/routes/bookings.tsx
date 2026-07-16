@@ -9,7 +9,8 @@ import { PHASE_LABELS } from '../components/booking/phase';
 import { StaggerGroup, StaggerItem } from '../components/motion';
 import { formatDayLong, intlTag, warsawDate, warsawTime } from '../lib/format';
 import { bookingQuery } from '../lib/queries';
-import { api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
+import { QueryError } from '../components/QueryError';
 import { recentBookingIds, rememberBooking } from '../lib/recent-bookings';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
@@ -30,6 +31,11 @@ function MyBookingsPage() {
 
   const isLoading = ids == null || results.some(result => result.isPending);
   const bookings = results.map(result => result.data).filter(booking => booking != null);
+  // A 404 means that stored booking is gone (drop it silently); a network/5xx
+  // failure with nothing to show must not masquerade as "no bookings".
+  const hardFailure = results.some(
+    result => result.error && !(result.error instanceof ApiError && result.error.status === 404)
+  );
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
@@ -40,6 +46,8 @@ function MyBookingsPage() {
           <div className="flex justify-center py-16">
             <Spinner aria-label={m.loading()} />
           </div>
+        ) : hardFailure && bookings.length === 0 ? (
+          <QueryError onRetry={() => results.forEach(result => void result.refetch())} />
         ) : bookings.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-12">
             <p className="text-grey-cool">{m.no_bookings()}</p>

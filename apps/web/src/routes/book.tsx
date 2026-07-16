@@ -4,6 +4,7 @@ import { useStore } from '@tanstack/react-store';
 import { AnimatePresence, m } from '../components/motion';
 import { m as msg } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
+import { warsawToday } from '../lib/format';
 import { PageHeader } from '../components/AppHeader';
 import { WizardProgress } from '../components/WizardProgress';
 import { DateStep } from '../components/wizard/DateStep';
@@ -14,6 +15,7 @@ import { DetailsStep } from '../components/wizard/DetailsStep';
 import {
   WIZARD_STEPS,
   goToStep,
+  resetIfDateStale,
   stepIndex,
   wizardStore,
   type WizardState,
@@ -63,6 +65,12 @@ const stepVariants = {
 function BookingWizard() {
   const navigate = useNavigate();
   const state = useStore(wizardStore);
+
+  // Drop an abandoned wizard whose date has since passed (client-only mutation)
+  useEffect(() => {
+    resetIfDateStale(warsawToday());
+  }, []);
+
   const step = permittedStep(state);
 
   useEffect(() => {

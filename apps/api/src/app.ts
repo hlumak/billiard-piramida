@@ -53,11 +53,17 @@ export async function buildApp({
       typeof logger === 'object'
         ? { ...logger, redact: { paths: ['req.headers.authorization'], remove: true } }
         : logger,
-    // Behind the nginx reverse proxy: resolve the real client IP from X-Forwarded-For
-    trustProxy: true
+    // Behind exactly one nginx reverse proxy: trust only the last hop so
+    // request.ip is the address nginx appended, not a client-forged
+    // X-Forwarded-For (which would let anyone rotate IPs past the rate limits).
+    trustProxy: 1
   }).withTypeProvider<TypeBoxTypeProvider>();
 
   const { db, pool } = createDb(databaseUrl);
+  // A pg Pool emits 'error' when an idle backend connection dies (e.g. Postgres
+  // restart); with no listener that throws as an uncaughtException and kills the
+  // process. Log and let the pool recycle the client on next checkout.
+  pool.on('error', err => app.log.error({ err }, 'idle postgres client error'));
   app.decorate('db', db);
   app.decorate('availabilityHub', new AvailabilityHub());
   app.addHook('onClose', async () => {
@@ -79,8 +85,13 @@ export async function buildApp({
   await app.register(websocket, {
     options: { maxPayload: 1024 }
   });
-  // Registered even when auth is disabled (routes 503) so jwtSign/jwtVerify exist
-  await app.register(jwt, { secret: jwtSecret ?? 'auth-disabled-placeholder' });
+  // Registered even when auth is disabled (routes 503) so jwtSign/jwtVerify exist.
+  // Tokens expire (low-stakes accounts, no server-side revocation) — jwtVerify
+  // rejects expired ones and the web client treats 401 as signed-out.
+  await app.register(jwt, {
+    secret: jwtSecret ?? 'auth-disabled-placeholder',
+    sign: { expiresIn: '30d' }
+  });
 
   app.decorate('authenticatedUser', async (request: FastifyRequest) => {
     if (jwtSecret === undefined) return null;
