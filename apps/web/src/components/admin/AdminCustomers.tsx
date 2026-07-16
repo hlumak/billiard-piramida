@@ -34,8 +34,8 @@ export function AdminCustomers({
     <StaggerGroup>
       <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
         {customers.map(customer => (
-          <StaggerItem key={customer.phone}>
-            <li className="rounded-[10px] bg-club-green-light p-3">
+          <StaggerItem key={customer.phone} className="h-full">
+            <li className="h-full rounded-[10px] bg-club-green-light p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold text-creme">{customer.name}</span>
                 <span className="flex items-center gap-2">
