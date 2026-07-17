@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { AnimatePresence, m } from '../components/motion/provider';
 import { m as msg } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 import { warsawToday } from '../lib/format';
@@ -55,13 +54,6 @@ function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) 
   return <DetailsStep draft={{ date, startHour, durationHours, tableId }} />;
 }
 
-/* Steps slide in from the side you're heading towards */
-const stepVariants = {
-  enter: (direction: number) => ({ opacity: 0, x: 32 * direction }),
-  center: { opacity: 1, x: 0 },
-  exit: (direction: number) => ({ opacity: 0, x: -32 * direction })
-};
-
 function BookingWizard() {
   const navigate = useNavigate();
   const state = useStore(wizardStore);
@@ -99,19 +91,11 @@ function BookingWizard() {
       <WizardProgress step={index + 1} total={WIZARD_STEPS.length} />
       {/* Clip box extends into the page padding so input focus rings aren't shaved off */}
       <main className="-mx-6 mt-8 flex-1 overflow-x-clip px-6">
-        <AnimatePresence mode="popLayout" initial={false} custom={direction}>
-          <m.div
-            key={step}
-            custom={direction}
-            variants={stepVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-          >
-            <CurrentStep state={state} step={step} />
-          </m.div>
-        </AnimatePresence>
+        {/* key remounts the wrapper per step so the CSS slide-in replays;
+            enter-only on purpose — see step-in-* keyframes in styles.css */}
+        <div key={step} className={direction === 1 ? 'anim-step-forward' : 'anim-step-back'}>
+          <CurrentStep state={state} step={step} />
+        </div>
       </main>
     </div>
   );

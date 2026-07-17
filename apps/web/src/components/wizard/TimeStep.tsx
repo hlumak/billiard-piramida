@@ -7,8 +7,6 @@ import { m } from '../../paraglide/messages.js';
 import { formatHour } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { useLiveAvailability } from '../../lib/availability-live';
-import { m as motion } from '../motion/provider';
-import { fadeUpChild, staggerParent, tapScale } from '../motion/variants';
 import { QueryError } from '../QueryError';
 import { selectTime, wizardStore } from '../../store/booking-wizard';
 
@@ -37,7 +35,7 @@ function maxDuration(availability: AvailabilityDto, start: number): number {
 }
 
 const chip = (selected: boolean) =>
-  `h-10 min-w-[64px] rounded-[10px] px-3 font-semibold transition-colors ${
+  `anim-stagger-item h-10 min-w-[64px] rounded-[10px] px-3 font-semibold transition active:scale-95 ${
     selected ? 'bg-golden text-btn-text' : 'bg-club-green-light text-creme hover:bg-surface-hover'
   }`;
 
@@ -77,50 +75,36 @@ export function TimeStep({ date }: { date: IsoDate }) {
       ) : (
         <>
           <p className="mb-2 text-sm text-grey-cool">{m.time_start()}</p>
-          <motion.div
-            className="flex flex-wrap gap-2"
-            variants={staggerParent}
-            initial="hidden"
-            animate="visible"
-          >
+          <div className="flex flex-wrap gap-2">
             {hours.map(hour => (
-              <motion.button
+              <button
                 key={hour}
                 type="button"
-                variants={fadeUpChild}
-                whileTap={tapScale}
                 aria-pressed={validStart === hour}
                 onClick={() => setStart(hour)}
                 className={chip(validStart === hour)}
               >
                 {formatHour(hour)}
-              </motion.button>
+              </button>
             ))}
-          </motion.div>
+          </div>
 
           {validStart != null ? (
             <>
               <p className="mb-2 mt-6 text-sm text-grey-cool">{m.time_duration()}</p>
-              <motion.div
-                className="flex flex-wrap gap-2"
-                variants={staggerParent}
-                initial="hidden"
-                animate="visible"
-              >
+              <div className="flex flex-wrap gap-2">
                 {durations.map(hoursCount => (
-                  <motion.button
+                  <button
                     key={hoursCount}
                     type="button"
-                    variants={fadeUpChild}
-                    whileTap={tapScale}
                     aria-pressed={effectiveDuration === hoursCount}
                     onClick={() => setDuration(hoursCount)}
                     className={chip(effectiveDuration === hoursCount)}
                   >
                     {m.hours_n({ n: hoursCount })}
-                  </motion.button>
+                  </button>
                 ))}
-              </motion.div>
+              </div>
               <p className="mt-3 text-xs text-grey-cool">{m.min_booking_note()}</p>
             </>
           ) : null}

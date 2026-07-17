@@ -5,7 +5,6 @@ import { menuQuery } from '../../lib/queries';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { StaggerGroup, StaggerItem } from '../motion';
-import { m as motion } from '../motion/provider';
 import { AddFoodModal } from './AddFoodModal';
 import { CancelModal } from './CancelModal';
 import { ExtendModal } from './ExtendModal';
@@ -30,15 +29,10 @@ export function BookingDetails({
   return (
     <StaggerGroup className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
       {justCreated && booking.phase !== 'cancelled' ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-          className="rounded-[10px] bg-golden/15 p-4 text-center md:col-span-2"
-        >
+        <div className="anim-pop rounded-[10px] bg-golden/15 p-4 text-center md:col-span-2">
           <p className="text-lg font-bold text-golden">{m.success_title()}</p>
           <p className="mt-1 text-sm text-creme/80">{m.success_hint()}</p>
-        </motion.div>
+        </div>
       ) : null}
 
       <StaggerItem className="rounded-[10px] bg-club-green-light p-4">

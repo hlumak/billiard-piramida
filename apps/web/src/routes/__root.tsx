@@ -3,7 +3,6 @@ import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/reac
 
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
-import { MotionProvider } from '../components/motion/provider';
 import { SITE_URL } from '../lib/seo';
 import { DevTools } from '../integrations/devtools';
 
@@ -49,7 +48,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <MotionProvider>{children}</MotionProvider>
+        {children}
         {import.meta.env.DEV ? (
           <Suspense fallback={null}>
             <DevTools />

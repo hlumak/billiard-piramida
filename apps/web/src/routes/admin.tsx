@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Button, Spinner } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { AnimatePresence, m as motion } from '../components/motion/provider';
 import { PageHeader } from '../components/AppHeader';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { AdminBookings } from '../components/admin/AdminBookings';
@@ -117,25 +116,18 @@ function AdminPage() {
               </div>
             </div>
 
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.div
-                key={tab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
-              >
-                {tab === 'overview' ? <AdminOverview /> : null}
-                {tab === 'stats' ? <AdminStats /> : null}
-                {tab === 'bookings' ? (
-                  <AdminBookings key={bookingsPhone} initialPhone={bookingsPhone} />
-                ) : null}
-                {tab === 'customers' ? (
-                  <AdminCustomers onShowBookings={showCustomerBookings} />
-                ) : null}
-                {tab === 'menu' ? <AdminMenu /> : null}
-              </motion.div>
-            </AnimatePresence>
+            {/* key remounts the pane so the CSS entrance replays per tab */}
+            <div key={tab} className="anim-stagger-item">
+              {tab === 'overview' ? <AdminOverview /> : null}
+              {tab === 'stats' ? <AdminStats /> : null}
+              {tab === 'bookings' ? (
+                <AdminBookings key={bookingsPhone} initialPhone={bookingsPhone} />
+              ) : null}
+              {tab === 'customers' ? (
+                <AdminCustomers onShowBookings={showCustomerBookings} />
+              ) : null}
+              {tab === 'menu' ? <AdminMenu /> : null}
+            </div>
           </div>
         )}
       </main>

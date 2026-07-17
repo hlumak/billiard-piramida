@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 
-/* Entrance components are pure CSS (see styles.css `fade-up-in`) and this
- * module must NOT import 'motion/react': most routes only fade content in,
- * and a JS runtime would hold SSR-rendered content invisible until hydration.
- * Components that need real JS animation (AnimatePresence, m.*, whileTap)
- * import from './provider' instead. */
+/* All animation in this app is pure CSS (see styles.css: fade-up-in,
+ * step-in-*, pop-in) — a JS animation runtime held SSR-rendered content
+ * invisible until hydration and dropped frames when step transitions raced
+ * data fetches. Step changes are enter-only: remount with a key and the
+ * keyframe replays; exiting content just unmounts. Tap feedback is
+ * `active:scale-*` with a transform transition. */
 
 /** One-off entrance for a standalone block. */
 export function Reveal({

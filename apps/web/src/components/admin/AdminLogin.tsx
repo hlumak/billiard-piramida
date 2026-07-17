@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
 import { adminApi } from '../../lib/admin-api';
-import { m as motion } from '../motion/provider';
 import { m } from '../../paraglide/messages.js';
 
 export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
@@ -15,11 +14,8 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   });
 
   return (
-    <motion.form
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="mx-auto mt-16 flex w-full max-w-sm flex-col gap-4"
+    <form
+      className="anim-reveal mx-auto mt-16 flex w-full max-w-sm flex-col gap-4"
       onSubmit={event => {
         event.preventDefault();
         event.stopPropagation();
@@ -51,6 +47,6 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
       >
         {m.admin_login_btn()}
       </Button>
-    </motion.form>
+    </form>
   );
 }

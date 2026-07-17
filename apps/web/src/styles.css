@@ -115,9 +115,48 @@ body {
   }
 }
 
+/* Wizard/tab step changes are enter-only: the outgoing step unmounts
+   instantly and the new one slides in from the travel direction. Exit
+   animations (AnimatePresence) doubled the animated trees exactly while the
+   incoming step fetched data and rendered — the source of dropped frames on
+   weak devices. */
+@keyframes step-in-forward {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes step-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+}
+
+/* Springy confirmation pop (overshoot ≈ the old stiffness-320 spring) */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .anim-reveal {
     animation: fade-up-in 0.4s ease-out backwards;
+  }
+
+  .anim-step-forward {
+    animation: step-in-forward 0.25s ease-out backwards;
+  }
+
+  .anim-step-back {
+    animation: step-in-back 0.25s ease-out backwards;
+  }
+
+  .anim-pop {
+    animation: pop-in 0.35s cubic-bezier(0.34, 1.3, 0.64, 1) backwards;
   }
 
   .anim-stagger-item {

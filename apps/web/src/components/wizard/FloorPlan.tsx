@@ -1,7 +1,5 @@
 import type { KeyboardEvent } from 'react';
 import { m as msg } from '../../paraglide/messages.js';
-import { m } from '../motion/provider';
-import { fadeUpChild, staggerParent } from '../motion/variants';
 
 /**
  * Interactive venue floor plan (owner's blueprint): entrance and reception
@@ -60,8 +58,7 @@ function PlanTable({
   };
 
   return (
-    <m.g
-      variants={fadeUpChild}
+    <g
       role="button"
       aria-label={label}
       aria-disabled={!free}
@@ -70,10 +67,10 @@ function PlanTable({
         ? {
             onClick: () => onSelect(id),
             onKeyDown: handleKeyDown,
-            whileTap: { scale: 0.94 },
-            className: 'group cursor-pointer outline-none'
+            className:
+              'anim-stagger-item group cursor-pointer outline-none transition-transform active:scale-[0.94]'
           }
-        : { className: 'opacity-35' })}
+        : { className: 'anim-stagger-item opacity-35' })}
       style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
     >
       {/* Oversized invisible hit area for fat fingers */}
@@ -114,7 +111,7 @@ function PlanTable({
       >
         {id}
       </text>
-    </m.g>
+    </g>
   );
 }
 
@@ -127,14 +124,11 @@ export function FloorPlan({
 }) {
   return (
     <div>
-      <m.svg
+      <svg
         viewBox="0 0 1000 580"
         role="group"
         aria-label={msg.step_table_title()}
         className="w-full"
-        variants={staggerParent}
-        initial="hidden"
-        animate="visible"
       >
         {/* Room walls */}
         <rect
@@ -200,15 +194,19 @@ export function FloorPlan({
           WC
         </text>
 
-        {TABLES.map(spot => (
-          <PlanTable
-            key={spot.id}
-            spot={spot}
-            free={freeTableIds.has(spot.id)}
-            onSelect={onSelect}
-          />
-        ))}
-      </m.svg>
+        {/* Own group: the stagger cascade indexes by sibling position, and the
+            tables must not share a parent with the static room shapes above */}
+        <g>
+          {TABLES.map(spot => (
+            <PlanTable
+              key={spot.id}
+              spot={spot}
+              free={freeTableIds.has(spot.id)}
+              onSelect={onSelect}
+            />
+          ))}
+        </g>
+      </svg>
 
       <div className="mt-3 flex items-center gap-5 text-xs text-grey-cool">
         <span className="flex items-center gap-1.5">
