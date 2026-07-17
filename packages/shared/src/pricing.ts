@@ -20,16 +20,22 @@ export interface DiscountCards {
   clubCardNumber: string | null;
 }
 
+/** A card counts only when present and non-blank. Lenient clients (and legacy
+ *  rows) may store '' instead of null for an untouched field — an empty string
+ *  is "no card" and must never earn a discount. */
+function hasCard(value: string | null): boolean {
+  return value !== null && value.trim() !== '';
+}
+
 /**
  * The better of the two discounts applies — they don't stack.
  * Never exceeds the table rental itself.
  */
 export function discountGroszFor(cards: DiscountCards, tableTotalGrosz: number): number {
-  const sport = cards.sportCardType !== null ? SPORT_CARD_DISCOUNT_GROSZ : 0;
-  const club =
-    cards.clubCardNumber !== null
-      ? Math.round((tableTotalGrosz * CLUB_CARD_DISCOUNT_PERCENT) / 100)
-      : 0;
+  const sport = hasCard(cards.sportCardType) ? SPORT_CARD_DISCOUNT_GROSZ : 0;
+  const club = hasCard(cards.clubCardNumber)
+    ? Math.round((tableTotalGrosz * CLUB_CARD_DISCOUNT_PERCENT) / 100)
+    : 0;
   return Math.min(Math.max(sport, club), tableTotalGrosz);
 }
 

@@ -45,6 +45,15 @@ const UPDATE_BODY = Type.Object(
   { additionalProperties: false }
 );
 
+/** Store a blank (empty or whitespace-only) card field as null so pricing —
+ *  which treats any non-null card as real — never grants a discount for an
+ *  untouched field a client submitted as ''. */
+function blankToNull(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
 function toProfile(user: typeof users.$inferSelect): UserProfileDto {
   return {
     id: user.id,
@@ -95,8 +104,8 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
             name: name.trim(),
             passwordHash,
             sportCardType: sportCardType ?? null,
-            sportCardNumber: sportCardNumber ?? null,
-            clubCardNumber: clubCardNumber ?? null
+            sportCardNumber: blankToNull(sportCardNumber),
+            clubCardNumber: blankToNull(clubCardNumber)
           })
           .returning();
       } catch (err) {
@@ -179,8 +188,10 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
         .set({
           ...(name !== undefined ? { name: name.trim() } : {}),
           ...(sportCardType !== undefined ? { sportCardType } : {}),
-          ...(sportCardNumber !== undefined ? { sportCardNumber } : {}),
-          ...(clubCardNumber !== undefined ? { clubCardNumber } : {})
+          ...(sportCardNumber !== undefined
+            ? { sportCardNumber: blankToNull(sportCardNumber) }
+            : {}),
+          ...(clubCardNumber !== undefined ? { clubCardNumber: blankToNull(clubCardNumber) } : {})
         })
         .where(eq(users.id, user.id))
         .returning();
