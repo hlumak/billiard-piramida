@@ -7,7 +7,32 @@ import type {
   TableDto
 } from '@repo/shared';
 
-const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+/**
+ * API origin.
+ *
+ * Browser: call our own public origin (VITE_API_URL — same-origin in prod) so
+ * the HttpOnly session cookie rides along.
+ *
+ * SSR: the web server must NOT fetch that public hostname. The request would
+ * hairpin back through nginx to this same host and hang, 504-ing every route
+ * with an SSR loader (/prices, /booking/$id). Reach the API directly over
+ * loopback instead. API_PORT rides in the same .env the prod server loads
+ * (--env-file), so this needs no extra config; INTERNAL_API_URL is an explicit
+ * override for other topologies. In dev (`vite dev`, no --env-file) neither is
+ * set, so SSR falls back to the public URL and behaves as before.
+ */
+function resolveApiUrl(): string {
+  const publicUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+  if (!import.meta.env.SSR) return publicUrl;
+
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+    ?.env;
+  const internalUrl =
+    env?.INTERNAL_API_URL ?? (env?.API_PORT ? `http://127.0.0.1:${env.API_PORT}` : undefined);
+  return internalUrl ?? publicUrl;
+}
+
+const API_URL: string = resolveApiUrl();
 
 /** Non-sensitive flag cookie the server sets alongside the HttpOnly session
  *  cookie, so the client can gate its UI without ever reading the token. */
