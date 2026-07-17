@@ -1,11 +1,11 @@
 /** Single source for real-world venue facts (contacts page, SEO, JSON-LD). */
 export const VENUE = {
   name: 'piramida',
-  street: 'ul. Zielona 12',
-  postalCode: '00-001',
-  city: 'Warszawa',
+  street: 'ul. Tatrzańska 42/44',
+  postalCode: '93-219',
+  city: 'Łódź',
   country: 'PL',
-  phone: '+48 123 456 789'
+  phone: '+48 602 56 56 55'
 } as const;
 
 export const VENUE_ADDRESS = `${VENUE.street}, ${VENUE.postalCode} ${VENUE.city}`;

@@ -1,19 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0b4e31"/>
-  <g fill="#feaa00">
-    <circle cx="256" cy="158" r="62"/>
-    <circle cx="189" cy="274" r="62"/>
-    <circle cx="323" cy="274" r="62"/>
-    <circle cx="122" cy="390" r="62"/>
-    <circle cx="256" cy="390" r="62"/>
-    <circle cx="390" cy="390" r="62"/>
-  </g>
-  <g fill="#f9f9e1" opacity="0.85">
-    <circle cx="238" cy="140" r="14"/>
-    <circle cx="171" cy="256" r="14"/>
-    <circle cx="305" cy="256" r="14"/>
-    <circle cx="104" cy="372" r="14"/>
-    <circle cx="238" cy="372" r="14"/>
-    <circle cx="372" cy="372" r="14"/>
-  </g>
+  <defs>
+    <radialGradient id="ball" cx="38%" cy="32%" r="75%">
+      <stop offset="0%" stop-color="#3a3a3a"/>
+      <stop offset="45%" stop-color="#101010"/>
+      <stop offset="100%" stop-color="#000"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="240" fill="url(#ball)"/>
+  <ellipse cx="188" cy="168" rx="96" ry="58" fill="#fff" opacity="0.30" transform="rotate(-32 188 168)"/>
+  <circle cx="256" cy="272" r="118" fill="#f4f4f4"/>
+  <text x="256" y="274" text-anchor="middle" dominant-baseline="central"
+        font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="170" fill="#111">8</text>
 </svg>

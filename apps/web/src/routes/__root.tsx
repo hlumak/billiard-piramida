@@ -31,8 +31,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     // render-blocking requests on the critical path.
     links: [
       { rel: 'stylesheet', href: appCss },
-      { rel: 'icon', href: '/favicon.ico', sizes: '32x32' },
+      { rel: 'icon', href: '/favicon.ico', sizes: '48x48' },
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16.png' },
+      { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' },
       { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
       { rel: 'manifest', href: '/manifest.webmanifest' }
     ]

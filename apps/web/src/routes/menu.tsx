@@ -24,16 +24,19 @@ function MenuPage() {
         navigate({ to: '/' });
       }}
     >
-      <img
-        src="/hero-bg-mobile.webp"
-        srcSet="/hero-bg-mobile.webp 428w, /hero-bg-desktop.webp 752w"
-        sizes="100vw"
-        alt=""
-        width={376}
-        height={768}
-        loading="lazy"
-        className="absolute inset-0 size-full object-cover opacity-40 blur-sm"
-      />
+      <picture>
+        {/* Select by viewport width (device class), not resolution: high-DPR
+            phones would otherwise pull the wide desktop crop via `w` descriptors. */}
+        <source media="(min-width: 768px)" srcSet="/hero-bg-desktop.webp" />
+        <img
+          src="/hero-bg-mobile.webp"
+          alt=""
+          width={376}
+          height={768}
+          loading="lazy"
+          className="absolute inset-0 size-full object-cover opacity-40 blur-sm"
+        />
+      </picture>
       <div className="absolute inset-0 bg-club-green/70" />
 
       <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col px-10 pb-10 pt-16">

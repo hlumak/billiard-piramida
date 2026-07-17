@@ -20,16 +20,19 @@ function Home() {
 
   return (
     <div className="relative min-h-dvh overflow-hidden">
-      <img
-        src="/hero-bg-mobile.webp"
-        srcSet="/hero-bg-mobile.webp 428w, /hero-bg-desktop.webp 752w"
-        sizes="100vw"
-        alt=""
-        width={376}
-        height={768}
-        fetchPriority="high"
-        className="absolute inset-0 size-full object-cover"
-      />
+      <picture>
+        {/* Select by viewport width (device class), not resolution: high-DPR
+            phones would otherwise pull the wide desktop crop via `w` descriptors. */}
+        <source media="(min-width: 768px)" srcSet="/hero-bg-desktop.webp" />
+        <img
+          src="/hero-bg-mobile.webp"
+          alt=""
+          width={376}
+          height={768}
+          fetchPriority="high"
+          className="absolute inset-0 size-full object-cover"
+        />
+      </picture>
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/10 to-black/50" />
 
       <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-[18dvh] pt-14 md:max-w-3xl md:pt-16">
