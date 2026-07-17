@@ -39,7 +39,7 @@ export function FoodStep() {
         {hasItems ? (
           <Button
             size="lg"
-            className="h-[45px] w-full text-lg font-bold"
+            className="h-11.25 w-full text-lg font-bold"
             onPress={() => goToStep('details')}
           >
             {m.btn_next()} · {formatPln(foodTotal, intlTag())}
@@ -48,7 +48,7 @@ export function FoodStep() {
           <Button
             size="lg"
             variant="outline"
-            className="h-[45px] w-full border-golden text-lg font-semibold text-creme"
+            className="h-11.25 w-full border-golden text-lg font-semibold text-creme"
             onPress={() => goToStep('details')}
           >
             {m.btn_skip()}

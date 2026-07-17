@@ -26,7 +26,7 @@ export function CancelModal({ booking }: { booking: BookingDto }) {
       </Button>
       <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
         <Modal.Container>
-          <Modal.Dialog className="sm:max-w-[360px]">
+          <Modal.Dialog className="sm:max-w-90">
             <Modal.CloseTrigger />
             <Modal.Header>
               <Modal.Heading>{m.cancel_confirm_title()}</Modal.Heading>

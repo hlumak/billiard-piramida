@@ -41,7 +41,7 @@ function Home() {
         </Reveal>
 
         <Reveal delay={0.15} className="mt-auto flex flex-col items-center gap-3">
-          <div className="w-full max-w-[296px]">
+          <div className="w-full max-w-74">
             <ButtonLink to="/book">{m.book_now()}</ButtonLink>
           </div>
           <p className="text-sm text-creme/80">

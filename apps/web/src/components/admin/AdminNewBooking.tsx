@@ -11,7 +11,7 @@ import { m } from '../../paraglide/messages.js';
 import { AdminDatePicker } from './AdminDatePicker';
 
 const chip = (selected: boolean, disabled = false) =>
-  `h-9 min-w-[56px] rounded-[10px] px-2.5 text-sm font-semibold transition-colors ${
+  `h-9 min-w-14 rounded-[10px] px-2.5 text-sm font-semibold transition-colors ${
     selected
       ? 'bg-golden text-btn-text'
       : disabled

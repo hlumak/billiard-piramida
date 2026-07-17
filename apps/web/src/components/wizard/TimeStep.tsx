@@ -35,7 +35,7 @@ function maxDuration(availability: AvailabilityDto, start: number): number {
 }
 
 const chip = (selected: boolean) =>
-  `anim-stagger-item h-10 min-w-[64px] rounded-[10px] px-3 font-semibold transition active:scale-95 ${
+  `anim-stagger-item h-10 min-w-16 rounded-[10px] px-3 font-semibold transition active:scale-95 ${
     selected ? 'bg-golden text-btn-text' : 'bg-club-green-light text-creme hover:bg-surface-hover'
   }`;
 
@@ -111,7 +111,7 @@ export function TimeStep({ date }: { date: IsoDate }) {
 
           <Button
             size="lg"
-            className="mt-8 h-[45px] w-full text-lg font-bold"
+            className="mt-8 h-11.25 w-full text-lg font-bold"
             isDisabled={validStart == null}
             onPress={() => {
               if (validStart != null) selectTime(validStart, effectiveDuration);

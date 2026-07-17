@@ -22,7 +22,7 @@ export function ButtonLink({
   return (
     <Link
       to={to}
-      className={`flex h-[45px] w-full items-center justify-center rounded-[10px] transition-colors ${VARIANTS[variant]}`}
+      className={`flex h-11.25 w-full items-center justify-center rounded-[10px] transition-colors ${VARIANTS[variant]}`}
     >
       {children}
     </Link>

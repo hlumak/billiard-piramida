@@ -156,7 +156,7 @@ function LookupSection({ onFound }: { onFound: () => void }) {
         <Button
           type="submit"
           size="lg"
-          className="h-[45px] w-full text-lg font-bold"
+          className="h-11.25 w-full text-lg font-bold"
           isPending={lookup.isPending}
         >
           {m.btn_find()}

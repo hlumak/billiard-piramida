@@ -41,7 +41,7 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
       <Button
         type="submit"
         size="lg"
-        className="h-[45px] w-full text-lg font-bold"
+        className="h-11.25 w-full text-lg font-bold"
         isDisabled={token.trim().length === 0}
         isPending={login.isPending}
       >

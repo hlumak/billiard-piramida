@@ -99,7 +99,7 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
         <Button
           type="submit"
           size="lg"
-          className="h-[45px] w-full text-lg font-bold"
+          className="h-11.25 w-full text-lg font-bold"
           isPending={save.isPending}
         >
           {save.isSuccess ? m.saved_ok() : m.btn_save()}

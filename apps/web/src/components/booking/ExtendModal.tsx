@@ -28,7 +28,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
     <Modal>
       <Button
         size="lg"
-        className="h-[45px] w-full text-lg font-bold"
+        className="h-11.25 w-full text-lg font-bold"
         onPress={() => {
           setHours(1);
           extend.reset();
@@ -39,7 +39,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
       </Button>
       <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
         <Modal.Container>
-          <Modal.Dialog className="sm:max-w-[360px]">
+          <Modal.Dialog className="sm:max-w-90">
             <Modal.CloseTrigger />
             <Modal.Header>
               <Modal.Heading>{m.extend_by()}</Modal.Heading>
@@ -52,7 +52,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
                     type="button"
                     aria-pressed={effectiveHours === count}
                     onClick={() => setHours(count)}
-                    className={`h-10 min-w-[64px] rounded-[10px] px-3 font-semibold transition-colors ${
+                    className={`h-10 min-w-16 rounded-[10px] px-3 font-semibold transition-colors ${
                       effectiveHours === count
                         ? 'bg-golden text-btn-text'
                         : 'bg-club-green text-creme hover:bg-surface-hover'

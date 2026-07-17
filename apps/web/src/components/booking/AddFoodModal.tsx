@@ -41,7 +41,7 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
       <Button
         size="lg"
         variant="outline"
-        className="h-[45px] w-full border-golden text-lg font-semibold text-creme"
+        className="h-11.25 w-full border-golden text-lg font-semibold text-creme"
         onPress={() => setOpen(true)}
       >
         {m.add_food()}

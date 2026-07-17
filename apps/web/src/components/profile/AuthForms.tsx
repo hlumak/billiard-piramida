@@ -128,7 +128,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
         <Button
           type="submit"
           size="lg"
-          className="h-[45px] w-full text-lg font-bold"
+          className="h-11.25 w-full text-lg font-bold"
           isDisabled={!isValidPhone(phone) || password.length < 8}
           isPending={submit.isPending}
         >

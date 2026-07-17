@@ -17,7 +17,7 @@ export function DateStep() {
             key={date}
             type="button"
             onClick={() => selectDate(date)}
-            className="anim-stagger-item flex h-[52px] flex-col items-center justify-center rounded-[10px] bg-club-green-light text-creme transition hover:bg-surface-hover active:scale-95"
+            className="anim-stagger-item flex h-13 flex-col items-center justify-center rounded-[10px] bg-club-green-light text-creme transition hover:bg-surface-hover active:scale-95"
           >
             <span className="font-medium capitalize">{formatDay(date)}</span>
             {i <= 1 ? (
