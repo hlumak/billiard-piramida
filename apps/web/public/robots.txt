@@ -6,4 +6,4 @@ Disallow: /book
 Disallow: /booking/
 Disallow: /bookings
 
-Sitemap: https://piramida-club.example/sitemap.xml
+Sitemap: https://test.spravy.com.ua/sitemap.xml

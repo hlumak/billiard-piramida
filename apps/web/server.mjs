@@ -6,6 +6,7 @@ import handler from './dist/server/server.js';
 
 const server = serve({
   port: Number(process.env.PORT ?? 3000),
+  hostname: process.env.HOST ?? '127.0.0.1',
   fetch: handler.fetch,
   middleware: [serveStatic({ dir: 'dist/client' })]
 });
