@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
 import { adminApi } from '../../lib/admin-api';
-import { m as motion } from '../motion';
+import { m as motion } from '../motion/provider';
 import { m } from '../../paraglide/messages.js';
 
 export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {

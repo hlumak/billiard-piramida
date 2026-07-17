@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import { m as msg } from '../../paraglide/messages.js';
-import { m } from '../motion';
+import { m } from '../motion/provider';
 import { fadeUpChild, staggerParent } from '../motion/variants';
 
 /**

@@ -1,23 +1,10 @@
-import { LazyMotion, MotionConfig, m } from 'motion/react';
 import type { ReactNode } from 'react';
-import { fadeUpChild, staggerParent } from './variants';
 
-export { AnimatePresence, m } from 'motion/react';
-
-const loadFeatures = () => import('./features').then(mod => mod.default);
-
-/**
- * App-wide motion setup: the dom renderer loads as a deferred chunk (`strict`
- * guarantees only `m.*` components are used), and `reducedMotion="user"`
- * disables transform/layout animation for people who ask the OS for less motion.
- */
-export function MotionProvider({ children }: { children: ReactNode }) {
-  return (
-    <LazyMotion features={loadFeatures} strict>
-      <MotionConfig reducedMotion="user">{children}</MotionConfig>
-    </LazyMotion>
-  );
-}
+/* Entrance components are pure CSS (see styles.css `fade-up-in`) and this
+ * module must NOT import 'motion/react': most routes only fade content in,
+ * and a JS runtime would hold SSR-rendered content invisible until hydration.
+ * Components that need real JS animation (AnimatePresence, m.*, whileTap)
+ * import from './provider' instead. */
 
 /** One-off entrance for a standalone block. */
 export function Reveal({
@@ -30,14 +17,12 @@ export function Reveal({
   className?: string | undefined;
 }) {
   return (
-    <m.div
-      className={className}
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut', delay }}
+    <div
+      className={className ? `anim-reveal ${className}` : 'anim-reveal'}
+      style={delay > 0 ? { animationDelay: `${delay}s` } : undefined}
     >
       {children}
-    </m.div>
+    </div>
   );
 }
 
@@ -49,13 +34,10 @@ export function StaggerGroup({
   children: ReactNode;
   className?: string | undefined;
 }) {
-  return (
-    <m.div className={className} variants={staggerParent} initial="hidden" animate="visible">
-      {children}
-    </m.div>
-  );
+  return <div className={className}>{children}</div>;
 }
 
+/** Cascades by sibling position (nth-child), so items must be siblings. */
 export function StaggerItem({
   children,
   className
@@ -64,8 +46,8 @@ export function StaggerItem({
   className?: string | undefined;
 }) {
   return (
-    <m.div className={className} variants={fadeUpChild}>
+    <div className={className ? `anim-stagger-item ${className}` : 'anim-stagger-item'}>
       {children}
-    </m.div>
+    </div>
   );
 }

@@ -26,8 +26,10 @@ function MenuPage() {
     >
       <picture>
         {/* Select by viewport width (device class), not resolution: high-DPR
-            phones would otherwise pull the wide desktop crop via `w` descriptors. */}
-        <source media="(min-width: 768px)" srcSet="/hero-bg-desktop.webp" />
+            phones would otherwise pull the wide desktop crop via `w` descriptors.
+            Dedicated 960w asset: this backdrop is blurred + dimmed anyway, and
+            CSS-blurring the full-res hero cost real GPU time on weak devices. */}
+        <source media="(min-width: 768px)" srcSet="/hero-bg-menu.webp" />
         <img
           src="/hero-bg-mobile.webp"
           alt=""

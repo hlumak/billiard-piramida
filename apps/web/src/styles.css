@@ -102,3 +102,48 @@ body {
   color: var(--color-golden);
   text-shadow: 3px 0 4px rgba(0, 0, 0, 0.4);
 }
+
+/* Entrance animations (Reveal / StaggerItem components) — pure CSS on purpose:
+   SSR used to ship these elements at opacity:0 and JS-driven variants kept them
+   invisible until hydration + the lazy animation chunk arrived (~1s extra on
+   slow connections). CSS starts at first paint and needs no JS at all.
+   `backwards` holds the from-state during a delay so cascades read as such. */
+@keyframes fade-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .anim-reveal {
+    animation: fade-up-in 0.4s ease-out backwards;
+  }
+
+  .anim-stagger-item {
+    animation: fade-up-in 0.35s ease-out backwards;
+  }
+  /* Cascade by sibling position, 45ms apart, capped past the 8th —
+     later items enter together rather than dragging the tail out. */
+  .anim-stagger-item:nth-child(2) {
+    animation-delay: 45ms;
+  }
+  .anim-stagger-item:nth-child(3) {
+    animation-delay: 90ms;
+  }
+  .anim-stagger-item:nth-child(4) {
+    animation-delay: 135ms;
+  }
+  .anim-stagger-item:nth-child(5) {
+    animation-delay: 180ms;
+  }
+  .anim-stagger-item:nth-child(6) {
+    animation-delay: 225ms;
+  }
+  .anim-stagger-item:nth-child(7) {
+    animation-delay: 270ms;
+  }
+  .anim-stagger-item:nth-child(n + 8) {
+    animation-delay: 315ms;
+  }
+}

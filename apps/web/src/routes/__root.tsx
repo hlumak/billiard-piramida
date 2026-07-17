@@ -3,7 +3,7 @@ import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/reac
 
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
-import { MotionProvider } from '../components/motion';
+import { MotionProvider } from '../components/motion/provider';
 import { SITE_URL } from '../lib/seo';
 import { DevTools } from '../integrations/devtools';
 

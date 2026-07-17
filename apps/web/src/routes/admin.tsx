@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Spinner } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { AnimatePresence, m as motion } from '../components/motion';
+import { AnimatePresence, m as motion } from '../components/motion/provider';
 import { PageHeader } from '../components/AppHeader';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { AdminBookings } from '../components/admin/AdminBookings';

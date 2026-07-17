@@ -7,7 +7,7 @@ import { m } from '../../paraglide/messages.js';
 import { formatHour } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { useLiveAvailability } from '../../lib/availability-live';
-import { m as motion } from '../motion';
+import { m as motion } from '../motion/provider';
 import { fadeUpChild, staggerParent, tapScale } from '../motion/variants';
 import { QueryError } from '../QueryError';
 import { selectTime, wizardStore } from '../../store/booking-wizard';

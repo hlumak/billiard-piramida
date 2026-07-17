@@ -6,7 +6,8 @@ import { intlTag } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
-import { m as motion, Reveal } from '../motion';
+import { Reveal } from '../motion';
+import { m as motion } from '../motion/provider';
 import { fadeUpChild, staggerParent } from '../motion/variants';
 import { QueryError } from '../QueryError';
 

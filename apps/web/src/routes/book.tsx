@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { AnimatePresence, m } from '../components/motion';
+import { AnimatePresence, m } from '../components/motion/provider';
 import { m as msg } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 import { warsawToday } from '../lib/format';

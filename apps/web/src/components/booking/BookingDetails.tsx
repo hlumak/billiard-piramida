@@ -4,7 +4,8 @@ import { formatDayLong, intlTag, warsawDate, warsawHour, warsawTime } from '../.
 import { menuQuery } from '../../lib/queries';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
-import { m as motion, StaggerGroup, StaggerItem } from '../motion';
+import { StaggerGroup, StaggerItem } from '../motion';
+import { m as motion } from '../motion/provider';
 import { AddFoodModal } from './AddFoodModal';
 import { CancelModal } from './CancelModal';
 import { ExtendModal } from './ExtendModal';

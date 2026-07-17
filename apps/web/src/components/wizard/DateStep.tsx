@@ -1,6 +1,6 @@
 import { m as msg } from '../../paraglide/messages.js';
 import { addDays, formatDay, warsawToday } from '../../lib/format';
-import { m } from '../motion';
+import { m } from '../motion/provider';
 import { fadeUpChild, staggerParent, tapScale } from '../motion/variants';
 import { selectDate } from '../../store/booking-wizard';
 
