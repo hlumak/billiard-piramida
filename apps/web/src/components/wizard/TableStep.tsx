@@ -71,7 +71,10 @@ export function TableStep({
               <Select.Value />
               <Select.Indicator />
             </Select.Trigger>
-            <Select.Popover>
+            {/* Never flip above the trigger: an upward popover covers the floor
+                plan, which the user needs to see while choosing. Capped height
+                scrolls instead when space below is tight. */}
+            <Select.Popover shouldFlip={false} maxHeight={260}>
               <ListBox>
                 {freeTables.map(table => (
                   <ListBox.Item
