@@ -163,5 +163,11 @@
   "admin_delete_confirm": "Usunąć danie?",
   "admin_has_orders": "Danie występuje już w zamówieniach — ukryj je zamiast usuwać",
   "admin_category": "Kategoria",
-  "admin_description": "Opis"
+  "admin_description": "Opis",
+  "admin_tab_schedule": "Grafik",
+  "admin_free": "Wolne",
+  "admin_booked": "Zajęte",
+  "admin_today": "Dziś",
+  "admin_prev_day": "Poprzedni dzień",
+  "admin_next_day": "Następny dzień"
 }

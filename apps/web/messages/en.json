@@ -163,5 +163,11 @@
   "admin_delete_confirm": "Delete this dish?",
   "admin_has_orders": "This dish already appears in orders — hide it instead of deleting",
   "admin_category": "Category",
-  "admin_description": "Description"
+  "admin_description": "Description",
+  "admin_tab_schedule": "Schedule",
+  "admin_free": "Free",
+  "admin_booked": "Booked",
+  "admin_today": "Today",
+  "admin_prev_day": "Previous day",
+  "admin_next_day": "Next day"
 }

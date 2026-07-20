@@ -9,6 +9,7 @@ import { AdminCustomers } from '../components/admin/AdminCustomers';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AdminMenu } from '../components/admin/AdminMenu';
 import { AdminOverview } from '../components/admin/AdminOverview';
+import { AdminSchedule } from '../components/admin/AdminSchedule';
 import { AdminStats } from '../components/admin/AdminStats';
 import { adminApi, isAdminSignedIn } from '../lib/admin-api';
 import { ApiError } from '../lib/api';
@@ -22,6 +23,7 @@ export const Route = createFileRoute('/admin')({
 
 const TABS = [
   { id: 'overview', label: m.admin_tab_overview },
+  { id: 'schedule', label: m.admin_tab_schedule },
   { id: 'stats', label: m.admin_tab_stats },
   { id: 'bookings', label: m.admin_tab_bookings },
   { id: 'customers', label: m.admin_tab_customers },
@@ -119,6 +121,7 @@ function AdminPage() {
             {/* key remounts the pane so the CSS entrance replays per tab */}
             <div key={tab} className="anim-stagger-item">
               {tab === 'overview' ? <AdminOverview /> : null}
+              {tab === 'schedule' ? <AdminSchedule onShowBooking={showCustomerBookings} /> : null}
               {tab === 'stats' ? <AdminStats /> : null}
               {tab === 'bookings' ? (
                 <AdminBookings key={bookingsPhone} initialPhone={bookingsPhone} />

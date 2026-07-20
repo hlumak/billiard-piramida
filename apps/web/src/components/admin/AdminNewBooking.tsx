@@ -19,14 +19,40 @@ const chip = (selected: boolean, disabled = false) =>
         : 'bg-club-green text-creme hover:bg-surface-hover'
   }`;
 
+/** A slot picked elsewhere (e.g. the schedule grid) that seeds the form. */
+export interface NewBookingPrefill {
+  date: IsoDate;
+  startHour: number;
+  tableId: number;
+}
+
 /** Reception desk: create a booking for a walk-in / phone client. */
 export function AdminNewBooking() {
-  const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
-  const [date, setDate] = useState<IsoDate>(() => warsawToday());
-  const [startHour, setStartHour] = useState<number | null>(null);
+  return (
+    <>
+      <Button size="sm" className="font-semibold" onPress={() => setOpen(true)}>
+        {m.admin_new_booking()}
+      </Button>
+      <AdminNewBookingModal isOpen={isOpen} onOpenChange={setOpen} />
+    </>
+  );
+}
+
+export function AdminNewBookingModal({
+  isOpen,
+  onOpenChange,
+  prefill
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  prefill?: NewBookingPrefill;
+}) {
+  const queryClient = useQueryClient();
+  const [date, setDate] = useState<IsoDate>(() => prefill?.date ?? warsawToday());
+  const [startHour, setStartHour] = useState<number | null>(prefill?.startHour ?? null);
   const [duration, setDuration] = useState(1);
-  const [tableId, setTableId] = useState<number | null>(null);
+  const [tableId, setTableId] = useState<number | null>(prefill?.tableId ?? null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
@@ -45,7 +71,7 @@ export function AdminNewBooking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin'] });
       queryClient.invalidateQueries({ queryKey: availabilityQuery(date).queryKey });
-      setOpen(false);
+      onOpenChange(false);
       setStartHour(null);
       setTableId(null);
       setName('');
@@ -73,10 +99,7 @@ export function AdminNewBooking() {
 
   return (
     <Modal>
-      <Button size="sm" className="font-semibold" onPress={() => setOpen(true)}>
-        {m.admin_new_booking()}
-      </Button>
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />

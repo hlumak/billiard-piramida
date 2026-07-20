@@ -163,5 +163,11 @@
   "admin_delete_confirm": "Видалити страву?",
   "admin_has_orders": "Страва вже є в замовленнях — приховайте її замість видалення",
   "admin_category": "Категорія",
-  "admin_description": "Опис"
+  "admin_description": "Опис",
+  "admin_tab_schedule": "Розклад",
+  "admin_free": "Вільно",
+  "admin_booked": "Зайнято",
+  "admin_today": "Сьогодні",
+  "admin_prev_day": "Попередній день",
+  "admin_next_day": "Наступний день"
 }
