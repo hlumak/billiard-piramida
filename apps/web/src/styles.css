@@ -75,11 +75,14 @@ body,
   min-height: 100%;
 }
 
-/* Reserve scrollbar space so centered pages don't shift when content
- * height crosses the viewport (e.g. switching admin tabs) */
-html {
-  scrollbar-gutter: stable;
-}
+/* `scrollbar-gutter: stable` used to live here to stop centered pages shifting
+ * when content height crosses the viewport (switching admin tabs). It was
+ * removed: on classic-scrollbar platforms (Windows/Linux Chrome) it reserves a
+ * ~12px gutter on EVERY page, and the full-bleed hero pages can't paint into
+ * it — so the club-green canvas showed as a stripe down the right edge of the
+ * photo. macOS overlay scrollbars are zero-width, which is why it only ever
+ * reproduced on Windows. A staff-only 6px tab-switch jump is not worth a
+ * visible seam on the first screen every customer sees. */
 
 body {
   margin: 0;
