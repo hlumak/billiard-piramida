@@ -35,7 +35,7 @@ function permittedStep(state: WizardState): WizardStep {
   const index = stepIndex(state.step);
   if (index > stepIndex('date') && state.date == null) return 'date';
   if (index > stepIndex('time') && state.startHour == null) return 'time';
-  if (index > stepIndex('table') && state.tableId == null) return 'table';
+  if (index > stepIndex('table') && (state.tableId == null || state.kind == null)) return 'table';
   return state.step;
 }
 
@@ -44,14 +44,16 @@ function permittedStep(state: WizardState): WizardStep {
  * so the steps receive non-null props instead of asserting store fields.
  */
 function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) {
-  const { date, startHour, durationHours, tableId } = state;
+  const { date, startHour, durationHours, tableId, kind, tableLabel } = state;
   if (step === 'date' || date == null) return <DateStep />;
   if (step === 'time' || startHour == null) return <TimeStep date={date} />;
-  if (step === 'table' || tableId == null) {
+  // `kind` is written together with `tableId`, so a spot without one can only
+  // be a stale store from before darts existed — send them back to re-pick.
+  if (step === 'table' || tableId == null || kind == null || tableLabel == null) {
     return <TableStep date={date} startHour={startHour} durationHours={durationHours} />;
   }
   if (step === 'food') return <FoodStep />;
-  return <DetailsStep draft={{ date, startHour, durationHours, tableId }} />;
+  return <DetailsStep draft={{ date, startHour, durationHours, tableId, kind, tableLabel }} />;
 }
 
 function BookingWizard() {

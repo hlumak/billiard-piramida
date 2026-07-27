@@ -59,7 +59,7 @@ export function availabilityRoutes(app: AppInstance) {
           // `available` also excludes past hours for the public wizard.
           slots.push({ hour, available: !overlaps && !inPast, booked: overlaps });
         }
-        return { tableId: table.id, slots };
+        return { tableId: table.id, kind: table.kind, label: table.label, slots };
       });
 
       return { date, open, close, tables: tableAvailability };

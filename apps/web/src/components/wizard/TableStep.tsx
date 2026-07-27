@@ -1,14 +1,18 @@
 import { Button, ListBox, Select, Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
-import type { IsoDate } from '@repo/shared';
+import { useState } from 'react';
+import type { ActivityKind, IsoDate } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
 import { formatHour } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { useLiveAvailability } from '../../lib/availability-live';
+import { ACTIVITY_KINDS, activityName, spotName } from '../../lib/spots';
 import { Reveal } from '../motion';
 import { QueryError } from '../QueryError';
 import { goToStep, selectTable } from '../../store/booking-wizard';
 import { FloorPlan } from './FloorPlan';
+
+const KIND_ICON: Record<ActivityKind, string> = { billiard: '🎱', darts: '🎯' };
 
 export function TableStep({
   date,
@@ -21,6 +25,7 @@ export function TableStep({
 }) {
   useLiveAvailability(date);
   const { data: availability, isPending, isError, refetch } = useQuery(availabilityQuery(date));
+  const [kind, setKind] = useState<ActivityKind>('billiard');
 
   if (isError) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !availability) {
@@ -31,6 +36,7 @@ export function TableStep({
     );
   }
 
+  // Free = every hour of the chosen window is available on that spot
   const freeTableIds = new Set<number>();
   for (const table of availability.tables) {
     const free = new Set<number>();
@@ -44,7 +50,17 @@ export function TableStep({
     }
     if (wholeWindowFree) freeTableIds.add(table.tableId);
   }
-  const freeTables = availability.tables.filter(table => freeTableIds.has(table.tableId));
+
+  const spots = availability.tables.map(t => ({ id: t.tableId, label: t.label, kind: t.kind }));
+  const ofKind = availability.tables.filter(table => table.kind === kind);
+  const freeOfKind = ofKind.filter(table => freeTableIds.has(table.tableId));
+  // Only offer the toggle for kinds the venue actually has seeded
+  const offeredKinds = ACTIVITY_KINDS.filter(k => availability.tables.some(t => t.kind === k));
+
+  const pick = (tableId: number) => {
+    const spot = availability.tables.find(t => t.tableId === tableId);
+    if (spot) selectTable(tableId, spot.kind, spot.label);
+  };
 
   return (
     <section>
@@ -53,18 +69,49 @@ export function TableStep({
         {formatHour(startHour)}–{formatHour(startHour + durationHours)}
       </p>
 
-      <FloorPlan freeTableIds={freeTableIds} onSelect={selectTable} />
+      {offeredKinds.length > 1 ? (
+        <div role="group" aria-label={m.step_table_title()} className="mb-4 flex gap-2">
+          {offeredKinds.map(option => {
+            const freeCount = availability.tables.filter(
+              t => t.kind === option && freeTableIds.has(t.tableId)
+            ).length;
+            return (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={kind === option}
+                onClick={() => setKind(option)}
+                className={`h-10 flex-1 rounded-[10px] px-3 text-sm font-semibold transition-colors ${
+                  kind === option
+                    ? 'bg-golden text-btn-text'
+                    : 'bg-club-green-light text-creme hover:bg-surface-hover'
+                }`}
+              >
+                {KIND_ICON[option]} {activityName(option)}
+                <span className={kind === option ? 'opacity-70' : 'text-grey-cool'}>
+                  {' '}
+                  ({freeCount})
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {/* The plan always shows the whole room — the toggle drives the picker below */}
+      <FloorPlan spots={spots} freeTableIds={freeTableIds} onSelect={pick} />
 
       {/* Narrow screens: the plan is a map; picking happens in the select below */}
-      {freeTables.length > 0 ? (
+      {freeOfKind.length > 0 ? (
         <Reveal className="mt-4 md:hidden">
           <Select
+            key={kind}
             aria-label={m.step_table_title()}
             placeholder={m.step_table_title()}
             className="w-full"
             onSelectionChange={key => {
               const tableId = Number(key);
-              if (freeTableIds.has(tableId)) selectTable(tableId);
+              if (freeTableIds.has(tableId)) pick(tableId);
             }}
           >
             <Select.Trigger>
@@ -76,13 +123,13 @@ export function TableStep({
                 scrolls instead when space below is tight. */}
             <Select.Popover shouldFlip={false} maxHeight={260}>
               <ListBox>
-                {freeTables.map(table => (
+                {freeOfKind.map(table => (
                   <ListBox.Item
                     key={table.tableId}
                     id={String(table.tableId)}
-                    textValue={m.table_n({ n: table.tableId })}
+                    textValue={spotName(table.kind, table.label)}
                   >
-                    🎱 {m.table_n({ n: table.tableId })}
+                    {KIND_ICON[table.kind]} {spotName(table.kind, table.label)}
                     <ListBox.ItemIndicator />
                   </ListBox.Item>
                 ))}
@@ -92,7 +139,7 @@ export function TableStep({
         </Reveal>
       ) : null}
 
-      {freeTableIds.size === 0 ? (
+      {freeOfKind.length === 0 ? (
         <div className="mt-4 flex flex-col items-center gap-4">
           <p className="text-center text-grey-cool">{m.no_tables_free()}</p>
           <Button

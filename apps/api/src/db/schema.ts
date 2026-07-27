@@ -18,6 +18,8 @@ export const sportCardTypeEnum = pgEnum('sport_card_type', [
   'fitprofit'
 ]);
 
+export const activityKindEnum = pgEnum('activity_kind', ['billiard', 'darts']);
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   phone: text('phone').notNull().unique(),
@@ -26,13 +28,21 @@ export const users = pgTable('users', {
   /** Self-declared; staff verifies the physical card at the reception desk */
   sportCardType: sportCardTypeEnum('sport_card_type'),
   sportCardNumber: text('sport_card_number'),
+  /** Club cards are discontinued — no discount, no UI, no longer in the DTO.
+   *  The column stays so the numbers survive if the scheme ever comes back. */
   clubCardNumber: text('club_card_number'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
 
+/**
+ * Bookable spots. Still called `tables` because `bookings.table_id` is written
+ * into the hand-written overlap EXCLUDE constraint — renaming would mean
+ * rebuilding that guard for no functional gain. `kind` carries what the spot is.
+ */
 export const tables = pgTable('tables', {
   id: integer('id').primaryKey(),
-  label: text('label').notNull()
+  label: text('label').notNull(),
+  kind: activityKindEnum('kind').notNull().default('billiard')
 });
 
 export const bookings = pgTable(
@@ -47,8 +57,11 @@ export const bookings = pgTable(
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
     endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
     status: bookingStatusEnum('status').notNull().default('confirmed'),
-    /** Set when a signed-in client booked — enables discounts and history */
+    /** Set when a signed-in client booked — enables history */
     userId: uuid('user_id').references(() => users.id),
+    /** Partner sport cards declared for this booking, one per player. Guests
+     *  can claim them too — the discount is not tied to an account. */
+    sportCardCount: integer('sport_card_count').notNull().default(0),
     discountGrosz: integer('discount_grosz').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },

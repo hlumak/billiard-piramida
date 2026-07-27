@@ -6,9 +6,19 @@ export type BookingStatus = 'confirmed' | 'cancelled';
 /** Derived from status + current time; never stored. */
 export type BookingPhase = 'upcoming' | 'active' | 'finished' | 'cancelled';
 
+/** What a spot is booked for — picks the hourly rate and how it's labelled. */
+export type ActivityKind = 'billiard' | 'darts';
+
+/**
+ * A bookable spot: a billiard table or a dartboard. Still named "table"
+ * throughout the DB and the DTOs — `bookings.table_id` is load-bearing for the
+ * hand-written overlap EXCLUDE constraint, so the column keeps its name and
+ * `kind` carries the distinction.
+ */
 export interface TableDto {
   id: number;
   label: string;
+  kind: ActivityKind;
 }
 
 export interface SlotDto {
@@ -23,6 +33,8 @@ export interface SlotDto {
 
 export interface TableAvailabilityDto {
   tableId: TableDto['id'];
+  kind: ActivityKind;
+  label: TableDto['label'];
   slots: SlotDto[];
 }
 
@@ -53,6 +65,9 @@ export interface OrderItemDto {
 export interface BookingDto {
   id: string;
   tableId: TableDto['id'];
+  kind: ActivityKind;
+  /** Number within the kind ("Table 3", "Dartboard 1") — not the global id */
+  tableLabel: TableDto['label'];
   customerName: string;
   customerPhone: string;
   startsAt: string;
@@ -60,9 +75,12 @@ export interface BookingDto {
   status: BookingStatus;
   phase: BookingPhase;
   items: OrderItemDto[];
+  /** Rental of the booked spot — billiard table or dartboard */
   tableTotalGrosz: number;
   foodTotalGrosz: number;
-  /** Loyalty/sport-card discount locked in at booking time */
+  /** Partner sport cards declared at booking time, one per player */
+  sportCardCount: number;
+  /** Sport-card discount locked in at booking time */
   discountGrosz: number;
   totalGrosz: number;
 }
@@ -75,7 +93,6 @@ export interface UserProfileDto {
   name: string;
   sportCardType: SportCardType | null;
   sportCardNumber: string | null;
-  clubCardNumber: string | null;
 }
 
 export interface AuthResponseDto {
@@ -161,5 +178,7 @@ export interface CreateBookingInput {
   durationHours: number;
   customerName: BookingDto['customerName'];
   customerPhone: BookingDto['customerPhone'];
+  /** Self-declared, guests included — staff verify the physical cards on site */
+  sportCardCount?: number;
   items?: NewOrderItem[];
 }

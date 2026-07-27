@@ -22,8 +22,7 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
     if (profile && cards === null) {
       setCards({
         sportCardType: profile.sportCardType,
-        sportCardNumber: profile.sportCardNumber ?? '',
-        clubCardNumber: profile.clubCardNumber ?? ''
+        sportCardNumber: profile.sportCardNumber ?? ''
       });
     }
   }, [profile, cards]);
@@ -32,8 +31,7 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
     mutationFn: (next: CardsState) =>
       authApi.update({
         sportCardType: next.sportCardType,
-        sportCardNumber: next.sportCardType !== null ? next.sportCardNumber.trim() || null : null,
-        clubCardNumber: next.clubCardNumber.trim() || null
+        sportCardNumber: next.sportCardType !== null ? next.sportCardNumber.trim() || null : null
       }),
     onSuccess: updated => {
       queryClient.setQueryData(profileQuery().queryKey, updated);

@@ -3,7 +3,14 @@ import { useForm } from '@tanstack/react-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { discountGroszFor, formatPln, tablePriceGrosz, type IsoDate } from '@repo/shared';
+import {
+  discountGroszFor,
+  formatPln,
+  MAX_SPORT_CARDS_PER_BOOKING,
+  spotPriceGrosz,
+  type ActivityKind,
+  type IsoDate
+} from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
@@ -13,7 +20,9 @@ import { availabilityQuery, bookingQuery, menuQuery } from '../../lib/queries';
 import { rememberBooking } from '../../lib/recent-bookings';
 import { profileQuery } from '../../lib/auth';
 import { Link } from '@tanstack/react-router';
-import { goToStep, resetWizard, wizardStore } from '../../store/booking-wizard';
+import { spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
+import { SportCardPicker } from './SportCardPicker';
+import { goToStep, resetWizard, setSportCardCount, wizardStore } from '../../store/booking-wizard';
 
 /** All picks made in earlier steps — non-null by construction (see book.tsx). */
 export interface BookingDraft {
@@ -21,12 +30,15 @@ export interface BookingDraft {
   startHour: number;
   durationHours: number;
   tableId: number;
+  kind: ActivityKind;
+  tableLabel: string;
 }
 
 export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const items = useStore(wizardStore, state => state.items);
+  const sportCardCount = useStore(wizardStore, state => state.sportCardCount);
   const { data: menu } = useQuery(menuQuery(getLocale()));
   const { data: profile } = useQuery(profileQuery());
 
@@ -37,10 +49,10 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
     })
     .filter(line => line != null);
 
-  const tableTotal = tablePriceGrosz(draft.durationHours);
+  const tableTotal = spotPriceGrosz(draft.kind, draft.durationHours);
   const foodTotal = orderLines.reduce((sum, line) => sum + line.item.priceGrosz * line.quantity, 0);
   // Preview only — the server recomputes and locks the discount in
-  const discount = profile ? discountGroszFor(profile, tableTotal) : 0;
+  const discount = discountGroszFor(sportCardCount, tableTotal);
 
   const createBooking = useMutation({
     mutationFn: api.createBooking,
@@ -65,6 +77,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
         ...draft,
         customerName: value.customerName.trim(),
         customerPhone: value.customerPhone.trim(),
+        sportCardCount,
         items: Object.entries(items).map(([foodItemId, quantity]) => ({
           foodItemId: Number(foodItemId),
           quantity
@@ -112,15 +125,15 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-grey-cool">{m.summary_table()}</dt>
-              <dd>{m.table_n({ n: draft.tableId })}</dd>
+              <dt className="text-grey-cool">{spotSummaryLabel(draft.kind)}</dt>
+              <dd>{spotName(draft.kind, draft.tableLabel)}</dd>
             </div>
           </dl>
 
           <div className="mt-3 border-t border-deep-cream/30 pt-3 text-sm">
             <div className="flex justify-between text-creme">
               <span className="text-grey-cool">
-                {m.table_rental()} · {m.hours_n({ n: draft.durationHours })}
+                {spotRentalLabel(draft.kind)} · {m.hours_n({ n: draft.durationHours })}
               </span>
               <span>{formatPln(tableTotal, intlTag())}</span>
             </div>
@@ -134,7 +147,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             ))}
             {discount > 0 ? (
               <div className="flex justify-between text-creme">
-                <span className="text-grey-cool">{m.discount_label()}</span>
+                <span className="text-grey-cool">{m.sport_cards_count({ n: sportCardCount })}</span>
                 <span className="text-golden">−{formatPln(discount, intlTag())}</span>
               </div>
             ) : null}
@@ -153,6 +166,12 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             form.handleSubmit();
           }}
         >
+          <SportCardPicker
+            count={sportCardCount}
+            max={MAX_SPORT_CARDS_PER_BOOKING}
+            onChange={setSportCardCount}
+          />
+
           <form.Field
             name="customerName"
             validators={{

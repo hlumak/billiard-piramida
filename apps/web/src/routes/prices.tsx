@@ -1,8 +1,9 @@
 import { Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { HOURLY_RATE_GROSZ, formatPln } from '@repo/shared';
+import { HOURLY_RATE_GROSZ, SPORT_CARD_DISCOUNT_GROSZ, formatPln } from '@repo/shared';
 import { PageHeader } from '../components/AppHeader';
+import { PartnerCardLogos } from '../components/PartnerCardLogos';
 import { QueryError } from '../components/QueryError';
 import { Reveal, StaggerGroup, StaggerItem } from '../components/motion';
 import { intlTag } from '../lib/format';
@@ -26,16 +27,38 @@ function PricesPage() {
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="prices" />
       <main className="mt-8 flex-1">
-        <Reveal className="rounded-[10px] bg-club-green-light p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-creme">{m.table_rental_price()}</p>
-              <p className="text-xs text-grey-cool">{m.min_booking_note()}</p>
+        <Reveal className="flex flex-col gap-2">
+          {(
+            [
+              ['billiard', m.table_rental_price(), m.min_booking_note()],
+              ['darts', m.dartboard_rental_price(), m.min_booking_note()]
+            ] as const
+          ).map(([kind, title, note]) => (
+            <div
+              key={kind}
+              className="flex items-center justify-between rounded-[10px] bg-club-green-light p-4"
+            >
+              <div>
+                <p className="font-semibold text-creme">{title}</p>
+                <p className="text-xs text-grey-cool">{note}</p>
+              </div>
+              <p className="text-lg font-bold text-golden">
+                {formatPln(HOURLY_RATE_GROSZ[kind], intlTag())}{' '}
+                <span className="text-sm font-medium text-creme/80">/ {m.per_hour()}</span>
+              </p>
             </div>
-            <p className="text-lg font-bold text-golden">
-              {formatPln(HOURLY_RATE_GROSZ, intlTag())}{' '}
-              <span className="text-sm font-medium text-creme/80">/ {m.per_hour()}</span>
-            </p>
+          ))}
+
+          <div className="rounded-[10px] bg-club-green-light p-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="font-semibold text-creme">{m.partner_cards_title()}</p>
+              <p className="shrink-0 text-lg font-bold text-golden">
+                −{formatPln(SPORT_CARD_DISCOUNT_GROSZ, intlTag())}{' '}
+                <span className="text-sm font-medium text-creme/80">{m.prices_per_card()}</span>
+              </p>
+            </div>
+            <PartnerCardLogos className="mt-3" />
+            <p className="mt-3 text-xs text-grey-cool">{m.sport_cards_hint()}</p>
           </div>
         </Reveal>
 

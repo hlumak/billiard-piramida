@@ -2,16 +2,17 @@ import assert from 'node:assert';
 import { Type } from '@sinclair/typebox';
 import {
   discountGroszFor,
-  HOURLY_RATE_GROSZ,
   hoursForDate,
   isIsoDate,
   isValidBookingWindow,
   MAX_ORDER_ITEM_QUANTITY,
-  TABLES_COUNT
+  MAX_SPORT_CARDS_PER_BOOKING,
+  spotPriceGrosz,
+  SPOTS_COUNT
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, asc, eq, gt } from 'drizzle-orm';
-import { bookings, users } from '../db/schema.ts';
+import { bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BOOKING_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
@@ -45,12 +46,16 @@ const NEW_ITEMS = Type.Array(
 
 const CREATE_BOOKING_BODY = Type.Object(
   {
-    tableId: Type.Integer({ minimum: 1, maximum: TABLES_COUNT }),
+    tableId: Type.Integer({ minimum: 1, maximum: SPOTS_COUNT }),
     date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
     startHour: Type.Integer({ minimum: 0, maximum: 23 }),
     durationHours: Type.Integer({ minimum: 1, maximum: 8 }),
     customerName: Type.String({ minLength: 1, maxLength: 120 }),
     customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
+    /** Self-declared and open to guests — staff check the cards at reception */
+    sportCardCount: Type.Optional(
+      Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })
+    ),
     items: Type.Optional(NEW_ITEMS)
   },
   { additionalProperties: false }
@@ -71,6 +76,7 @@ export function bookingRoutes(app: AppInstance) {
     async (request, reply) => {
       const { tableId, date, startHour, durationHours, customerName } = request.body;
       const items = request.body.items ?? [];
+      const sportCardCount = request.body.sportCardCount ?? 0;
 
       if (!isIsoDate(date)) {
         return reply.code(400).send({ error: 'invalid_date' });
@@ -89,9 +95,17 @@ export function bookingRoutes(app: AppInstance) {
         return reply.code(422).send({ error: 'start_in_past' });
       }
 
-      // Optional sign-in: guests book exactly the same way, just without discounts
+      // The rate follows the spot, so an unknown id must fail before pricing
+      const [spot] = await app.db.select().from(tables).where(eq(tables.id, tableId));
+      if (!spot) return reply.code(422).send({ error: 'unknown_table' });
+
+      // Optional sign-in: guests book exactly the same way, discounts included —
+      // the cards belong to the players at the spot, not to an account
       const user = await app.authenticatedUser(request);
-      const discountGrosz = user ? discountGroszFor(user, durationHours * HOURLY_RATE_GROSZ) : 0;
+      const discountGrosz = discountGroszFor(
+        sportCardCount,
+        spotPriceGrosz(spot.kind, durationHours)
+      );
 
       try {
         const bookingId = await app.db.transaction(async tx => {
@@ -104,6 +118,7 @@ export function bookingRoutes(app: AppInstance) {
               startsAt,
               endsAt,
               userId: user?.id ?? null,
+              sportCardCount,
               discountGrosz
             })
             .returning({ id: bookings.id });
@@ -209,18 +224,16 @@ export function bookingRoutes(app: AppInstance) {
         return reply.code(422).send({ error: 'past_closing_time' });
       }
 
-      // Discount is a fraction of table rental, so a longer rental changes it —
-      // recompute for signed-in bookings (guests always have discount 0).
-      let discountGrosz = booking.discountGrosz;
-      if (booking.userId !== null) {
-        const [user] = await app.db.select().from(users).where(eq(users.id, booking.userId));
-        if (user) {
-          const newDurationHours = Math.round(
-            (newEndsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
-          );
-          discountGrosz = discountGroszFor(user, newDurationHours * HOURLY_RATE_GROSZ);
-        }
-      }
+      // The discount is capped by the rental, so a longer rental can uncap it
+      // (three cards on one darts hour were clipped to 30 zł; at two hours the
+      // full 45 zł applies) — recompute against the new duration.
+      const [spot] = await app.db.select().from(tables).where(eq(tables.id, booking.tableId));
+      const newDurationHours = Math.round(
+        (newEndsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
+      );
+      const discountGrosz = spot
+        ? discountGroszFor(booking.sportCardCount, spotPriceGrosz(spot.kind, newDurationHours))
+        : booking.discountGrosz;
 
       try {
         await app.db

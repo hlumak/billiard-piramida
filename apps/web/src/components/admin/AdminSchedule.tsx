@@ -2,17 +2,17 @@ import { useEffect, useState } from 'react';
 import { Button, Spinner } from '@heroui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { hoursForDate, TABLES_COUNT, type BookingDto, type IsoDate } from '@repo/shared';
+import { hoursForDate, type BookingDto, type IsoDate, type TableDto } from '@repo/shared';
 import { formatPhone } from '@repo/shared/phone';
 import { adminBookingsQuery } from '../../lib/admin-api';
+import { tablesQuery } from '../../lib/queries';
+import { spotName } from '../../lib/spots';
 import { availabilityLive } from '../../lib/availability-live';
 import { addDays, formatDayLong, formatHour, warsawHour, warsawToday } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { AdminDatePicker } from './AdminDatePicker';
 import { AdminNewBookingModal, type NewBookingPrefill } from './AdminNewBooking';
-
-const TABLE_IDS = Array.from({ length: TABLES_COUNT }, (_, i) => i + 1);
 
 /** (tableId, hour) → the confirmed booking covering that hour. Bookings are
  *  hour-aligned and never cross midnight (close is 23 at the latest). */
@@ -29,7 +29,7 @@ function occupancyOf(bookings: BookingDto[]): Map<string, BookingDto> {
 /** One table's row of grid cells: free hours are buttons that seed a new
  *  booking; a booking renders as a single block spanning all its hours. */
 function TableRow({
-  tableId,
+  spot,
   open,
   close,
   occupancy,
@@ -38,7 +38,7 @@ function TableRow({
   onPickSlot,
   onShowBooking
 }: {
-  tableId: number;
+  spot: TableDto;
   open: number;
   close: number;
   occupancy: Map<string, BookingDto>;
@@ -49,6 +49,8 @@ function TableRow({
   onShowBooking: (phone: string) => void;
 }) {
   const isPastHour = (hour: number) => isPastDate || (nowHour !== null && hour < nowHour);
+  const tableId = spot.id;
+  const name = spotName(spot.kind, spot.label);
 
   const cells = [];
   for (let hour = open; hour < close;) {
@@ -84,7 +86,7 @@ function TableRow({
         <button
           key={slotHour}
           type="button"
-          aria-label={`${m.table_n({ n: tableId })}, ${formatHour(slotHour)} — ${m.admin_free()}`}
+          aria-label={`${name}, ${formatHour(slotHour)} — ${m.admin_free()}`}
           onClick={() => onPickSlot(slotHour)}
           className={`h-12 rounded-[10px] border transition-colors hover:bg-surface-hover ${
             isPastHour(slotHour) ? 'border-grey-warm opacity-40' : 'border-golden/60'
@@ -98,7 +100,7 @@ function TableRow({
   return (
     <>
       <div className="sticky left-0 z-10 flex h-12 items-center bg-club-green pr-3 text-sm font-semibold text-creme">
-        {m.table_n({ n: tableId })}
+        {name}
       </div>
       {cells}
     </>
@@ -119,6 +121,9 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
     isError,
     refetch
   } = useQuery(adminBookingsQuery({ date, status: 'confirmed' }));
+  // Rows come from the venue's real spots, so seeding a new dartboard shows up
+  // here without a code change.
+  const { data: spots = [] } = useQuery(tablesQuery());
 
   // Same live signal the public wizard uses: any create/extend/cancel on this
   // date refreshes the grid instantly.
@@ -203,16 +208,16 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
                 {formatHour(hour)}
               </div>
             ))}
-            {TABLE_IDS.map(tableId => (
+            {spots.map(spot => (
               <TableRow
-                key={tableId}
-                tableId={tableId}
+                key={spot.id}
+                spot={spot}
                 open={open}
                 close={close}
                 occupancy={occupancy}
                 nowHour={nowHour}
                 isPastDate={date < today}
-                onPickSlot={hour => pickSlot(tableId, hour)}
+                onPickSlot={hour => pickSlot(spot.id, hour)}
                 onShowBooking={onShowBooking}
               />
             ))}

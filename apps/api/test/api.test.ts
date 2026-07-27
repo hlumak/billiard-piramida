@@ -1,13 +1,27 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  BILLIARD_TABLES_COUNT,
+  DARTBOARDS_COUNT,
+  HOURLY_RATE_GROSZ,
+  SPORT_CARD_DISCOUNT_GROSZ,
+  SPOTS_COUNT
+} from '@repo/shared';
+import { eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 import { buildApp } from '../src/app.ts';
 import { LOCAL_DATABASE_URL } from '../src/lib/config.ts';
 import { createDb } from '../src/db/client.ts';
-import { bookings } from '../src/db/schema.ts';
+import { bookings, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
+
+/** Derived from the shared constants — a rate change must not silently rot these. */
+const BILLIARD_HOUR = HOURLY_RATE_GROSZ.billiard;
+const DARTS_HOUR = HOURLY_RATE_GROSZ.darts;
+/** Seeded spot ids: 1..5 are billiard tables, 6..7 dartboards. */
+const DARTBOARD_ID = 6;
 
 const ADMIN_URL = process.env.DATABASE_URL ?? LOCAL_DATABASE_URL;
 const TEST_URL = ADMIN_URL.replace(/\/[^/]+$/, '/piramida_test');
@@ -66,10 +80,23 @@ test('health check responds', async () => {
   assert.deepEqual(res.json(), { status: 'ok' });
 });
 
-test('lists 5 tables', async () => {
+test('lists every bookable spot with its kind', async () => {
   const res = await app.inject({ method: 'GET', url: '/api/tables' });
   assert.equal(res.statusCode, 200);
-  assert.equal(res.json().length, 5);
+  const spots = res.json();
+  assert.equal(spots.length, SPOTS_COUNT);
+  assert.equal(
+    spots.filter((s: { kind: string }) => s.kind === 'billiard').length,
+    BILLIARD_TABLES_COUNT
+  );
+  assert.equal(spots.filter((s: { kind: string }) => s.kind === 'darts').length, DARTBOARDS_COUNT);
+  // Labels number within the kind, so a dartboard is never "table 6"
+  assert.deepEqual(
+    spots
+      .filter((s: { kind: string }) => s.kind === 'darts')
+      .map((s: { label: string }) => s.label),
+    Array.from({ length: DARTBOARDS_COUNT }, (_, i) => String(i + 1))
+  );
 });
 
 test('menu is localized with english fallback', async () => {
@@ -89,7 +116,7 @@ test('availability reflects operating hours', async () => {
   const monBody = mon.json();
   assert.equal(monBody.open, 16);
   assert.equal(monBody.close, 21);
-  assert.equal(monBody.tables.length, 5);
+  assert.equal(monBody.tables.length, SPOTS_COUNT);
   assert.deepEqual(
     monBody.tables[0].slots.map((s: { hour: number }) => s.hour),
     [16, 17, 18, 19, 20]
@@ -121,9 +148,11 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   });
   assert.equal(create.statusCode, 201);
   const booking = create.json();
-  assert.equal(booking.tableTotalGrosz, 8000);
+  assert.equal(booking.tableTotalGrosz, 2 * BILLIARD_HOUR);
+  assert.equal(booking.kind, 'billiard');
+  assert.equal(booking.tableLabel, '1');
   assert.equal(booking.foodTotalGrosz, 2 * fries.priceGrosz);
-  assert.equal(booking.totalGrosz, 8000 + 2 * fries.priceGrosz);
+  assert.equal(booking.totalGrosz, 2 * BILLIARD_HOUR + 2 * fries.priceGrosz);
   assert.equal(booking.phase, 'upcoming');
 
   // overlapping booking on the same table → 409 via EXCLUDE constraint
@@ -172,7 +201,7 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
     payload: { additionalHours: 1 }
   });
   assert.equal(extend.statusCode, 200);
-  assert.equal(extend.json().tableTotalGrosz, 12000);
+  assert.equal(extend.json().tableTotalGrosz, 3 * BILLIARD_HOUR);
 
   // extending past closing time (21:00) → 422
   const tooLong = await app.inject({
@@ -307,7 +336,7 @@ test('admin stats, bookings and customers respond with data', async () => {
   const found = list.find((b: { customerName: string }) => b.customerName === 'Admin Test');
   assert.ok(found);
   assert.equal(found.items.length, 1);
-  assert.equal(found.totalGrosz, 2 * 40_00 + 2 * found.items[0].unitPriceGrosz);
+  assert.equal(found.totalGrosz, 2 * BILLIARD_HOUR + 2 * found.items[0].unitPriceGrosz);
 
   const customers = await app.inject({ method: 'GET', url: '/api/admin/customers', headers });
   assert.equal(customers.statusCode, 200);
@@ -410,69 +439,78 @@ test('auth: register, login, profile update', async () => {
   assert.equal(anon.statusCode, 401);
 });
 
-test('discounts: sport card takes 15 zl off, club card 10%, guests none', async () => {
-  // Sport card holder — flat 15 zł off
-  const sport = await app.inject({
-    method: 'POST',
-    url: '/api/auth/register',
-    payload: {
-      phone: '+48 111 000 111',
-      name: 'Sport Card',
-      password: 'secret-pass-2',
-      sportCardType: 'medicover',
-      sportCardNumber: 'MC-1'
-    }
-  });
-  const sportToken = sport.json().token;
-  const sportBooking = await app.inject({
+test('discounts: 15 zl per sport card, stacking, capped at the rental', async () => {
+  // One card on a 2h billiard booking — flat 15 zł off, no account needed
+  const oneCard = await app.inject({
     method: 'POST',
     url: '/api/bookings',
-    headers: { authorization: `Bearer ${sportToken}` },
     payload: {
       tableId: 4,
       date: MONDAY,
       startHour: 16,
       durationHours: 2,
-      customerName: 'Sport Card',
-      customerPhone: '+48 111 000 111'
+      customerName: 'One Card',
+      customerPhone: '+48 111 000 111',
+      sportCardCount: 1
     }
   });
-  assert.equal(sportBooking.statusCode, 201);
-  const sportDto = sportBooking.json();
-  assert.equal(sportDto.discountGrosz, 15_00);
-  assert.equal(sportDto.totalGrosz, 2 * 40_00 - 15_00);
+  assert.equal(oneCard.statusCode, 201);
+  const oneDto = oneCard.json();
+  assert.equal(oneDto.sportCardCount, 1);
+  assert.equal(oneDto.discountGrosz, SPORT_CARD_DISCOUNT_GROSZ);
+  assert.equal(oneDto.totalGrosz, 2 * BILLIARD_HOUR - SPORT_CARD_DISCOUNT_GROSZ);
 
-  // Club card holder — 10% of table rental (3h × 40 = 120 → 12 zł < 15 zł flat...
-  // wait: club-only holder gets the 10%)
-  const club = await app.inject({
-    method: 'POST',
-    url: '/api/auth/register',
-    payload: {
-      phone: '+48 222 000 222',
-      name: 'Club Card',
-      password: 'secret-pass-3',
-      clubCardNumber: '0005'
-    }
-  });
-  const clubBooking = await app.inject({
+  // Two partners, two cards — they stack
+  const twoCards = await app.inject({
     method: 'POST',
     url: '/api/bookings',
-    headers: { authorization: `Bearer ${club.json().token}` },
     payload: {
       tableId: 4,
       date: MONDAY,
       startHour: 18,
       durationHours: 3,
-      customerName: 'Club Card',
-      customerPhone: '+48 222 000 222'
+      customerName: 'Two Cards',
+      customerPhone: '+48 222 000 222',
+      sportCardCount: 2
     }
   });
-  assert.equal(clubBooking.statusCode, 201);
-  const clubDto = clubBooking.json();
-  assert.equal(clubDto.discountGrosz, Math.round(3 * 40_00 * 0.1));
-  assert.equal(clubDto.totalGrosz, 3 * 40_00 - 12_00);
+  assert.equal(twoCards.statusCode, 201);
+  const twoDto = twoCards.json();
+  assert.equal(twoDto.discountGrosz, 2 * SPORT_CARD_DISCOUNT_GROSZ);
+  assert.equal(twoDto.totalGrosz, 3 * BILLIARD_HOUR - 2 * SPORT_CARD_DISCOUNT_GROSZ);
 
-  // Guest — no discount
+  // Policy example: one darts hour with two cards is free, never negative
+  const darts = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: DARTBOARD_ID,
+      date: MONDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Darts Pair',
+      customerPhone: '+48 444 000 444',
+      sportCardCount: 2
+    }
+  });
+  assert.equal(darts.statusCode, 201);
+  const dartsDto = darts.json();
+  assert.equal(dartsDto.kind, 'darts');
+  assert.equal(dartsDto.tableLabel, '1');
+  assert.equal(dartsDto.tableTotalGrosz, DARTS_HOUR);
+  assert.equal(dartsDto.discountGrosz, DARTS_HOUR);
+  assert.equal(dartsDto.totalGrosz, 0);
+
+  // Extending uncaps a clipped discount: 2 cards = 30 zł, now under a 2h rental
+  const extended = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${dartsDto.id}/extend`,
+    payload: { additionalHours: 1 }
+  });
+  assert.equal(extended.statusCode, 200);
+  assert.equal(extended.json().discountGrosz, 2 * SPORT_CARD_DISCOUNT_GROSZ);
+
+  // No cards declared — no discount
   const guest = await app.inject({
     method: 'POST',
     url: '/api/bookings',
@@ -486,8 +524,48 @@ test('discounts: sport card takes 15 zl off, club card 10%, guests none', async 
     }
   });
   assert.equal(guest.statusCode, 201);
+  assert.equal(guest.json().sportCardCount, 0);
   assert.equal(guest.json().discountGrosz, 0);
-  assert.equal(guest.json().totalGrosz, 40_00);
+  assert.equal(guest.json().totalGrosz, BILLIARD_HOUR);
+
+  // Above the per-booking ceiling the request is rejected outright
+  const tooMany = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 2,
+      date: MONDAY,
+      startHour: 19,
+      durationHours: 1,
+      customerName: 'Too Many',
+      customerPhone: '+48 555 000 555',
+      sportCardCount: 99
+    }
+  });
+  assert.equal(tooMany.statusCode, 400);
+});
+
+test('club cards are retired: the field is ignored, never stored', async () => {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    payload: {
+      phone: '+48 999 000 999',
+      name: 'No Club Card',
+      password: 'secret-pass-9',
+      clubCardNumber: '0005'
+    }
+  });
+  // Stripped by the schema rather than rejected, so older clients still register
+  assert.equal(res.statusCode, 201);
+  const profile = res.json().profile;
+  assert.equal('clubCardNumber' in profile, false);
+
+  const { db, pool } = createDb(TEST_URL);
+  const [row] = await db.select().from(users).where(eq(users.phone, '+48999000999'));
+  await pool.end();
+  assert.ok(row);
+  assert.equal(row.clubCardNumber, null);
 });
 
 test('admin CRM: create walk-in booking, staff cancel, analytics, menu patch', async () => {
@@ -539,7 +617,7 @@ test('admin CRM: create walk-in booking, staff cancel, analytics, menu patch', a
   const stats = analytics.json();
   assert.equal(stats.days, 14);
   assert.equal(stats.daily.length, 14);
-  assert.equal(stats.tables.length, 5);
+  assert.equal(stats.tables.length, SPOTS_COUNT);
   assert.ok(stats.tables.every((t: { openHours: number }) => t.openHours > 0));
 
   // Menu management: price + availability round-trip
@@ -838,7 +916,7 @@ test('extend colliding with a later booking on the same table returns 409', asyn
     payload: { additionalHours: 1 }
   });
   assert.equal(ok.statusCode, 200);
-  assert.equal(ok.json().tableTotalGrosz, 2 * 40_00);
+  assert.equal(ok.json().tableTotalGrosz, 2 * BILLIARD_HOUR);
 });
 
 test('bookings in the past are rejected on public and admin create', async () => {

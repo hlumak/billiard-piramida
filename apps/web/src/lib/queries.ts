@@ -9,6 +9,14 @@ export const availabilityQuery = (date: string) =>
     refetchInterval: 60_000
   });
 
+/** The room's spots (billiard tables + dartboards) — venue config, rarely changes. */
+export const tablesQuery = () =>
+  queryOptions({
+    queryKey: ['tables'],
+    queryFn: ({ signal }) => api.tables(signal),
+    staleTime: 60 * 60_000
+  });
+
 export const menuQuery = (locale: string) =>
   queryOptions({
     queryKey: ['menu', locale],

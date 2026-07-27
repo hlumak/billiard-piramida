@@ -1,4 +1,4 @@
-import { TABLES_COUNT } from '@repo/shared';
+import { BILLIARD_TABLES_COUNT, DARTBOARDS_COUNT } from '@repo/shared';
 import { LOCAL_DATABASE_URL } from '../lib/config.ts';
 import { createDb } from './client.ts';
 import { foodItems, foodItemTranslations, tables } from './schema.ts';
@@ -100,9 +100,23 @@ const FOOD: SeedFood[] = [
 export async function seed(url: string) {
   const { db, pool } = createDb(url);
   try {
+    // Ids are positional and permanent: billiard tables first, then dartboards.
+    // `label` numbers each spot within its own kind, so the UI can say
+    // "Dartboard 1" for id 6 without knowing the seeding order.
     await db
       .insert(tables)
-      .values(Array.from({ length: TABLES_COUNT }, (_, i) => ({ id: i + 1, label: `${i + 1}` })))
+      .values([
+        ...Array.from({ length: BILLIARD_TABLES_COUNT }, (_, i) => ({
+          id: i + 1,
+          label: `${i + 1}`,
+          kind: 'billiard' as const
+        })),
+        ...Array.from({ length: DARTBOARDS_COUNT }, (_, i) => ({
+          id: BILLIARD_TABLES_COUNT + i + 1,
+          label: `${i + 1}`,
+          kind: 'darts' as const
+        }))
+      ])
       .onConflictDoNothing();
 
     for (const food of FOOD) {

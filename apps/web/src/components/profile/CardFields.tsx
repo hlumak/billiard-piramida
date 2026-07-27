@@ -1,6 +1,7 @@
 import { Input, Label, TextField } from '@heroui/react';
 import type { SportCardType } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
+import { PartnerCardLogos } from '../PartnerCardLogos';
 
 const SPORT_CARDS: { value: SportCardType | null; label: string }[] = [
   { value: null, label: '' },
@@ -12,7 +13,6 @@ const SPORT_CARDS: { value: SportCardType | null; label: string }[] = [
 export interface CardsState {
   sportCardType: SportCardType | null;
   sportCardNumber: string;
-  clubCardNumber: string;
 }
 
 /** Sport-card chips + numbers — shared by registration and profile editing. */
@@ -59,17 +59,7 @@ export function CardFields({
         </TextField>
       ) : null}
 
-      <TextField
-        name="clubCardNumber"
-        value={value.clubCardNumber}
-        onChange={clubCardNumber => onChange({ ...value, clubCardNumber })}
-      >
-        <Label>
-          {m.club_card_label()} · {m.card_number_label()}
-        </Label>
-        <Input placeholder="0005" />
-      </TextField>
-
+      <PartnerCardLogos />
       <p className="text-xs text-grey-cool">{m.cards_hint()}</p>
     </div>
   );

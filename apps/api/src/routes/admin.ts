@@ -2,11 +2,14 @@ import assert from 'node:assert';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Type } from '@sinclair/typebox';
 import {
+  discountGroszFor,
   hoursForDate,
   HOURLY_RATE_GROSZ,
   isIsoDate,
   isValidBookingWindow,
-  TABLES_COUNT,
+  MAX_SPORT_CARDS_PER_BOOKING,
+  spotPriceGrosz,
+  SPOTS_COUNT,
   type AdminAnalyticsDto,
   type AdminCustomerDto,
   type AdminStatsDto
@@ -40,7 +43,18 @@ function tokenMatches(provided: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-/** Table rental + food revenue of confirmed bookings starting in [from, to). */
+/**
+ * Hourly rate of the spot a booking sits on. Every rental sum has to join
+ * `tables` and go through this — billiard and darts bill at different rates.
+ */
+// The ::int casts are load-bearing: inside a CASE, Postgres has no operand to
+// infer a bound parameter's type from and defaults it to text, which then blows
+// up on `numeric * text` when the rate is multiplied by the hours.
+const SPOT_RATE_GROSZ = sql<number>`case ${tables.kind} when 'darts' then ${HOURLY_RATE_GROSZ.darts}::int else ${HOURLY_RATE_GROSZ.billiard}::int end`;
+
+const RENTAL_GROSZ = sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${SPOT_RATE_GROSZ}), 0)::int`;
+
+/** Spot rental + food revenue of confirmed bookings starting in [from, to). */
 async function revenueBetween(db: Db, from: Date, to: Date): Promise<number> {
   const inRange = and(
     eq(bookings.status, 'confirmed'),
@@ -51,9 +65,10 @@ async function revenueBetween(db: Db, from: Date, to: Date): Promise<number> {
     db
       .select({
         // Net of discounts so /stats agrees with /analytics for the same day
-        grosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${HOURLY_RATE_GROSZ}), 0)::int - coalesce(sum(${bookings.discountGrosz}), 0)::int`
+        grosz: sql<number>`${RENTAL_GROSZ} - coalesce(sum(${bookings.discountGrosz}), 0)::int`
       })
       .from(bookings)
+      .innerJoin(tables, eq(bookings.tableId, tables.id))
       .where(inRange),
     db
       .select({
@@ -224,9 +239,10 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
             cancelledCount: sql<number>`count(*) filter (where ${bookings.status} = 'cancelled')::int`,
             firstSeen: min(bookings.startsAt),
             lastSeen: max(bookings.startsAt),
-            tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${HOURLY_RATE_GROSZ}) filter (where ${bookings.status} = 'confirmed'), 0)::int`
+            tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${SPOT_RATE_GROSZ}) filter (where ${bookings.status} = 'confirmed'), 0)::int`
           })
           .from(bookings)
+          .innerJoin(tables, eq(bookings.tableId, tables.id))
           .where(phoneFilter)
           .groupBy(bookings.customerPhone)
           .orderBy(desc(max(bookings.startsAt)))
@@ -359,12 +375,15 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         schema: {
           body: Type.Object(
             {
-              tableId: Type.Integer({ minimum: 1, maximum: TABLES_COUNT }),
+              tableId: Type.Integer({ minimum: 1, maximum: SPOTS_COUNT }),
               date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
               startHour: Type.Integer({ minimum: 0, maximum: 23 }),
               durationHours: Type.Integer({ minimum: 1, maximum: 8 }),
               customerName: Type.String({ minLength: 1, maxLength: 120 }),
-              customerPhone: Type.String({ minLength: 5, maxLength: 25 })
+              customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
+              sportCardCount: Type.Optional(
+                Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })
+              )
             },
             { additionalProperties: false }
           ),
@@ -386,10 +405,26 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         }
         const endsAt = new Date(startsAt.getTime() + durationHours * HOUR_MS);
 
+        const [spot] = await admin.db.select().from(tables).where(eq(tables.id, tableId));
+        if (!spot) return reply.code(422).send({ error: 'unknown_table' });
+        const sportCardCount = request.body.sportCardCount ?? 0;
+        const discountGrosz = discountGroszFor(
+          sportCardCount,
+          spotPriceGrosz(spot.kind, durationHours)
+        );
+
         try {
           const [created] = await admin.db
             .insert(bookings)
-            .values({ tableId, customerName, customerPhone, startsAt, endsAt })
+            .values({
+              tableId,
+              customerName,
+              customerPhone,
+              startsAt,
+              endsAt,
+              sportCardCount,
+              discountGrosz
+            })
             .returning({ id: bookings.id });
           assert(created, 'insert returned no row');
           const dto = await mustLoadBookingDto(admin.db, created.id);
@@ -460,10 +495,11 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
             .select({
               date: warsawDay,
               bookings: count(),
-              tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${HOURLY_RATE_GROSZ}), 0)::int`,
+              tableGrosz: RENTAL_GROSZ,
               discountGrosz: sql<number>`coalesce(sum(${bookings.discountGrosz}), 0)::int`
             })
             .from(bookings)
+            .innerJoin(tables, eq(bookings.tableId, tables.id))
             .where(confirmedInWindow)
             .groupBy(warsawDay),
           db

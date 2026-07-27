@@ -1,5 +1,5 @@
 import { createStore } from '@tanstack/react-store';
-import type { IsoDate } from '@repo/shared';
+import type { ActivityKind, IsoDate } from '@repo/shared';
 
 export const WIZARD_STEPS = ['date', 'time', 'table', 'food', 'details'] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
@@ -10,6 +10,12 @@ export interface WizardState {
   startHour: number | null;
   durationHours: number;
   tableId: number | null;
+  /** Kind + label of the picked spot — carried so later steps render and price
+   *  it without refetching availability */
+  kind: ActivityKind | null;
+  tableLabel: string | null;
+  /** Sport cards the players will present, 15 zł off each */
+  sportCardCount: number;
   /** foodItemId → quantity */
   items: Record<number, number>;
 }
@@ -20,6 +26,9 @@ const initialState: WizardState = {
   startHour: null,
   durationHours: 1,
   tableId: null,
+  kind: null,
+  tableLabel: null,
+  sportCardCount: 0,
   items: {}
 };
 
@@ -58,6 +67,8 @@ export function selectDate(date: IsoDate): void {
       startHour: null,
       durationHours: 1,
       tableId: null,
+      kind: null,
+      tableLabel: null,
       step: 'time'
     };
   });
@@ -69,12 +80,18 @@ export function selectTime(startHour: number, durationHours: number): void {
     startHour,
     durationHours,
     tableId: null,
+    kind: null,
+    tableLabel: null,
     step: 'table'
   }));
 }
 
-export function selectTable(tableId: number): void {
-  wizardStore.setState(state => ({ ...state, tableId, step: 'food' }));
+export function selectTable(tableId: number, kind: ActivityKind, tableLabel: string): void {
+  wizardStore.setState(state => ({ ...state, tableId, kind, tableLabel, step: 'food' }));
+}
+
+export function setSportCardCount(sportCardCount: number): void {
+  wizardStore.setState(state => ({ ...state, sportCardCount: Math.max(0, sportCardCount) }));
 }
 
 export function setItemQuantity(foodItemId: number, quantity: number): void {

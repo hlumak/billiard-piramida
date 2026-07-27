@@ -18,6 +18,7 @@ export interface AdminCreateBookingInput {
   durationHours: number;
   customerName: string;
   customerPhone: string;
+  sportCardCount?: number;
 }
 
 /** The admin token is an HttpOnly cookie; this readable flag cookie tells the

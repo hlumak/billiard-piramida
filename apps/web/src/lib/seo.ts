@@ -1,3 +1,4 @@
+import { HOURLY_RATE_GROSZ } from '@repo/shared';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 import { VENUE } from './venue';
@@ -33,7 +34,8 @@ export function venueJsonLd(): string {
     url: SITE_URL,
     image: `${SITE_URL}/og-image.jpg`,
     telephone: VENUE.phone,
-    priceRange: '40 PLN/h',
+    // Derived so a rate change can't leave stale structured data behind
+    priceRange: `${HOURLY_RATE_GROSZ.darts / 100}–${HOURLY_RATE_GROSZ.billiard / 100} PLN/h`,
     address: {
       '@type': 'PostalAddress',
       streetAddress: VENUE.street,

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatPln, hoursForDate, type BookingDto } from '@repo/shared';
 import { formatDayLong, intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
+import { spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { StaggerGroup, StaggerItem } from '../motion';
@@ -56,8 +57,8 @@ export function BookingDetails({
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-grey-cool">{m.summary_table()}</dt>
-            <dd>{m.table_n({ n: booking.tableId })}</dd>
+            <dt className="text-grey-cool">{spotSummaryLabel(booking.kind)}</dt>
+            <dd>{spotName(booking.kind, booking.tableLabel)}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-grey-cool">{m.name_label()}</dt>
@@ -70,7 +71,7 @@ export function BookingDetails({
         <h3 className="mb-2 font-semibold text-golden">{m.order_title()}</h3>
         <div className="flex flex-col gap-1 text-sm text-creme">
           <div className="flex justify-between">
-            <span className="text-grey-cool">{m.table_rental()}</span>
+            <span className="text-grey-cool">{spotRentalLabel(booking.kind)}</span>
             <span>{formatPln(booking.tableTotalGrosz, intlTag())}</span>
           </div>
           {booking.items.map(item => (
@@ -83,7 +84,9 @@ export function BookingDetails({
           ))}
           {booking.discountGrosz > 0 ? (
             <div className="flex justify-between">
-              <span className="text-grey-cool">{m.discount_label()}</span>
+              <span className="text-grey-cool">
+                {m.sport_cards_count({ n: booking.sportCardCount })}
+              </span>
               <span className="text-golden">−{formatPln(booking.discountGrosz, intlTag())}</span>
             </div>
           ) : null}

@@ -8,7 +8,7 @@ import { ApiError } from '../../lib/api';
 import { authApi, storeSession, type RegisterInput } from '../../lib/auth';
 import { m } from '../../paraglide/messages.js';
 
-const EMPTY_CARDS: CardsState = { sportCardType: null, sportCardNumber: '', clubCardNumber: '' };
+const EMPTY_CARDS: CardsState = { sportCardType: null, sportCardNumber: '' };
 
 export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   const queryClient = useQueryClient();
@@ -26,8 +26,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
         name: name.trim(),
         password,
         sportCardType: cards.sportCardType,
-        sportCardNumber: cards.sportCardType !== null ? cards.sportCardNumber.trim() || null : null,
-        clubCardNumber: cards.clubCardNumber.trim() || null
+        sportCardNumber: cards.sportCardType !== null ? cards.sportCardNumber.trim() || null : null
       };
       return authApi.register(input);
     },

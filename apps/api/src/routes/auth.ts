@@ -20,10 +20,11 @@ const CREDENTIALS = {
   password: Type.String({ minLength: 8, maxLength: 100 })
 };
 
+// Club cards are discontinued: the column survives in the DB, but nothing may
+// set or read one any more.
 const CARD_FIELDS = {
   sportCardType: Type.Optional(Type.Union([SPORT_CARD_TYPE, Type.Null()])),
-  sportCardNumber: Type.Optional(Type.Union([Type.String({ maxLength: 40 }), Type.Null()])),
-  clubCardNumber: Type.Optional(Type.Union([Type.String({ maxLength: 40 }), Type.Null()]))
+  sportCardNumber: Type.Optional(Type.Union([Type.String({ maxLength: 40 }), Type.Null()]))
 };
 
 const REGISTER_BODY = Type.Object(
@@ -45,9 +46,8 @@ const UPDATE_BODY = Type.Object(
   { additionalProperties: false }
 );
 
-/** Store a blank (empty or whitespace-only) card field as null so pricing —
- *  which treats any non-null card as real — never grants a discount for an
- *  untouched field a client submitted as ''. */
+/** Store a blank (empty or whitespace-only) card field as null, so an
+ *  untouched field a client submitted as '' never reads back as a real card. */
 function blankToNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null) return null;
   const trimmed = value.trim();
@@ -60,8 +60,7 @@ function toProfile(user: typeof users.$inferSelect): UserProfileDto {
     phone: user.phone,
     name: user.name,
     sportCardType: user.sportCardType,
-    sportCardNumber: user.sportCardNumber,
-    clubCardNumber: user.clubCardNumber
+    sportCardNumber: user.sportCardNumber
   };
 }
 
@@ -85,7 +84,7 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
       }
     },
     async (request, reply) => {
-      const { password, name, sportCardType, sportCardNumber, clubCardNumber } = request.body;
+      const { password, name, sportCardType, sportCardNumber } = request.body;
       const phone = normalizePhone(request.body.phone);
       if (phone === null) return reply.code(400).send({ error: 'invalid_phone' });
 
@@ -104,8 +103,7 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
             name: name.trim(),
             passwordHash,
             sportCardType: sportCardType ?? null,
-            sportCardNumber: blankToNull(sportCardNumber),
-            clubCardNumber: blankToNull(clubCardNumber)
+            sportCardNumber: blankToNull(sportCardNumber)
           })
           .returning();
       } catch (err) {
@@ -182,7 +180,7 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
       const user = await app.authenticatedUser(request);
       if (!user) return reply.code(401).send({ error: 'unauthorized' });
 
-      const { name, sportCardType, sportCardNumber, clubCardNumber } = request.body;
+      const { name, sportCardType, sportCardNumber } = request.body;
       const [updated] = await app.db
         .update(users)
         .set({
@@ -190,8 +188,7 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
           ...(sportCardType !== undefined ? { sportCardType } : {}),
           ...(sportCardNumber !== undefined
             ? { sportCardNumber: blankToNull(sportCardNumber) }
-            : {}),
-          ...(clubCardNumber !== undefined ? { clubCardNumber: blankToNull(clubCardNumber) } : {})
+            : {})
         })
         .where(eq(users.id, user.id))
         .returning();

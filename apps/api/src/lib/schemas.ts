@@ -25,9 +25,12 @@ export const ISO_DATE = Type.Unsafe<IsoDate>(Type.String({ pattern: '^\\d{4}-\\d
 
 export const ERROR_RESPONSE = Type.Object({ error: Type.String() });
 
+export const ACTIVITY_KIND = Type.Union([Type.Literal('billiard'), Type.Literal('darts')]);
+
 export const TABLE_RESPONSE = Type.Object({
   id: Type.Integer(),
-  label: Type.String()
+  label: Type.String(),
+  kind: ACTIVITY_KIND
 });
 
 export const AVAILABILITY_RESPONSE = Type.Object({
@@ -37,6 +40,8 @@ export const AVAILABILITY_RESPONSE = Type.Object({
   tables: Type.Array(
     Type.Object({
       tableId: Type.Integer(),
+      kind: ACTIVITY_KIND,
+      label: Type.String(),
       slots: Type.Array(
         Type.Object({
           hour: Type.Integer(),
@@ -60,6 +65,8 @@ export const MENU_ITEM_RESPONSE = Type.Object({
 export const BOOKING_RESPONSE = Type.Object({
   id: Type.String(),
   tableId: Type.Integer(),
+  kind: ACTIVITY_KIND,
+  tableLabel: Type.String(),
   customerName: Type.String(),
   customerPhone: Type.String(),
   startsAt: Type.String(),
@@ -82,6 +89,7 @@ export const BOOKING_RESPONSE = Type.Object({
   ),
   tableTotalGrosz: Type.Integer(),
   foodTotalGrosz: Type.Integer(),
+  sportCardCount: Type.Integer(),
   discountGrosz: Type.Integer(),
   totalGrosz: Type.Integer()
 });
@@ -144,8 +152,7 @@ export const PROFILE_RESPONSE = Type.Object({
   phone: Type.String(),
   name: Type.String(),
   sportCardType: Type.Union([SPORT_CARD_TYPE, Type.Null()]),
-  sportCardNumber: Type.Union([Type.String(), Type.Null()]),
-  clubCardNumber: Type.Union([Type.String(), Type.Null()])
+  sportCardNumber: Type.Union([Type.String(), Type.Null()])
 });
 
 export const AUTH_RESPONSE = Type.Object({
