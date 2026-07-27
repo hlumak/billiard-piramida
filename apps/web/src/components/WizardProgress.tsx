@@ -11,8 +11,11 @@ export function WizardProgress({ step, total }: { step: number; total: number })
         aria-label={m.step_of({ step, total })}
         className="h-2 w-full overflow-hidden rounded-[3px] bg-deep-cream"
       >
+        {/* Width is the only thing that animates here, so name it. Tailwind has
+            no `transition-width` utility — the arbitrary property is the way to
+            avoid `transition-all` sweeping in every other changed property. */}
         <div
-          className="h-full rounded-[3px] bg-golden transition-all duration-300"
+          className="h-full rounded-[3px] bg-golden transition-[width] duration-300"
           style={{ width: `${(step / total) * 100}%` }}
         />
       </div>
