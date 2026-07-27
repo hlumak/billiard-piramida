@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { ChevronLeft, CircleUser, Menu } from 'lucide-react';
 import { m } from '../paraglide/messages.js';
+import { BrandLogo } from './BrandLogo';
 
 /** Transparent header over the hero photo: burger · brand · account. */
 export function HomeHeader() {
@@ -9,8 +10,8 @@ export function HomeHeader() {
       <Link to="/menu" aria-label={m.nav_menu()} className="text-golden hover:text-golden-hover">
         <Menu className="size-8" strokeWidth={2.5} />
       </Link>
-      <Link to="/" className="brand-title text-4xl leading-none md:text-5xl">
-        piramida
+      <Link to="/">
+        <BrandLogo className="w-36 md:w-44" />
       </Link>
       <Link
         to="/profile"

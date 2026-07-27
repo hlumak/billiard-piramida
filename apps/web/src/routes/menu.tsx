@@ -1,4 +1,5 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { BrandLogo } from '../components/BrandLogo';
 import { ButtonLink } from '../components/ButtonLink';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { Reveal, StaggerGroup, StaggerItem } from '../components/motion';
@@ -43,8 +44,8 @@ function MenuPage() {
 
       <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col px-10 pb-10 pt-16">
         <Reveal className="flex justify-center">
-          <Link to="/" className="brand-title text-4xl leading-none">
-            piramida
+          <Link to="/">
+            <BrandLogo className="w-44" />
           </Link>
         </Reveal>
 

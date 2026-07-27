@@ -4,7 +4,6 @@
 
 @theme {
   --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
-  --font-brand: 'Galada', cursive;
   --font-script: 'Great Vibes', cursive;
   --font-alt: 'Montserrat Alternates', sans-serif;
 
@@ -87,13 +86,6 @@ body {
   font-family: var(--font-sans);
   background: var(--background);
   color: var(--foreground);
-}
-
-/* Brand wordmark — Galada is Latin-only; "piramida" stays Latin in all locales */
-.brand-title {
-  font-family: var(--font-brand);
-  color: var(--color-golden);
-  text-shadow: 3px 0 1.8px rgba(215, 23, 23, 0.4);
 }
 
 /* Script page titles ("booking", "prices"…) — Great Vibes, Latin-only, English in all locales */
