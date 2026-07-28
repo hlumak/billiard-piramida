@@ -4,21 +4,50 @@ import { m as msg } from '../../paraglide/messages.js';
 import { spotName } from '../../lib/spots';
 
 /**
- * Interactive venue floor plan, drawn from the owner's blueprint.
+ * Interactive venue floor plan, traced from the owner's blueprint.
  *
- * Hall 1 (top) is the bar side: entrance and reception top-left, bar and two
- * WCs along the top wall, tables 1-5 and both dartboards. A wall with a single
- * passage separates it from hall 2 (bottom), which holds tables 6-9 down the
- * window wall, with the cloakroom and two more WCs opposite.
+ * The building is an L. Guests enter from the west into a vestibule — reception
+ * on the left, bar and two WCs along the north wall — and turn south into
+ * hall 1, which runs east past tables 1-5 with both dartboards on the dividing
+ * wall. That wall has a single passage, on the entrance side, down into hall 2:
+ * tables 6-9 in a row, staff rooms behind the west partition. Cloakroom and two
+ * more WCs sit in the annex that hangs south off hall 1's east end.
  *
- * Coordinates live in a 1000×1180 viewBox. Tables are drawn oversized relative
- * to the room so they stay tappable when the plan shrinks to phone width, so
- * this is a wayfinding diagram — arrangement is faithful, scale is not.
+ * Geometry is traced 1:1 from the blueprint into a 1000×1190 viewBox, so the
+ * arrangement is faithful; scale is not. Tables are drawn a little oversized
+ * and every spot carries a padded invisible hit area, so targets stay tappable
+ * when the plan shrinks to phone width.
  */
 
-const HALL_DIVIDER_Y = 545;
-/** Gap in the dividing wall — the way through, on the entrance side. */
-const PASSAGE = { x: 40, w: 140 };
+/**
+ * Outer and interior walls. Every break in a run is a real opening on the
+ * blueprint — the entrance in the west wall, the mouth of hall 1, the single
+ * passage between the halls, and the doorways of the staff rooms.
+ */
+const WALLS = [
+  // Vestibule: north wall, then east wall down to hall 1's north wall
+  'M29 39V37A27 27 0 0 1 56 10H266A26 26 0 0 1 292 36V225',
+  // West wall, hall 2's south wall, and back up hall 2's east wall
+  'M29 87V1151A25 25 0 0 0 54 1176H515A38 38 0 0 0 553 1138V493',
+  // Hall 1: north wall, east wall, then west along the wall dividing the halls
+  'M292 225H967A25 25 0 0 1 992 250V465A28 28 0 0 0 964 493H139',
+  // The stub of that wall west of the passage
+  'M29 493H76',
+  // Partition walling the staff rooms off hall 2, with two doorways
+  'M235 493V660',
+  'M235 724V951',
+  'M235 999V1176',
+  // Staff room walls
+  'M29 797H150',
+  'M198 797H235',
+  'M29 871H235',
+  // The annex corridor reaching east to the cloakroom and WCs
+  'M553 727H815V783A24 24 0 0 1 791 807H553'
+];
+
+/** Both tables are the same size everywhere; the vertical ones are just turned. */
+const T_LONG = 123;
+const T_SHORT = 61;
 
 interface TableSpot {
   id: number;
@@ -28,21 +57,24 @@ interface TableSpot {
   h: number;
 }
 
+const across = (x: number, y: number) => ({ x, y, w: T_LONG, h: T_SHORT });
+const down = (x: number, y: number) => ({ x, y, w: T_SHORT, h: T_LONG });
+
 const TABLES: TableSpot[] = [
-  // Hall 1: 1 and 2 sit under the bar; 3, 4 and 5 carry on down the hall past
-  // the WCs, which is where the blueprint puts them.
-  { id: 1, x: 45, y: 300, w: 175, h: 88 },
-  { id: 2, x: 265, y: 300, w: 175, h: 88 },
-  { id: 3, x: 570, y: 230, w: 85, h: 170 },
-  { id: 4, x: 690, y: 270, w: 160, h: 85 },
-  { id: 5, x: 885, y: 230, w: 85, h: 170 },
-  // Hall 2 — ids 8-11 read as tables 6-9, see SPOTS in @repo/shared.
-  // 140px pitch on a 90px table keeps a 50px gap — wider than the 28px the
-  // oversized tap areas add, so neighbouring targets never overlap.
-  { id: 8, x: 150, y: 600, w: 190, h: 90 },
-  { id: 9, x: 150, y: 740, w: 190, h: 90 },
-  { id: 10, x: 150, y: 880, w: 190, h: 90 },
-  { id: 11, x: 150, y: 1020, w: 190, h: 90 }
+  // Hall 1: 1 and 2 step down the hall from the entrance, then 3, 4 and 5 line
+  // the east end — 3 and 5 turned end-on to fit between the walls.
+  { id: 1, ...across(66, 305) },
+  { id: 2, ...across(295, 342) },
+  { id: 3, ...down(599, 301) },
+  { id: 4, ...across(714, 331) },
+  { id: 5, ...down(893, 301) },
+  // Hall 2 — ids 8-11 read as tables 6-9, see SPOTS in @repo/shared. The 135
+  // pitch on a 61-tall table leaves a 74 gap, wider than the 28 the padded hit
+  // areas add, so neighbouring targets never overlap.
+  { id: 8, ...across(331, 603) },
+  { id: 9, ...across(331, 738) },
+  { id: 10, ...across(331, 873) },
+  { id: 11, ...across(331, 1008) }
 ];
 
 interface DartSpot {
@@ -52,28 +84,71 @@ interface DartSpot {
   r: number;
 }
 
-/** Mounted on the wall directly opposite the WCs, as drawn. */
+/** Mounted on the wall dividing the halls, just east of the passage. */
 const DARTBOARDS: DartSpot[] = [
-  { id: 6, cx: 480, cy: 470, r: 32 },
-  { id: 7, cx: 575, cy: 470, r: 32 }
+  { id: 6, cx: 457, cy: 453, r: 21 },
+  { id: 7, cx: 524, cy: 453, r: 21 }
 ];
 
-/** Fixed rooms along the walls: [x, y, w, h, label]. */
-const ROOMS: { x: number; y: number; w: number; h: number; label: () => string }[] = [
-  // Hall 1 top wall: reception by the door, then bar, then the two WCs. The
-  // wall right of the WCs is open — that stretch of hall holds tables 3-5.
-  { x: 30, y: 130, w: 195, h: 110, label: () => msg.plan_reception() },
-  { x: 256, y: 30, w: 175, h: 120, label: () => msg.plan_bar() },
-  { x: 445, y: 30, w: 88, h: 120, label: () => 'WC' },
-  { x: 540, y: 30, w: 88, h: 120, label: () => 'WC' },
-  // Hall 2
-  { x: 430, y: 600, w: 250, h: 190, label: () => msg.plan_cloakroom() },
-  { x: 730, y: 600, w: 210, h: 130, label: () => 'WC' },
-  { x: 730, y: 750, w: 210, h: 130, label: () => 'WC' }
+/**
+ * Fixed rooms. `d` is the shape — the blueprint chamfers the reception toward
+ * the door and rounds the corners the guest walks around — and `tx`/`ty` centre
+ * the label in whatever space the room leaves. A room with a doorway carries an
+ * `outline` to stroke instead, so the shape can stay closed for filling.
+ */
+const ROOMS: {
+  d: string;
+  outline?: string;
+  tx: number;
+  ty: number;
+  size: number;
+  label: () => string;
+}[] = [
+  {
+    d: 'M29 90H133L204 154V225H29Z',
+    // South wall stops short of the east corner: the way out to hall 1
+    outline: 'M140 225H29V90H133L204 154V225',
+    tx: 109,
+    ty: 161,
+    size: 24,
+    label: () => msg.plan_reception()
+  },
+  { d: 'M292 119H412V225H292Z', tx: 352, ty: 172, size: 20, label: () => msg.plan_bar() },
+  { d: 'M412 119H482V225H412Z', tx: 447, ty: 172, size: 20, label: () => 'WC' },
+  {
+    d: 'M482 119H529A27 27 0 0 1 556 146V225H482Z',
+    tx: 519,
+    ty: 172,
+    size: 20,
+    label: () => 'WC'
+  },
+  {
+    d: 'M654 727V643A24 24 0 0 1 678 619H747V727Z',
+    tx: 696,
+    ty: 673,
+    size: 16,
+    label: () => msg.plan_cloakroom()
+  },
+  {
+    d: 'M747 658V603A15 15 0 0 1 762 588H800A15 15 0 0 1 815 603V658Z',
+    tx: 781,
+    ty: 618,
+    size: 16,
+    label: () => 'WC'
+  },
+  { d: 'M747 658H815V727H747Z', tx: 781, ty: 692, size: 16, label: () => 'WC' }
 ];
 
-/** Windows down the exterior wall of hall 2, as on the blueprint. */
-const WINDOWS = [620, 760, 900, 1040];
+/** One shape for every room, so the fill can go down in a single pass. */
+const ROOM_FILLS = ROOMS.map(room => room.d).join(' ');
+
+/**
+ * Walls and room outlines stroke as ONE path on purpose. Rooms share edges with
+ * each other and sit flush against the walls, and the stroke is translucent —
+ * drawn as separate paths, every shared edge would blend twice and read brighter
+ * than the wall it continues.
+ */
+const OUTLINES = [...WALLS, ...ROOMS.map(room => room.outline ?? room.d)].join(' ');
 
 /** Six pockets: four corners + two long-side middles. */
 function pocketCenters({ x, y, w, h }: TableSpot): [number, number][] {
@@ -145,6 +220,8 @@ function PlanTable({
   onSelect: (tableId: number) => void;
 }) {
   const { id, x, y, w, h } = spot;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
 
   return (
     <PlanSpot id={id} label={label} free={free} onSelect={onSelect}>
@@ -167,22 +244,24 @@ function PlanTable({
       />
       {/* Felt */}
       <rect
-        x={x + 14}
-        y={y + 14}
-        width={w - 28}
-        height={h - 28}
+        x={x + 10}
+        y={y + 10}
+        width={w - 20}
+        height={h - 20}
         rx={6}
         className="fill-club-green transition-colors group-hover:fill-surface-tertiary"
       />
-      {pocketCenters(spot).map(([cx, cy]) => (
-        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={5.5} className="fill-black/60" />
+      {pocketCenters(spot).map(([px, py]) => (
+        <circle key={`${px}-${py}`} cx={px} cy={py} r={5} className="fill-black/60" />
       ))}
       <text
-        x={x + w / 2}
-        y={y + h / 2}
+        x={cx}
+        y={cy}
         textAnchor="middle"
         dominantBaseline="central"
-        className={`text-[34px] font-bold ${free ? 'fill-creme' : 'fill-grey-cool'}`}
+        /* End-on tables read side-on, the way the blueprint labels them */
+        transform={h > w ? `rotate(-90 ${cx} ${cy})` : undefined}
+        className={`text-[26px] font-bold ${free ? 'fill-creme' : 'fill-grey-cool'}`}
       >
         {displayNumber}
       </text>
@@ -211,15 +290,16 @@ function PlanDartboard({
 
   return (
     <PlanSpot id={id} label={label} free={free} onSelect={onSelect}>
-      <circle cx={cx} cy={cy} r={r + 14} fill="transparent" />
+      {/* The pair sits 67 apart, so 12 is all the padding that fits between */}
+      <circle cx={cx} cy={cy} r={r + 12} fill="transparent" />
       <circle cx={cx} cy={cy} r={r} fill="var(--color-club-green-light)" />
-      <circle cx={cx} cy={cy} r={r} fill="none" strokeWidth={5} className={ringClass} />
+      <circle cx={cx} cy={cy} r={r} fill="none" strokeWidth={4} className={ringClass} />
       <circle
         cx={cx}
         cy={cy}
         r={r * 0.62}
         fill="none"
-        strokeWidth={3}
+        strokeWidth={2.5}
         className={`${ringClass} opacity-70`}
       />
       <circle
@@ -233,7 +313,7 @@ function PlanDartboard({
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
-        className={`text-[26px] font-bold ${free ? 'fill-creme' : 'fill-grey-cool'}`}
+        className={`text-[16px] font-bold ${free ? 'fill-creme' : 'fill-grey-cool'}`}
       >
         {displayNumber}
       </text>
@@ -241,40 +321,29 @@ function PlanDartboard({
   );
 }
 
-function Room({
-  x,
-  y,
-  w,
-  h,
+/** Room labels shrink with the room, which is why the size travels with them. */
+function RoomLabel({
+  tx,
+  ty,
+  size,
   label
 }: {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  tx: number;
+  ty: number;
+  size: number;
   label: string;
 }) {
   return (
-    <g>
-      <rect
-        x={x}
-        y={y}
-        width={w}
-        height={h}
-        rx={10}
-        className="fill-club-green-light stroke-deep-cream/30"
-        strokeWidth={2}
-      />
-      <text
-        x={x + w / 2}
-        y={y + h / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        className="fill-creme/90 text-[24px] font-medium"
-      >
-        {label}
-      </text>
-    </g>
+    <text
+      x={tx}
+      y={ty}
+      textAnchor="middle"
+      dominantBaseline="central"
+      className="fill-creme/90 font-medium"
+      style={{ fontSize: size }}
+    >
+      {label}
+    </text>
   );
 }
 
@@ -301,77 +370,44 @@ export function FloorPlan({
   return (
     <div>
       <svg
-        viewBox="0 0 1000 1180"
+        viewBox="0 0 1000 1190"
         role="group"
         aria-label={msg.step_table_title()}
         className="w-full"
       >
-        {/* Outer walls */}
-        <rect
-          x={6}
-          y={6}
-          width={988}
-          height={1168}
-          rx={26}
-          fill="none"
-          strokeWidth={3}
-          className="stroke-deep-cream/50"
-        />
-
-        {/* Entrance: gap in the top wall + inward arrow */}
-        <rect x={55} y={2} width={100} height={8} fill="var(--background)" />
+        <path d={ROOM_FILLS} className="fill-club-green-light" />
         <path
-          d="M105 14 v46 m0 0 l-12 -14 m12 14 l12 -14"
+          d={OUTLINES}
           fill="none"
-          strokeWidth={4}
+          strokeWidth={5}
           strokeLinecap="round"
-          className="stroke-golden"
+          strokeLinejoin="round"
+          className="stroke-deep-cream/50"
         />
-        <text x={105} y={95} textAnchor="middle" className="fill-creme/80 text-[22px]">
-          {msg.plan_entrance()}
-        </text>
-
         {ROOMS.map(room => (
-          <Room key={`${room.x}-${room.y}`} {...room} label={room.label()} />
+          <RoomLabel key={room.d} tx={room.tx} ty={room.ty} size={room.size} label={room.label()} />
         ))}
 
-        {/* Wall between the halls, broken by the passage */}
-        <line
-          x1={6}
-          y1={HALL_DIVIDER_Y}
-          x2={PASSAGE.x}
-          y2={HALL_DIVIDER_Y}
-          strokeWidth={3}
-          className="stroke-deep-cream/50"
-        />
-        <line
-          x1={PASSAGE.x + PASSAGE.w}
-          y1={HALL_DIVIDER_Y}
-          x2={994}
-          y2={HALL_DIVIDER_Y}
-          strokeWidth={3}
-          className="stroke-deep-cream/50"
-        />
-
-        {/* Windows down the hall-2 exterior wall */}
-        {WINDOWS.map(y => (
-          <line
-            key={y}
-            x1={6}
-            y1={y}
-            x2={6}
-            y2={y + 70}
-            strokeWidth={9}
-            strokeLinecap="round"
-            className="stroke-creme/45"
-          />
-        ))}
-
-        <text x={700} y={185} className="fill-creme/45 text-[22px] font-semibold">
-          {msg.plan_hall({ n: 1 })}
-        </text>
-        <text x={40} y={583} className="fill-creme/45 text-[22px] font-semibold">
-          {msg.plan_hall({ n: 2 })}
+        {/* Entrance: in from the west, then south into hall 1 */}
+        <g
+          fill="none"
+          strokeWidth={5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="stroke-golden"
+        >
+          <path d="M10 64H143M126 47L143 64L126 81" />
+          <path d="M247 132V265M230 248L247 265L264 248" />
+        </g>
+        <text
+          x={215}
+          y={80}
+          textAnchor="middle"
+          dominantBaseline="central"
+          transform="rotate(50 215 80)"
+          className="fill-creme/80 text-[22px]"
+        >
+          {msg.plan_entrance()}
         </text>
 
         {/* Own group: the stagger cascade indexes by sibling position, and the
