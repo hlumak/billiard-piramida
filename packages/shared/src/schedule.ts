@@ -1,11 +1,3 @@
-/**
- * Bookable spots, seeded with sequential ids: billiard tables 1…5, then
- * dartboards. Ids are stable — never renumber, bookings reference them.
- */
-export const BILLIARD_TABLES_COUNT = 5;
-export const DARTBOARDS_COUNT = 2;
-export const SPOTS_COUNT = BILLIARD_TABLES_COUNT + DARTBOARDS_COUNT;
-
 export const MIN_BOOKING_HOURS = 1;
 export const VENUE_TIMEZONE = 'Europe/Warsaw';
 

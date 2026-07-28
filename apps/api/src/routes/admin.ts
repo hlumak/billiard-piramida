@@ -9,7 +9,7 @@ import {
   isValidBookingWindow,
   MAX_SPORT_CARDS_PER_BOOKING,
   spotPriceGrosz,
-  SPOTS_COUNT,
+  MAX_SPOT_ID,
   type AdminAnalyticsDto,
   type AdminCustomerDto,
   type AdminStatsDto
@@ -375,7 +375,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         schema: {
           body: Type.Object(
             {
-              tableId: Type.Integer({ minimum: 1, maximum: SPOTS_COUNT }),
+              tableId: Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }),
               date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
               startHour: Type.Integer({ minimum: 0, maximum: 23 }),
               durationHours: Type.Integer({ minimum: 1, maximum: 8 }),

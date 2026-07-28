@@ -8,7 +8,7 @@ import {
   MAX_ORDER_ITEM_QUANTITY,
   MAX_SPORT_CARDS_PER_BOOKING,
   spotPriceGrosz,
-  SPOTS_COUNT
+  MAX_SPOT_ID
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, asc, eq, gt } from 'drizzle-orm';
@@ -46,7 +46,7 @@ const NEW_ITEMS = Type.Array(
 
 const CREATE_BOOKING_BODY = Type.Object(
   {
-    tableId: Type.Integer({ minimum: 1, maximum: SPOTS_COUNT }),
+    tableId: Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }),
     date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
     startHour: Type.Integer({ minimum: 0, maximum: 23 }),
     durationHours: Type.Integer({ minimum: 1, maximum: 8 }),
