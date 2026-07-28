@@ -54,6 +54,7 @@ export function TableStep({
   const spots = availability.tables.map(t => ({ id: t.tableId, label: t.label, kind: t.kind }));
   const ofKind = availability.tables.filter(table => table.kind === kind);
   const freeOfKind = ofKind.filter(table => freeTableIds.has(table.tableId));
+  const roomIsBusy = freeTableIds.size === 0;
   // Only offer the toggle for kinds the venue actually has seeded
   const offeredKinds = ACTIVITY_KINDS.filter(k => availability.tables.some(t => t.kind === k));
 
@@ -69,8 +70,10 @@ export function TableStep({
         {formatHour(startHour)}–{formatHour(startHour + durationHours)}
       </p>
 
+      {/* Filters the select below, so it is only useful where that select is:
+          on desktop you pick straight off the plan and this would do nothing */}
       {offeredKinds.length > 1 ? (
-        <div role="group" aria-label={m.step_table_title()} className="mb-4 flex gap-2">
+        <div role="group" aria-label={m.step_table_title()} className="mb-4 flex gap-2 md:hidden">
           {offeredKinds.map(option => {
             const freeCount = availability.tables.filter(
               t => t.kind === option && freeTableIds.has(t.tableId)
@@ -118,10 +121,12 @@ export function TableStep({
               <Select.Value />
               <Select.Indicator />
             </Select.Trigger>
-            {/* Never flip above the trigger: an upward popover covers the floor
-                plan, which the user needs to see while choosing. Capped height
-                scrolls instead when space below is tight. */}
-            <Select.Popover shouldFlip={false} maxHeight={260}>
+            {/* Must be allowed to flip above the trigger. The trigger sits under
+                a tall floor plan, so on a phone it is at or past the bottom of
+                the viewport: pinned below with `shouldFlip={false}`, React Aria
+                found zero room, clamped the popover to max-height 0 and the list
+                rendered outside a collapsed, untappable box. */}
+            <Select.Popover maxHeight={260}>
               <ListBox>
                 {freeOfKind.map(table => (
                   <ListBox.Item
@@ -139,7 +144,15 @@ export function TableStep({
         </Reveal>
       ) : null}
 
-      {freeOfKind.length === 0 ? (
+      {/* Only this kind is out: the toggle above is the fix, so no step-back */}
+      {freeOfKind.length === 0 && !roomIsBusy ? (
+        <p className="mt-4 text-center text-grey-cool md:hidden">{m.no_kind_free()}</p>
+      ) : null}
+
+      {/* Whole room busy at this hour. Keyed off every spot, not the selected
+          kind: on desktop the toggle is hidden, so `kind` never moves off
+          billiard and a free dartboard would otherwise read as nothing free. */}
+      {roomIsBusy ? (
         <div className="mt-4 flex flex-col items-center gap-4">
           <p className="text-center text-grey-cool">{m.no_tables_free()}</p>
           <Button

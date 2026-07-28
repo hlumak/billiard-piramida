@@ -27,6 +27,7 @@
   "dartboard_n": "Dartboard {n}",
   "no_slots_for_date": "No free slots on this date",
   "no_tables_free": "Nothing free at this time. Try another slot.",
+  "no_kind_free": "None free in this category right now.",
   "min_booking_note": "Minimum booking — 1 hour",
   "food_skip_hint": "You can skip this step — order during your game too",
   "name_label": "Name",
