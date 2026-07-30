@@ -1,4 +1,4 @@
-import { Button, ListBox, Select, Spinner } from '@heroui/react';
+import { Button, Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { ActivityKind, IsoDate } from '@repo/shared';
@@ -7,7 +7,6 @@ import { formatHour } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { useLiveAvailability } from '../../lib/availability-live';
 import { ACTIVITY_KINDS, activityName, spotName } from '../../lib/spots';
-import { Reveal } from '../motion';
 import { QueryError } from '../QueryError';
 import { goToStep, selectTable } from '../../store/booking-wizard';
 import { FloorPlan } from './FloorPlan';
@@ -70,7 +69,7 @@ export function TableStep({
         {formatHour(startHour)}–{formatHour(startHour + durationHours)}
       </p>
 
-      {/* Filters the select below, so it is only useful where that select is:
+      {/* Filters the chip list below, so it is only useful where those chips are:
           on desktop you pick straight off the plan and this would do nothing */}
       {offeredKinds.length > 1 ? (
         <div role="group" aria-label={m.step_table_title()} className="mb-4 flex gap-2 md:hidden">
@@ -101,53 +100,36 @@ export function TableStep({
         </div>
       ) : null}
 
-      {/* The plan always shows the whole room — the toggle drives the picker below */}
-      <FloorPlan spots={spots} freeTableIds={freeTableIds} onSelect={pick} />
-
-      {/* Narrow screens: the plan is a map; picking happens in the select below */}
+      {/* Narrow screens: the plan is a map you consult, this is the control you
+          pick with — inline chips, not a dropdown. A Select popover has nowhere
+          to go here: the trigger sits against a ~470px-tall floor plan, so on a
+          phone React Aria either clamped it to max-height 0 (pinned below, no
+          room) or flipped it up over the plan, hiding the very map that tells
+          you where "Table 4" is. Chips also match the hour/duration grids on
+          the step before, and picking is one tap either way — `selectTable`
+          advances the wizard, so there was never anything to confirm. */}
       {freeOfKind.length > 0 ? (
-        <Reveal className="mt-4 md:hidden">
-          <Select
-            key={kind}
-            aria-label={m.step_table_title()}
-            placeholder={m.step_table_title()}
-            className="w-full"
-            onSelectionChange={key => {
-              const tableId = Number(key);
-              if (freeTableIds.has(tableId)) pick(tableId);
-            }}
-          >
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            {/* Must be allowed to flip above the trigger. The trigger sits under
-                a tall floor plan, so on a phone it is at or past the bottom of
-                the viewport: pinned below with `shouldFlip={false}`, React Aria
-                found zero room, clamped the popover to max-height 0 and the list
-                rendered outside a collapsed, untappable box. */}
-            <Select.Popover maxHeight={260}>
-              <ListBox>
-                {freeOfKind.map(table => (
-                  <ListBox.Item
-                    key={table.tableId}
-                    id={String(table.tableId)}
-                    textValue={spotName(table.kind, table.label)}
-                  >
-                    {KIND_ICON[table.kind]} {spotName(table.kind, table.label)}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
-        </Reveal>
+        <div key={kind} className="mb-4 flex flex-wrap gap-2 md:hidden">
+          {freeOfKind.map(table => (
+            <button
+              key={table.tableId}
+              type="button"
+              onClick={() => pick(table.tableId)}
+              className="anim-stagger-item h-10 rounded-[10px] bg-club-green-light px-3 text-sm font-semibold text-creme transition hover:bg-surface-hover active:scale-95"
+            >
+              {KIND_ICON[table.kind]} {spotName(table.kind, table.label)}
+            </button>
+          ))}
+        </div>
       ) : null}
 
       {/* Only this kind is out: the toggle above is the fix, so no step-back */}
       {freeOfKind.length === 0 && !roomIsBusy ? (
-        <p className="mt-4 text-center text-grey-cool md:hidden">{m.no_kind_free()}</p>
+        <p className="mb-4 text-center text-grey-cool md:hidden">{m.no_kind_free()}</p>
       ) : null}
+
+      {/* The plan always shows the whole room — the toggle drives the chips above */}
+      <FloorPlan spots={spots} freeTableIds={freeTableIds} onSelect={pick} />
 
       {/* Whole room busy at this hour. Keyed off every spot, not the selected
           kind: on desktop the toggle is hidden, so `kind` never moves off
