@@ -22,7 +22,7 @@
   "devDependencies": {
     "oxfmt": "^0.61.0",
     "oxlint": "^1.76.0",
-    "oxlint-plugin-react-doctor": "^0.9.2",
+    "oxlint-plugin-react-doctor": "^0.9.3",
     "typescript": "^7.0.2"
   },
   "engines": {
