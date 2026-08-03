@@ -18,10 +18,12 @@ import { bookings, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
 
 /** Derived from the shared constants — a rate change must not silently rot these. */
-const BILLIARD_HOUR = HOURLY_RATE_GROSZ.billiard;
+const BILLIARD_HOUR = HOURLY_RATE_GROSZ['9ft'];
+const BILLIARD_12FT_HOUR = HOURLY_RATE_GROSZ['12ft'];
 const DARTS_HOUR = HOURLY_RATE_GROSZ.darts;
-/** Seeded spot ids: 1..5 are billiard tables, 6..7 dartboards. */
+/** Seeded spot ids: 1..5 are 9ft tables, 6..7 dartboards, 8..11 the 12ft ones. */
 const DARTBOARD_ID = 6;
+const TABLE_12FT_ID = 8;
 
 const ADMIN_URL = process.env.DATABASE_URL ?? LOCAL_DATABASE_URL;
 const TEST_URL = ADMIN_URL.replace(/\/[^/]+$/, '/piramida_test');
@@ -318,6 +320,23 @@ test('admin stats, bookings and customers respond with data', async () => {
   });
   assert.equal(created.statusCode, 201);
 
+  // Same window on a 12ft table. The admin rental sums bill in SQL off a CASE
+  // generated from SPOTS, so this is the assertion that pins that CASE to the
+  // rate `hourlyRateGrosz` hands the rest of the app.
+  const createdBig = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: TABLE_12FT_ID,
+      date: nextDate(6),
+      startHour: 17,
+      durationHours: 2,
+      customerName: 'Admin Test 12ft',
+      customerPhone: '+48 700 800 901'
+    }
+  });
+  assert.equal(createdBig.statusCode, 201);
+
   const stats = await app.inject({ method: 'GET', url: '/api/admin/stats', headers });
   assert.equal(stats.statusCode, 200);
   const statsBody = stats.json();
@@ -345,6 +364,12 @@ test('admin stats, bookings and customers respond with data', async () => {
   assert.equal(customer.name, 'Admin Test');
   assert.ok(customer.bookingsCount >= 1);
   assert.ok(customer.totalSpentGrosz > 0);
+
+  // One booking each, so these totals are exact — and they differ only by cloth
+  const bigCustomer = customers.json().find((c: { phone: string }) => c.phone === '+48700800901');
+  assert.ok(bigCustomer);
+  assert.equal(bigCustomer.totalSpentGrosz, 2 * BILLIARD_12FT_HOUR);
+  assert.equal(customer.totalSpentGrosz, 2 * BILLIARD_HOUR + 2 * found.items[0].unitPriceGrosz);
 });
 
 test('websocket subscribers hear availability changes', async () => {
@@ -478,6 +503,28 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
   const twoDto = twoCards.json();
   assert.equal(twoDto.discountGrosz, 2 * SPORT_CARD_DISCOUNT_GROSZ);
   assert.equal(twoDto.totalGrosz, 3 * BILLIARD_HOUR - 2 * SPORT_CARD_DISCOUNT_GROSZ);
+
+  // Hall 2 is 12ft and bills higher; the card discount is flat all the same.
+  // The owner's worked example, on the dearer cloth: 4h × 70 − 4 × 15 = 220.
+  const bigTable = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: TABLE_12FT_ID,
+      date: MONDAY,
+      startHour: 16,
+      durationHours: 4,
+      customerName: 'Twelve Foot',
+      customerPhone: '+48 555 000 555',
+      sportCardCount: 4
+    }
+  });
+  assert.equal(bigTable.statusCode, 201);
+  const bigDto = bigTable.json();
+  assert.equal(bigDto.tableLabel, '6');
+  assert.equal(bigDto.tableTotalGrosz, 4 * BILLIARD_12FT_HOUR);
+  assert.equal(bigDto.discountGrosz, 4 * SPORT_CARD_DISCOUNT_GROSZ);
+  assert.equal(bigDto.totalGrosz, 4 * BILLIARD_12FT_HOUR - 4 * SPORT_CARD_DISCOUNT_GROSZ);
 
   // Policy example: one darts hour with two cards is free, never negative
   const darts = await app.inject({

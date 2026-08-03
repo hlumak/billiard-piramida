@@ -102,10 +102,7 @@ export function bookingRoutes(app: AppInstance) {
       // Optional sign-in: guests book exactly the same way, discounts included —
       // the cards belong to the players at the spot, not to an account
       const user = await app.authenticatedUser(request);
-      const discountGrosz = discountGroszFor(
-        sportCardCount,
-        spotPriceGrosz(spot.kind, durationHours)
-      );
+      const discountGrosz = discountGroszFor(sportCardCount, spotPriceGrosz(spot, durationHours));
 
       try {
         const bookingId = await app.db.transaction(async tx => {
@@ -232,7 +229,7 @@ export function bookingRoutes(app: AppInstance) {
         (newEndsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
       );
       const discountGrosz = spot
-        ? discountGroszFor(booking.sportCardCount, spotPriceGrosz(spot.kind, newDurationHours))
+        ? discountGroszFor(booking.sportCardCount, spotPriceGrosz(spot, newDurationHours))
         : booking.discountGrosz;
 
       try {

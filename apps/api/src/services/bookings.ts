@@ -25,7 +25,7 @@ export async function mustLoadBookingDto(db: Db, id: string): Promise<BookingDto
   return dto;
 }
 
-/** The spot a booking sits on — its kind picks the hourly rate. */
+/** The spot a booking sits on — its id and kind pick the hourly rate. */
 type Spot = Pick<typeof tables.$inferSelect, 'id' | 'label' | 'kind'>;
 
 function composeDto(
@@ -37,7 +37,7 @@ function composeDto(
   const durationHours = Math.round(
     (booking.endsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
   );
-  const tableTotalGrosz = spotPriceGrosz(spot.kind, durationHours);
+  const tableTotalGrosz = spotPriceGrosz(spot, durationHours);
   const foodTotalGrosz = items.reduce((sum, i) => sum + i.quantity * i.unitPriceGrosz, 0);
   return {
     id: booking.id,

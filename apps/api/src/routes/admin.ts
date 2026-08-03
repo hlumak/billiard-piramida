@@ -3,11 +3,13 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { Type } from '@sinclair/typebox';
 import {
   discountGroszFor,
+  hourlyRateGrosz,
   hoursForDate,
   HOURLY_RATE_GROSZ,
   isIsoDate,
   isValidBookingWindow,
   MAX_SPORT_CARDS_PER_BOOKING,
+  SPOTS,
   spotPriceGrosz,
   MAX_SPOT_ID,
   type AdminAnalyticsDto,
@@ -45,12 +47,18 @@ function tokenMatches(provided: string, expected: string): boolean {
 
 /**
  * Hourly rate of the spot a booking sits on. Every rental sum has to join
- * `tables` and go through this — billiard and darts bill at different rates.
+ * `tables` and go through this — dartboards, 9ft and 12ft tables all bill
+ * differently, and the tier follows the spot id, so the CASE is generated from
+ * SPOTS: the same definition the rows were seeded from and the same one
+ * `hourlyRateGrosz` reads, so the two can never disagree.
  */
 // The ::int casts are load-bearing: inside a CASE, Postgres has no operand to
 // infer a bound parameter's type from and defaults it to text, which then blows
 // up on `numeric * text` when the rate is multiplied by the hours.
-const SPOT_RATE_GROSZ = sql<number>`case ${tables.kind} when 'darts' then ${HOURLY_RATE_GROSZ.darts}::int else ${HOURLY_RATE_GROSZ.billiard}::int end`;
+const SPOT_RATE_GROSZ = sql<number>`case ${tables.id} ${sql.join(
+  SPOTS.map(spot => sql`when ${spot.id}::int then ${hourlyRateGrosz(spot)}::int`),
+  sql` `
+)} else ${HOURLY_RATE_GROSZ['9ft']}::int end`;
 
 const RENTAL_GROSZ = sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${SPOT_RATE_GROSZ}), 0)::int`;
 
@@ -408,10 +416,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const [spot] = await admin.db.select().from(tables).where(eq(tables.id, tableId));
         if (!spot) return reply.code(422).send({ error: 'unknown_table' });
         const sportCardCount = request.body.sportCardCount ?? 0;
-        const discountGrosz = discountGroszFor(
-          sportCardCount,
-          spotPriceGrosz(spot.kind, durationHours)
-        );
+        const discountGrosz = discountGroszFor(sportCardCount, spotPriceGrosz(spot, durationHours));
 
         try {
           const [created] = await admin.db

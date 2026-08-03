@@ -8,6 +8,8 @@ export const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'http://localho
 
 const OG_LOCALES = { uk: 'uk_UA', pl: 'pl_PL', en: 'en_GB' } as const;
 
+const RATES = Object.values(HOURLY_RATE_GROSZ);
+
 /** Standard head meta for an indexable page. */
 export function pageMeta(title: string, description: string) {
   return [
@@ -34,8 +36,9 @@ export function venueJsonLd(): string {
     url: SITE_URL,
     image: `${SITE_URL}/og-image.jpg`,
     telephone: VENUE.phone,
-    // Derived so a rate change can't leave stale structured data behind
-    priceRange: `${HOURLY_RATE_GROSZ.darts / 100}–${HOURLY_RATE_GROSZ.billiard / 100} PLN/h`,
+    // Spans every tier and is derived, so a rate change — or a new tier — can't
+    // leave stale structured data behind
+    priceRange: `${Math.min(...RATES) / 100}–${Math.max(...RATES) / 100} PLN/h`,
     address: {
       '@type': 'PostalAddress',
       streetAddress: VENUE.street,

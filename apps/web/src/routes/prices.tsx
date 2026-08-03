@@ -28,22 +28,29 @@ function PricesPage() {
       <PageHeader title="prices" />
       <main className="mt-8 flex-1">
         <Reveal className="flex flex-col gap-2">
+          {/* One row per rate tier, not per kind: the 9ft tables in hall 1 and the
+              12ft ones in hall 2 are priced apart, and the size is what tells a
+              guest which row their table is on. */}
           {(
             [
-              ['billiard', m.table_rental_price(), m.min_booking_note()],
-              ['darts', m.dartboard_rental_price(), m.min_booking_note()]
+              ['9ft', m.table_rental_price(), '9ft'],
+              ['12ft', m.table_rental_price(), '12ft'],
+              ['darts', m.dartboard_rental_price(), null]
             ] as const
-          ).map(([kind, title, note]) => (
+          ).map(([tier, title, size]) => (
             <div
-              key={kind}
+              key={tier}
               className="flex items-center justify-between rounded-[10px] bg-club-green-light p-4"
             >
               <div>
-                <p className="font-semibold text-creme">{title}</p>
-                <p className="text-xs text-grey-cool">{note}</p>
+                <p className="font-semibold text-creme">
+                  {title}
+                  {size ? <span className="text-golden"> {size}</span> : null}
+                </p>
+                <p className="text-xs text-grey-cool">{m.min_booking_note()}</p>
               </div>
               <p className="text-lg font-bold text-golden">
-                {formatPln(HOURLY_RATE_GROSZ[kind], intlTag())}{' '}
+                {formatPln(HOURLY_RATE_GROSZ[tier], intlTag())}{' '}
                 <span className="text-sm font-medium text-creme/80">/ {m.per_hour()}</span>
               </p>
             </div>

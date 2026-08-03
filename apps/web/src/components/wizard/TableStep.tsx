@@ -1,7 +1,7 @@
 import { Button, Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import type { ActivityKind, IsoDate } from '@repo/shared';
+import { sizeOf, type ActivityKind, type IsoDate } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
 import { formatHour } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
@@ -110,16 +110,21 @@ export function TableStep({
           advances the wizard, so there was never anything to confirm. */}
       {freeOfKind.length > 0 ? (
         <div key={kind} className="mb-4 flex flex-wrap gap-2 md:hidden">
-          {freeOfKind.map(table => (
-            <button
-              key={table.tableId}
-              type="button"
-              onClick={() => pick(table.tableId)}
-              className="anim-stagger-item h-10 rounded-[10px] bg-club-green-light px-3 text-sm font-semibold text-creme transition hover:bg-surface-hover active:scale-95"
-            >
-              {KIND_ICON[table.kind]} {spotName(table.kind, table.label)}
-            </button>
-          ))}
+          {freeOfKind.map(table => {
+            // 9ft and 12ft bill apart, so the chip has to say which one this is
+            const size = sizeOf(table.tableId);
+            return (
+              <button
+                key={table.tableId}
+                type="button"
+                onClick={() => pick(table.tableId)}
+                className="anim-stagger-item h-10 rounded-[10px] bg-club-green-light px-3 text-sm font-semibold text-creme transition hover:bg-surface-hover active:scale-95"
+              >
+                {KIND_ICON[table.kind]} {spotName(table.kind, table.label)}
+                {size ? <span className="font-medium text-grey-cool"> · {size}</span> : null}
+              </button>
+            );
+          })}
         </div>
       ) : null}
 

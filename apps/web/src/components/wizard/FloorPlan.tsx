@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import type { TableDto } from '@repo/shared';
+import { sizeOf } from '@repo/shared';
 import { m as msg } from '../../paraglide/messages.js';
 import { spotName } from '../../lib/spots';
 
@@ -10,8 +11,8 @@ import { spotName } from '../../lib/spots';
  * on the left, bar and two WCs along the north wall — and turn south into
  * hall 1, which runs east past tables 1-5 with both dartboards on the dividing
  * wall. That wall has a single passage, on the entrance side, down into hall 2:
- * tables 6-9 in a row, staff rooms behind the west partition. Cloakroom and two
- * more WCs sit in the annex that hangs south off hall 1's east end.
+ * tables 6-9 in a row, staff rooms behind the west partition. A utility room and
+ * two more WCs sit in the annex that hangs south off hall 1's east end.
  *
  * Geometry is traced 1:1 from the blueprint into a 1000×1190 viewBox, so the
  * arrangement is faithful; scale is not. Tables are drawn a little oversized
@@ -45,7 +46,11 @@ const WALLS = [
   'M553 727H815V783A24 24 0 0 1 791 807H553'
 ];
 
-/** Both tables are the same size everywhere; the vertical ones are just turned. */
+/**
+ * Every table is drawn the same box — the plan is schematic about size, and the
+ * 9ft/12ft split is carried by the caption on the table, not by its footprint.
+ * The vertical ones are just this box turned.
+ */
 const T_LONG = 123;
 const T_SHORT = 61;
 
@@ -126,8 +131,10 @@ const ROOMS: {
     d: 'M654 727V643A24 24 0 0 1 678 619H747V727Z',
     tx: 696,
     ty: 673,
-    size: 16,
-    label: () => msg.plan_cloakroom()
+    // Two long words in every locale, and the room is only 93 wide — 12 is what
+    // keeps the longest of them ("Pomieszczenie") inside it once wrapped
+    size: 12,
+    label: () => msg.plan_utility()
   },
   {
     d: 'M747 658V603A15 15 0 0 1 762 588H800A15 15 0 0 1 815 603V658Z',
@@ -210,12 +217,15 @@ function PlanTable({
   spot,
   label,
   displayNumber,
+  size,
   free,
   onSelect
 }: {
   spot: TableSpot;
   label: string;
   displayNumber: string;
+  /** Cloth size, suffixed to the number — 9ft and 12ft bill apart */
+  size: string | null;
   free: boolean;
   onSelect: (tableId: number) => void;
 }) {
@@ -254,16 +264,25 @@ function PlanTable({
       {pocketCenters(spot).map(([px, py]) => (
         <circle key={`${px}-${py}`} cx={px} cy={py} r={5} className="fill-black/60" />
       ))}
+      {/* Number and size share one centred line rather than stacking: the two
+          middle pockets sit dead centre on the long sides, and a second line
+          would land on one. End-on tables read side-on, the way the blueprint
+          labels them — the rotation is about the centre, so the pair turns whole. */}
       <text
         x={cx}
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
-        /* End-on tables read side-on, the way the blueprint labels them */
         transform={h > w ? `rotate(-90 ${cx} ${cy})` : undefined}
         className={`text-[26px] font-bold ${free ? 'fill-creme' : 'fill-grey-cool'}`}
       >
         {displayNumber}
+        {/* The gap is a non-breaking space — SVG collapses an ordinary one */}
+        {size ? (
+          <tspan className={`text-[15px] ${free ? 'fill-golden' : 'fill-grey-cool'}`}>
+            {` ${size}`}
+          </tspan>
+        ) : null}
       </text>
     </PlanSpot>
   );
@@ -321,7 +340,11 @@ function PlanDartboard({
   );
 }
 
-/** Room labels shrink with the room, which is why the size travels with them. */
+/**
+ * Room labels shrink with the room, which is why the size travels with them.
+ * Multi-word names wrap one word per line and centre as a block — SVG text does
+ * not wrap on its own, and "Pomieszczenie gospodarcze" overruns its room on one.
+ */
 function RoomLabel({
   tx,
   ty,
@@ -333,16 +356,29 @@ function RoomLabel({
   size: number;
   label: string;
 }) {
+  const lineHeight = size * 1.15;
+  // dy stacks each word under the last, so only the first line takes the anchor
+  let dy = 0;
+  const lines = label.split(' ').map(word => {
+    const line = { word, dy };
+    dy = lineHeight;
+    return line;
+  });
+
   return (
     <text
       x={tx}
-      y={ty}
+      y={ty - ((lines.length - 1) * lineHeight) / 2}
       textAnchor="middle"
       dominantBaseline="central"
       className="fill-creme/90 font-medium"
       style={{ fontSize: size }}
     >
-      {label}
+      {lines.map(line => (
+        <tspan key={line.word} x={tx} dy={line.dy}>
+          {line.word}
+        </tspan>
+      ))}
     </text>
   );
 }
@@ -358,9 +394,12 @@ export function FloorPlan({
   onSelect: (tableId: number) => void;
 }) {
   const byId = new Map(spots.map(spot => [spot.id, spot]));
+  // Screen readers get the size too — on the plan it is drawn, not spoken
   const nameOf = (id: number, fallbackKind: 'billiard' | 'darts') => {
     const spot = byId.get(id);
-    return spotName(spot?.kind ?? fallbackKind, spot?.label ?? id);
+    const name = spotName(spot?.kind ?? fallbackKind, spot?.label ?? id);
+    const size = sizeOf(id);
+    return size ? `${name}, ${size}` : name;
   };
   // Only draw spots the venue actually has, so the plan degrades gracefully if
   // a hall is taken out of service.
@@ -419,6 +458,7 @@ export function FloorPlan({
               spot={spot}
               label={nameOf(spot.id, 'billiard')}
               displayNumber={byId.get(spot.id)?.label ?? String(spot.id)}
+              size={sizeOf(spot.id)}
               free={freeTableIds.has(spot.id)}
               onSelect={onSelect}
             />

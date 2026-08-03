@@ -7,6 +7,7 @@ import {
   discountGroszFor,
   formatPln,
   MAX_SPORT_CARDS_PER_BOOKING,
+  sizeOf,
   spotPriceGrosz,
   type ActivityKind,
   type IsoDate
@@ -49,7 +50,9 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
     })
     .filter(line => line != null);
 
-  const tableTotal = spotPriceGrosz(draft.kind, draft.durationHours);
+  const spot = { id: draft.tableId, kind: draft.kind };
+  const tableSize = sizeOf(draft.tableId);
+  const tableTotal = spotPriceGrosz(spot, draft.durationHours);
   const foodTotal = orderLines.reduce((sum, line) => sum + line.item.priceGrosz * line.quantity, 0);
   // Preview only — the server recomputes and locks the discount in
   const discount = discountGroszFor(sportCardCount, tableTotal);
@@ -126,7 +129,11 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             </div>
             <div className="flex justify-between">
               <dt className="text-grey-cool">{spotSummaryLabel(draft.kind)}</dt>
-              <dd>{spotName(draft.kind, draft.tableLabel)}</dd>
+              {/* The size is what the rate hangs off, so it reads next to the name */}
+              <dd>
+                {spotName(draft.kind, draft.tableLabel)}
+                {tableSize ? <span className="text-grey-cool"> · {tableSize}</span> : null}
+              </dd>
             </div>
           </dl>
 
