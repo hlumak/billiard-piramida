@@ -3,12 +3,14 @@ import type {
   AdminAnalyticsDto,
   AdminCustomerDto,
   AdminMenuItemDto,
+  AdminNewsItemDto,
   AdminStatsDto,
   AuthResponseDto,
   AvailabilityDto,
   BookingDto,
   IsoDate,
   MenuItemDto,
+  NewsItemDto,
   TableDto,
   UserProfileDto
 } from '@repo/shared';
@@ -117,6 +119,27 @@ export const ADMIN_MENU_ITEM_RESPONSE = Type.Object({
   translations: Type.Array(MENU_TRANSLATION)
 });
 
+export const NEWS_ITEM_RESPONSE = Type.Object({
+  id: Type.Integer(),
+  title: Type.String(),
+  body: Type.Union([Type.String(), Type.Null()]),
+  imageUrl: Type.Union([Type.String(), Type.Null()]),
+  linkUrl: Type.Union([Type.String(), Type.Null()])
+});
+
+export const NEWS_TRANSLATION = Type.Object({
+  locale: LOCALE_SCHEMA,
+  title: Type.String(),
+  body: Type.Union([Type.String(), Type.Null()])
+});
+
+export const ADMIN_NEWS_ITEM_RESPONSE = Type.Object({
+  ...NEWS_ITEM_RESPONSE.properties,
+  isPublished: Type.Boolean(),
+  sortOrder: Type.Integer(),
+  translations: Type.Array(NEWS_TRANSLATION)
+});
+
 export const ADMIN_ANALYTICS_RESPONSE = Type.Object({
   days: Type.Integer(),
   daily: Type.Array(
@@ -201,5 +224,7 @@ export type SchemaDriftChecks = [
   Expect<Equals<Static<typeof PROFILE_RESPONSE>, UserProfileDto>>,
   Expect<Equals<Static<typeof AUTH_RESPONSE>, AuthResponseDto>>,
   Expect<Equals<Static<typeof ADMIN_ANALYTICS_RESPONSE>, AdminAnalyticsDto>>,
-  Expect<Equals<Static<typeof ADMIN_MENU_ITEM_RESPONSE>, AdminMenuItemDto>>
+  Expect<Equals<Static<typeof ADMIN_MENU_ITEM_RESPONSE>, AdminMenuItemDto>>,
+  Expect<Equals<Static<typeof NEWS_ITEM_RESPONSE>, NewsItemDto>>,
+  Expect<Equals<Static<typeof ADMIN_NEWS_ITEM_RESPONSE>, AdminNewsItemDto>>
 ];

@@ -8,6 +8,7 @@ import { AdminBookings } from '../components/admin/AdminBookings';
 import { AdminCustomers } from '../components/admin/AdminCustomers';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AdminMenu } from '../components/admin/AdminMenu';
+import { AdminNews } from '../components/admin/AdminNews';
 import { AdminOverview } from '../components/admin/AdminOverview';
 import { AdminSchedule } from '../components/admin/AdminSchedule';
 import { AdminStats } from '../components/admin/AdminStats';
@@ -27,7 +28,8 @@ const TABS = [
   { id: 'stats', label: m.admin_tab_stats },
   { id: 'bookings', label: m.admin_tab_bookings },
   { id: 'customers', label: m.admin_tab_customers },
-  { id: 'menu', label: m.admin_tab_menu }
+  { id: 'menu', label: m.admin_tab_menu },
+  { id: 'news', label: m.admin_tab_news }
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -130,6 +132,7 @@ function AdminPage() {
                 <AdminCustomers onShowBookings={showCustomerBookings} />
               ) : null}
               {tab === 'menu' ? <AdminMenu /> : null}
+              {tab === 'news' ? <AdminNews /> : null}
             </div>
           </div>
         )}

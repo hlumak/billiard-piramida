@@ -4,6 +4,7 @@ import type {
   CreateBookingInput,
   MenuItemDto,
   NewOrderItem,
+  NewsItemDto,
   TableDto
 } from '@repo/shared';
 
@@ -96,6 +97,8 @@ export const api = {
     request<AvailabilityDto>(`/api/availability?date=${date}`, { signal }),
   menu: (locale: string, signal?: AbortSignal) =>
     request<MenuItemDto[]>(`/api/menu?locale=${locale}`, { signal }),
+  news: (locale: string, signal?: AbortSignal) =>
+    request<NewsItemDto[]>(`/api/news?locale=${locale}`, { signal }),
   booking: (id: string, signal?: AbortSignal) =>
     request<BookingDto>(`/api/bookings/${id}`, { signal }),
   lookupBookings: (phone: string, signal?: AbortSignal) =>

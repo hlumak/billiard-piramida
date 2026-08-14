@@ -20,6 +20,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { bookingRoutes } from './routes/bookings.ts';
 import { menuRoutes } from './routes/menu.ts';
+import { newsRoutes } from './routes/news.ts';
 import { tableRoutes } from './routes/tables.ts';
 
 declare module 'fastify' {
@@ -161,6 +162,7 @@ export async function buildApp({
   tableRoutes(app);
   availabilityRoutes(app);
   menuRoutes(app);
+  newsRoutes(app);
   bookingRoutes(app);
   liveRoutes(app);
   authRoutes(app, jwtSecret !== undefined);

@@ -1,7 +1,14 @@
 import { SPOTS } from '@repo/shared';
+import { count } from 'drizzle-orm';
 import { LOCAL_DATABASE_URL } from '../lib/config.ts';
 import { createDb } from './client.ts';
-import { foodItems, foodItemTranslations, tables } from './schema.ts';
+import {
+  foodItems,
+  foodItemTranslations,
+  newsItems,
+  newsItemTranslations,
+  tables
+} from './schema.ts';
 
 const databaseUrl = process.env.DATABASE_URL ?? LOCAL_DATABASE_URL;
 
@@ -97,6 +104,35 @@ const FOOD: SeedFood[] = [
   }
 ];
 
+interface SeedNews {
+  sortOrder: number;
+  linkUrl: string | null;
+  uk: [title: string, body: string];
+  pl: [title: string, body: string];
+  en: [title: string, body: string];
+}
+
+/** Starter cards for the home carousel — staff replace these from the admin panel. */
+const NEWS: SeedNews[] = [
+  {
+    sortOrder: 1,
+    linkUrl: '/book',
+    uk: ['Друга зала відкрита', 'Чотири нові столи 12ft — бронюйте онлайн уже сьогодні.'],
+    pl: ['Druga sala otwarta', 'Cztery nowe stoły 12ft — rezerwuj online już dziś.'],
+    en: ['Second hall is open', 'Four new 12ft tables — book yours online today.']
+  },
+  {
+    sortOrder: 2,
+    linkUrl: '/prices',
+    uk: [
+      'Знижка за спортивною картою',
+      'Multisport, Medicover і FitProfit — −15 зл за кожну карту.'
+    ],
+    pl: ['Zniżka na kartę sportową', 'Multisport, Medicover i FitProfit — −15 zł za każdą kartę.'],
+    en: ['Sport card discount', 'Multisport, Medicover and FitProfit — −15 zł per card.']
+  }
+];
+
 export async function seed(url: string) {
   const { db, pool } = createDb(url);
   try {
@@ -129,6 +165,31 @@ export async function seed(url: string) {
           }))
         );
       });
+    }
+
+    // News rows carry no natural key, so an onConflict re-run guard is
+    // impossible: seed the starter cards only into an empty carousel, or a
+    // second `db:seed` would duplicate whatever staff are already showing.
+    const [existingNews] = await db.select({ n: count() }).from(newsItems);
+    if ((existingNews?.n ?? 0) === 0) {
+      for (const news of NEWS) {
+        await db.transaction(async tx => {
+          const [item] = await tx
+            .insert(newsItems)
+            .values({ sortOrder: news.sortOrder, linkUrl: news.linkUrl })
+            .returning({ id: newsItems.id });
+          if (!item) return;
+
+          await tx.insert(newsItemTranslations).values(
+            (['uk', 'pl', 'en'] as const).map(locale => ({
+              newsItemId: item.id,
+              locale,
+              title: news[locale][0],
+              body: news[locale][1]
+            }))
+          );
+        });
+      }
     }
   } finally {
     await pool.end();

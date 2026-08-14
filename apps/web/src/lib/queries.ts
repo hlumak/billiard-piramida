@@ -24,6 +24,14 @@ export const menuQuery = (locale: string) =>
     staleTime: 5 * 60_000
   });
 
+/** Home-screen carousel — staff-authored, changes a few times a month. */
+export const newsQuery = (locale: string) =>
+  queryOptions({
+    queryKey: ['news', locale],
+    queryFn: ({ signal }) => api.news(locale, signal),
+    staleTime: 5 * 60_000
+  });
+
 export const bookingQuery = (id: string) =>
   queryOptions({
     queryKey: ['booking', id],

@@ -134,6 +134,30 @@ export interface AdminMenuItemDto extends MenuItemDto {
   translations: MenuTranslationDto[];
 }
 
+/** One card of the home-screen carousel, already resolved to a single locale. */
+export interface NewsItemDto {
+  id: number;
+  title: string;
+  body: string | null;
+  /** App-relative path or absolute http(s) URL — see `isSafeUrl` */
+  imageUrl: string | null;
+  linkUrl: string | null;
+}
+
+export interface NewsTranslationDto {
+  locale: Locale;
+  title: string;
+  body: string | null;
+}
+
+/** News row for staff: includes hidden items (uk display copy) + all translations. */
+export interface AdminNewsItemDto extends NewsItemDto {
+  isPublished: boolean;
+  /** Ascending carousel position; ties break by newest first. */
+  sortOrder: number;
+  translations: NewsTranslationDto[];
+}
+
 export interface AdminDailyStatDto {
   date: IsoDate;
   bookings: number;

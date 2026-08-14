@@ -95,6 +95,41 @@ export const foodItemTranslations = pgTable(
   t => [primaryKey({ columns: [t.foodItemId, t.locale] })]
 );
 
+/**
+ * Home-screen news carousel, managed from the admin panel. Everything
+ * locale-independent lives here; the copy is per-locale in
+ * `news_item_translations`, same split as food items.
+ */
+export const newsItems = pgTable(
+  'news_items',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    /** Optional illustration: app-relative path or absolute http(s) URL */
+    imageUrl: text('image_url'),
+    /** Optional target the whole card links to */
+    linkUrl: text('link_url'),
+    isPublished: boolean('is_published').notNull().default(true),
+    /** Staff-controlled carousel position, ascending */
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  // The public carousel reads exactly this slice on every home-page render
+  t => [index('news_items_published_sort_idx').on(t.isPublished, t.sortOrder)]
+);
+
+export const newsItemTranslations = pgTable(
+  'news_item_translations',
+  {
+    newsItemId: integer('news_item_id')
+      .notNull()
+      .references(() => newsItems.id, { onDelete: 'cascade' }),
+    locale: text('locale').notNull(),
+    title: text('title').notNull(),
+    body: text('body')
+  },
+  t => [primaryKey({ columns: [t.newsItemId, t.locale] })]
+);
+
 export const orderItems = pgTable(
   'order_items',
   {

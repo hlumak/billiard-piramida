@@ -2,7 +2,9 @@ import type {
   AdminAnalyticsDto,
   AdminCustomerDto,
   AdminMenuItemDto,
+  AdminNewsItemDto,
   MenuTranslationDto,
+  NewsTranslationDto,
   AdminStatsDto,
   BookingDto,
   BookingStatus,
@@ -33,6 +35,14 @@ export interface AdminBookingFilters {
   date?: IsoDate | undefined;
   status?: BookingStatus | undefined;
   phone?: string | undefined;
+}
+
+/** A news card as the modal submits it — `null` clears the URL columns. */
+export interface AdminNewsInput {
+  imageUrl: string | null;
+  linkUrl: string | null;
+  sortOrder: number;
+  translations: NewsTranslationDto[];
 }
 
 export interface CustomerListParams {
@@ -89,7 +99,14 @@ export const adminApi = {
       category?: string;
       translations?: MenuTranslationDto[];
     }
-  ) => request<AdminMenuItemDto>(`/api/admin/menu/${id}`, { method: 'PATCH', body: patch })
+  ) => request<AdminMenuItemDto>(`/api/admin/menu/${id}`, { method: 'PATCH', body: patch }),
+  news: (signal?: AbortSignal) => request<AdminNewsItemDto[]>('/api/admin/news', { signal }),
+  createNewsItem: (input: AdminNewsInput) =>
+    request<AdminNewsItemDto>('/api/admin/news', { method: 'POST', body: input }),
+  updateNewsItem: (id: number, patch: Partial<AdminNewsInput> & { isPublished?: boolean }) =>
+    request<AdminNewsItemDto>(`/api/admin/news/${id}`, { method: 'PATCH', body: patch }),
+  deleteNewsItem: (id: number) =>
+    request<{ deleted: boolean }>(`/api/admin/news/${id}`, { method: 'DELETE' })
 };
 
 export const adminAnalyticsQuery = (days: number) =>
@@ -103,6 +120,12 @@ export const adminMenuQuery = () =>
   queryOptions({
     queryKey: ['admin', 'menu'],
     queryFn: ({ signal }) => adminApi.menu(signal)
+  });
+
+export const adminNewsQuery = () =>
+  queryOptions({
+    queryKey: ['admin', 'news'],
+    queryFn: ({ signal }) => adminApi.news(signal)
   });
 
 export const adminStatsQuery = () =>

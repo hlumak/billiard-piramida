@@ -753,6 +753,117 @@ test('admin menu CRUD: create with translations, edit, delete guard', async () =
   assert.equal(blocked.json().error, 'has_orders');
 });
 
+test('news is localized, published-only, and ordered by sort order', async () => {
+  const pl = await app.inject({ method: 'GET', url: '/api/news?locale=pl' });
+  assert.equal(pl.statusCode, 200);
+  const cards = pl.json();
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0].title, 'Druga sala otwarta');
+  assert.equal(cards[0].linkUrl, '/book');
+  // Ascending sortOrder, seeded 1 then 2
+  assert.equal(cards[1].title, 'Zniżka na kartę sportową');
+
+  // Unknown locale falls back to the default locale's copy, not a crash
+  const bogus = await app.inject({ method: 'GET', url: '/api/news?locale=xx' });
+  assert.equal(bogus.statusCode, 200);
+  assert.equal(bogus.json()[0].title, 'Druga sala otwarta');
+});
+
+test('admin news CRUD: create, hide, reorder, url guard, delete', async () => {
+  const headers = { 'x-admin-token': 'test-admin-token' };
+
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/news',
+    headers,
+    payload: {
+      sortOrder: 0,
+      imageUrl: '/news/cup.webp',
+      linkUrl: 'https://example.com/cup',
+      translations: [
+        { locale: 'uk', title: 'Турнір', body: 'Реєстрація відкрита' },
+        { locale: 'pl', title: 'Turniej' },
+        { locale: 'en', title: 'Tournament' }
+      ]
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const card = created.json();
+  assert.equal(card.title, 'Турнір'); // staff view is uk
+  assert.equal(card.isPublished, true);
+  assert.equal(card.translations.length, 3);
+
+  // sortOrder 0 puts it in front of the seeded cards on the storefront
+  const front = await app.inject({ method: 'GET', url: '/api/news?locale=pl' });
+  assert.equal(front.json()[0].title, 'Turniej');
+  assert.equal(front.json()[0].imageUrl, '/news/cup.webp');
+
+  // Hidden cards leave the carousel but stay in the staff list
+  const hidden = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/news/${card.id}`,
+    headers,
+    payload: { isPublished: false }
+  });
+  assert.equal(hidden.statusCode, 200);
+  assert.equal(hidden.json().isPublished, false);
+  const withoutHidden = await app.inject({ method: 'GET', url: '/api/news?locale=pl' });
+  assert.ok(!withoutHidden.json().some((n: { title: string }) => n.title === 'Turniej'));
+  const staffList = await app.inject({ method: 'GET', url: '/api/admin/news', headers });
+  assert.ok(staffList.json().some((n: { id: number }) => n.id === card.id));
+
+  // A translations-only PATCH touches no news_items column — must still work
+  const retitled = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/news/${card.id}`,
+    headers,
+    payload: { translations: [{ locale: 'pl', title: 'Turniej klubowy', body: 'Zapisy trwają' }] }
+  });
+  assert.equal(retitled.statusCode, 200);
+  const plRow = retitled.json().translations.find((t: { locale: string }) => t.locale === 'pl');
+  assert.equal(plRow.title, 'Turniej klubowy');
+  assert.equal(retitled.json().isPublished, false); // untouched by the patch
+
+  // Blank clears a URL column
+  const cleared = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/news/${card.id}`,
+    headers,
+    payload: { imageUrl: '   ', isPublished: true }
+  });
+  assert.equal(cleared.json().imageUrl, null);
+
+  // Anything that is not a path or an http(s) URL is rejected on write
+  for (const linkUrl of ['javascript:alert(1)', '//evil.example', '/\\evil.example']) {
+    const rejected = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/news/${card.id}`,
+      headers,
+      payload: { linkUrl }
+    });
+    assert.equal(rejected.statusCode, 422);
+    assert.equal(rejected.json().error, 'invalid_url');
+  }
+
+  const deleted = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/news/${card.id}`,
+    headers
+  });
+  assert.equal(deleted.statusCode, 200);
+  assert.deepEqual(deleted.json(), { deleted: true });
+  const gone = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/news/${card.id}`,
+    headers
+  });
+  assert.equal(gone.statusCode, 404);
+
+  // The carousel requires a session, the storefront does not
+  const unauthorized = await app.inject({ method: 'GET', url: '/api/admin/news' });
+  assert.equal(unauthorized.statusCode, 401);
+});
+
 test('phones are validated and normalized to E.164', async () => {
   // Garbage rejected
   const bad = await app.inject({
