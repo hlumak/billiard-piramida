@@ -24,7 +24,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { property: 'og:site_name', content: 'piramida' },
       { property: 'og:type', content: 'website' },
       { property: 'og:image', content: `${SITE_URL}/og-image.jpg` },
-      { name: 'twitter:card', content: 'summary_large_image' }
+      // X reads og:* as a fallback, but only when a card is already recognised —
+      // validators (and the devtools SEO panel) report an empty preview without
+      // the explicit twitter:* set, so the card carries its own image/title/desc.
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:image', content: `${SITE_URL}/og-image.jpg` },
+      { name: 'twitter:image:alt', content: m.app_title() }
     ],
     // Fonts are self-hosted (src/fonts.css via styles.css) — no third-party
     // render-blocking requests on the critical path.

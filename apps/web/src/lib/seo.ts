@@ -17,7 +17,10 @@ export function pageMeta(title: string, description: string) {
     { name: 'description', content: description },
     { property: 'og:title', content: title },
     { property: 'og:description', content: description },
-    { property: 'og:locale', content: OG_LOCALES[getLocale()] }
+    { property: 'og:locale', content: OG_LOCALES[getLocale()] },
+    // Per-page twins of the og:* pair; the card type and image are global (__root)
+    { name: 'twitter:title', content: title },
+    { name: 'twitter:description', content: description }
   ];
 }
 
