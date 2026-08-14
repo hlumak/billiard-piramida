@@ -105,13 +105,12 @@ export function AdminNews() {
       const [moved] = next.splice(from, 1);
       if (!moved) return;
       next.splice(to, 0, moved);
+      // flatMap in one pass so `index` stays the target position — filtering
+      // first and mapping after would renumber against the filtered array.
       await Promise.all(
-        next
-          // Pair with the target position BEFORE filtering: post-filter indexes
-          // would no longer be the positions being written.
-          .map((item, index) => ({ item, index }))
-          .filter(({ item, index }) => item.sortOrder !== index)
-          .map(({ item, index }) => adminApi.updateNewsItem(item.id, { sortOrder: index }))
+        next.flatMap((item, index) =>
+          item.sortOrder === index ? [] : [adminApi.updateNewsItem(item.id, { sortOrder: index })]
+        )
       );
     },
     onSuccess: () => {

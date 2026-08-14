@@ -51,13 +51,10 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   const imageUrl = draft.imageUrl.trim() || null;
   const linkUrl = draft.linkUrl.trim() || null;
   const sortOrder = Number(draft.sortOrder);
-  const translations: NewsTranslationDto[] = LOCALES.filter(
-    locale => draft.titles[locale].trim() !== ''
-  ).map(locale => ({
-    locale,
-    title: draft.titles[locale].trim(),
-    body: draft.bodies[locale].trim() || null
-  }));
+  const translations: NewsTranslationDto[] = LOCALES.flatMap(locale => {
+    const title = draft.titles[locale].trim();
+    return title === '' ? [] : [{ locale, title, body: draft.bodies[locale].trim() || null }];
+  });
   // The server re-checks both URLs; catching them here spares a round trip
   const urlsOk = [imageUrl, linkUrl].every(url => url === null || isSafeUrl(url));
   const canSubmit =
