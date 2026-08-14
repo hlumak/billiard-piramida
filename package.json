@@ -20,13 +20,13 @@
     "db:seed": "pnpm --filter @repo/api db:seed"
   },
   "devDependencies": {
-    "oxfmt": "^0.61.0",
-    "oxlint": "^1.76.0",
-    "oxlint-plugin-react-doctor": "^0.9.3",
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
+    "oxlint-plugin-react-doctor": "^0.9.11",
     "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=26"
   },
-  "packageManager": "pnpm@11.18.0"
+  "packageManager": "pnpm@11.21.0"
 }
