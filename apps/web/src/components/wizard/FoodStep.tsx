@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
@@ -7,6 +6,7 @@ import { formatPln } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { intlTag } from '../../lib/format';
+import { useIsHydrated } from '../../lib/hydration';
 import { menuQuery } from '../../lib/queries';
 import { MenuPicker } from '../MenuPicker';
 import { Reveal } from '../motion';
@@ -18,8 +18,7 @@ export function FoodStep() {
   const { data: menu, isPending, isError, refetch } = useQuery(menuQuery(getLocale()));
   // Portal the fixed CTA bar to <body> so the wizard's per-step transform (which
   // otherwise becomes the containing block for position:fixed) can't shift it.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsHydrated();
 
   if (isError) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !menu) {

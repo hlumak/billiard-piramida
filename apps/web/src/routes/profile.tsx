@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { createFileRoute } from '@tanstack/react-router';
 import { PageHeader } from '../components/AppHeader';
 import { AuthForms } from '../components/profile/AuthForms';
 import { ProfileView } from '../components/profile/ProfileView';
-import { isSignedIn } from '../lib/auth';
+import { userAuthFlag } from '../lib/auth';
+import { useFlagCookie, useIsHydrated } from '../lib/hydration';
 import { noindexMeta } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 
@@ -14,13 +14,10 @@ export const Route = createFileRoute('/profile')({
 });
 
 function ProfilePage() {
-  // The signed-in flag cookie is browser-only; decide after mount so SSR agrees
-  const [ready, setReady] = useState(false);
-  const [hasToken, setHasToken] = useState(false);
-  useEffect(() => {
-    setHasToken(isSignedIn());
-    setReady(true);
-  }, []);
+  // The signed-in flag cookie is browser-only; both of these read false until
+  // the client takes over, so SSR and the hydration render agree.
+  const ready = useIsHydrated();
+  const hasToken = useFlagCookie(userAuthFlag);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
@@ -31,9 +28,9 @@ function ProfilePage() {
             <Spinner aria-label={m.loading()} />
           </div>
         ) : hasToken ? (
-          <ProfileView onSignedOut={() => setHasToken(false)} />
+          <ProfileView onSignedOut={() => userAuthFlag.clear()} />
         ) : (
-          <AuthForms onSignedIn={() => setHasToken(true)} />
+          <AuthForms onSignedIn={() => userAuthFlag.refresh()} />
         )}
       </main>
     </div>

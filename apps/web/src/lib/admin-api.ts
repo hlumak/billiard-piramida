@@ -11,7 +11,8 @@ import type {
   IsoDate
 } from '@repo/shared';
 import { queryOptions } from '@tanstack/react-query';
-import { hasFlagCookie, request } from './api';
+import { request } from './api';
+import { createFlagCookieStore } from './hydration';
 
 export interface AdminCreateBookingInput {
   tableId: number;
@@ -27,9 +28,7 @@ export interface AdminCreateBookingInput {
  *  client whether a staff session exists, for UI gating. */
 const ADMIN_FLAG_COOKIE = 'piramida.admin';
 
-export function isAdminSignedIn(): boolean {
-  return hasFlagCookie(ADMIN_FLAG_COOKIE);
-}
+export const adminAuthFlag = createFlagCookieStore(ADMIN_FLAG_COOKIE);
 
 export interface AdminBookingFilters {
   date?: IsoDate | undefined;

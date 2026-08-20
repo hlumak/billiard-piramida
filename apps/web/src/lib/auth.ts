@@ -1,6 +1,7 @@
 import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import type { AuthResponseDto, SportCardType, UserProfileDto } from '@repo/shared';
 import { hasFlagCookie, request } from './api';
+import { createFlagCookieStore } from './hydration';
 
 /** The session token is an HttpOnly cookie (unreadable by JS); this readable
  *  flag cookie tells the client whether a session exists, for UI gating. */
@@ -9,6 +10,8 @@ const USER_FLAG_COOKIE = 'piramida.auth';
 export function isSignedIn(): boolean {
   return hasFlagCookie(USER_FLAG_COOKIE);
 }
+
+export const userAuthFlag = createFlagCookieStore(USER_FLAG_COOKIE);
 
 export interface RegisterInput {
   phone: string;

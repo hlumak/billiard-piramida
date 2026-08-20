@@ -12,8 +12,9 @@ import { AdminNews } from '../components/admin/AdminNews';
 import { AdminOverview } from '../components/admin/AdminOverview';
 import { AdminSchedule } from '../components/admin/AdminSchedule';
 import { AdminStats } from '../components/admin/AdminStats';
-import { adminApi, isAdminSignedIn } from '../lib/admin-api';
+import { adminApi, adminAuthFlag } from '../lib/admin-api';
 import { ApiError } from '../lib/api';
+import { useFlagCookie, useIsHydrated } from '../lib/hydration';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 
@@ -36,9 +37,10 @@ type TabId = (typeof TABS)[number]['id'];
 
 function AdminPage() {
   const queryClient = useQueryClient();
-  // The session flag cookie is browser-only; read after mount so SSR agrees
-  const [signedIn, setSignedIn] = useState(false);
-  const [ready, setReady] = useState(false);
+  // The session flag cookie is browser-only; both of these read false until the
+  // client takes over, so SSR and the hydration render agree.
+  const signedIn = useFlagCookie(adminAuthFlag);
+  const ready = useIsHydrated();
   const [tab, setTab] = useState<TabId>('overview');
   const [bookingsPhone, setBookingsPhone] = useState('');
 
@@ -47,15 +49,10 @@ function AdminPage() {
     setTab('bookings');
   };
 
-  useEffect(() => {
-    setSignedIn(isAdminSignedIn());
-    setReady(true);
-  }, []);
-
   const logout = () => {
     void adminApi.logout();
     queryClient.removeQueries({ queryKey: ['admin'] });
-    setSignedIn(false);
+    adminAuthFlag.clear();
   };
 
   // A rotated ADMIN_TOKEN (401) or disabled admin (503) invalidates the session
@@ -86,7 +83,7 @@ function AdminPage() {
           </div>
         ) : !signedIn ? (
           <>
-            <AdminLogin onSuccess={() => setSignedIn(true)} />
+            <AdminLogin onSuccess={() => adminAuthFlag.refresh()} />
             <div className="mt-8">
               <LocaleSwitcher />
             </div>
