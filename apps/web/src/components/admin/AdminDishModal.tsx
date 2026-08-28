@@ -43,13 +43,17 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
   };
 
   const priceGrosz = Math.round(Number(draft.price.replace(',', '.')) * 100);
-  const translations: MenuTranslationDto[] = LOCALES.filter(
-    locale => draft.names[locale].trim() !== ''
-  ).map(locale => ({
-    locale,
-    name: draft.names[locale].trim(),
-    description: draft.descriptions[locale].trim() || null
-  }));
+  // One pass: a locale with a blank name is left out entirely
+  const translations: MenuTranslationDto[] = [];
+  for (const locale of LOCALES) {
+    const name = draft.names[locale].trim();
+    if (name === '') continue;
+    translations.push({
+      locale,
+      name,
+      description: draft.descriptions[locale].trim() || null
+    });
+  }
   const canSubmit =
     Number.isFinite(priceGrosz) && priceGrosz >= 0 && translations.length === LOCALES.length;
 
