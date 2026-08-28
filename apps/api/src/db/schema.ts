@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   index,
   integer,
   pgEnum,
@@ -7,8 +8,10 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid
 } from 'drizzle-orm/pg-core';
+import { TOURNAMENT_REGISTRATION_STATUSES, TOURNAMENT_STATUSES } from '@repo/shared';
 
 export const bookingStatusEnum = pgEnum('booking_status', ['confirmed', 'cancelled']);
 
@@ -19,6 +22,15 @@ export const sportCardTypeEnum = pgEnum('sport_card_type', [
 ]);
 
 export const activityKindEnum = pgEnum('activity_kind', ['billiard', 'darts']);
+
+/** Both tournament enums are built from the shared literal tuples, so a new
+ *  status is one edit in @repo/shared rather than three that can drift. */
+export const tournamentStatusEnum = pgEnum('tournament_status', TOURNAMENT_STATUSES);
+
+export const tournamentRegistrationStatusEnum = pgEnum(
+  'tournament_registration_status',
+  TOURNAMENT_REGISTRATION_STATUSES
+);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -62,6 +74,9 @@ export const bookings = pgTable(
     /** Partner sport cards declared for this booking, one per player. Guests
      *  can claim them too — the discount is not tied to an account. */
     sportCardCount: integer('sport_card_count').notNull().default(0),
+    /** Rate locked in when the booking was written, exactly like an order
+     *  line's unit price: repricing the club must not rewrite old receipts. */
+    hourlyRateGrosz: integer('hourly_rate_grosz').notNull(),
     discountGrosz: integer('discount_grosz').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
@@ -73,6 +88,26 @@ export const bookings = pgTable(
     index('bookings_user_id_idx').on(t.userId)
   ]
 );
+
+/**
+ * Hourly rate per tier, staff-editable. Three rows, keyed by the shared
+ * `RateTier` ('9ft' | '12ft' | 'darts') — a text key rather than an enum so a
+ * new cloth size is a seed row, not a migration plus a deploy.
+ */
+export const venueRates = pgTable('venue_rates', {
+  tier: text('tier').primaryKey(),
+  hourlyGrosz: integer('hourly_grosz').notNull()
+});
+
+/**
+ * Opening hours, one row per weekday (0 = Sunday … 6 = Saturday). A day with
+ * `opens >= closes` is shut: no slot survives the window arithmetic.
+ */
+export const venueHours = pgTable('venue_hours', {
+  weekday: integer('weekday').primaryKey(),
+  opens: integer('opens').notNull(),
+  closes: integer('closes').notNull()
+});
 
 export const foodItems = pgTable('food_items', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
@@ -128,6 +163,80 @@ export const newsItemTranslations = pgTable(
     body: text('body')
   },
   t => [primaryKey({ columns: [t.newsItemId, t.locale] })]
+);
+
+/**
+ * Club tournaments. Dates are stored as venue-local calendar values, not
+ * instants: the rest of the app already speaks Warsaw wall clock (see
+ * `hoursForDate`), and an announced tournament often has no date at all until
+ * the roster fills — `starts_on` stays null until it does.
+ */
+export const tournaments = pgTable(
+  'tournaments',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    /** URL key, stable once announced — /tournaments/:slug */
+    slug: text('slug').notNull().unique(),
+    startsOn: date('starts_on'),
+    /** Venue-local start hour, same convention as a booking slot */
+    startHour: integer('start_hour'),
+    /** Last day sign-ups are accepted, inclusive */
+    registrationDeadline: date('registration_deadline'),
+    /** Paid in person at the reception desk — the site never takes money */
+    entryFeeGrosz: integer('entry_fee_grosz'),
+    /** Players needed before the bracket is played; 0 = no threshold */
+    minPlayers: integer('min_players').notNull().default(0),
+    /** Hard cap on the roster; null = uncapped */
+    maxPlayers: integer('max_players'),
+    status: tournamentStatusEnum('status').notNull().default('draft'),
+    /** Optional poster: app-relative path or absolute http(s) URL */
+    imageUrl: text('image_url'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  // The public list reads exactly this slice: everything but drafts, soonest first
+  t => [index('tournaments_status_starts_on_idx').on(t.status, t.startsOn)]
+);
+
+export const tournamentTranslations = pgTable(
+  'tournament_translations',
+  {
+    tournamentId: integer('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    locale: text('locale').notNull(),
+    title: text('title').notNull(),
+    summary: text('summary'),
+    details: text('details')
+  },
+  t => [primaryKey({ columns: [t.tournamentId, t.locale] })]
+);
+
+/**
+ * One seat on a tournament roster. Accounts stay optional throughout the app, so
+ * the phone — not a user id — is the identity of a sign-up, and the unique index
+ * on (tournament, phone) is what stops one player taking two seats. `user_id` is
+ * filled in opportunistically when a signed-in customer registers.
+ */
+export const tournamentRegistrations = pgTable(
+  'tournament_registrations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tournamentId: integer('tournament_id')
+      .notNull()
+      .references(() => tournaments.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /** Normalized to E.164 on write, like every other phone in the schema */
+    phone: text('phone').notNull(),
+    userId: uuid('user_id').references(() => users.id),
+    /** pending until staff take the entry fee at the reception desk */
+    status: tournamentRegistrationStatusEnum('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  t => [
+    uniqueIndex('tournament_registrations_tournament_phone_idx').on(t.tournamentId, t.phone),
+    // Seat counts group by exactly this pair on every tournament read
+    index('tournament_registrations_tournament_status_idx').on(t.tournamentId, t.status)
+  ]
 );
 
 export const orderItems = pgTable(

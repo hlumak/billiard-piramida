@@ -60,6 +60,11 @@ function MenuPage() {
               </ButtonLink>
             </StaggerItem>
             <StaggerItem>
+              <ButtonLink to="/tournaments" variant="outline">
+                {m.menu_tournaments()}
+              </ButtonLink>
+            </StaggerItem>
+            <StaggerItem>
               <ButtonLink to="/contacts" variant="outline">
                 {m.menu_contacts()}
               </ButtonLink>

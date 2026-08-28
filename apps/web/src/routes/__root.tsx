@@ -4,6 +4,7 @@ import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/reac
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 import { SITE_URL } from '../lib/seo';
+import { venueConfigQuery } from '../lib/queries';
 import { DevTools } from '../integrations/devtools';
 
 import appCss from '../styles.css?url';
@@ -15,6 +16,11 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+  // Rates and opening hours are read by nearly every screen, so they are
+  // fetched once here and served from cache — SSR included. A failure must not
+  // take a page down: `useVenueConfig` falls back to the published defaults.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(venueConfigQuery()).catch(() => null),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },

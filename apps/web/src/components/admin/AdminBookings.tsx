@@ -19,7 +19,9 @@ import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
 import { PHASE_LABELS, PHASE_STYLES, mutationErrorText } from '../booking/phase';
 import { AdminDatePicker } from './AdminDatePicker';
-import { AdminNewBooking } from './AdminNewBooking';
+import { AdminEditBooking, AdminNewBooking } from './AdminBookingModal';
+import { AdminBookingOrder } from './AdminBookingOrder';
+import { useVenueConfig } from '../../lib/venue-config';
 
 const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[] = [
   { value: undefined, label: m.admin_all_statuses },
@@ -29,6 +31,7 @@ const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[
 
 function RowActions({ booking }: { booking: BookingDto }) {
   const queryClient = useQueryClient();
+  const { hours: venueHours } = useVenueConfig();
   // Cancel/extend free or move a slot, so the New-Booking picker (availability
   // query) must refresh too, not just the admin lists.
   const invalidate = () => {
@@ -44,15 +47,23 @@ function RowActions({ booking }: { booking: BookingDto }) {
     mutationFn: () => adminApi.cancelBooking(booking.id),
     onSuccess: invalidate
   });
+  const restore = useMutation({
+    mutationFn: () => adminApi.updateBooking(booking.id, { status: 'confirmed' }),
+    onSuccess: invalidate
+  });
 
-  if (booking.phase !== 'upcoming' && booking.phase !== 'active') return null;
+  const live = booking.phase === 'upcoming' || booking.phase === 'active';
   // Hide +1h when it would run past closing time (the API would reject it)
-  const closeHour = hoursForDate(warsawDate(booking.startsAt)).close;
-  const canExtend = warsawHour(booking.endsAt) < closeHour;
-  const actionError = extend.error ?? cancel.error;
+  const closeHour = hoursForDate(warsawDate(booking.startsAt), venueHours).close;
+  const canExtend = live && warsawHour(booking.endsAt) < closeHour;
+  const actionError = extend.error ?? cancel.error ?? restore.error;
   return (
     <div className="flex flex-col items-end gap-1">
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap justify-end gap-1.5">
+        {/* Editable in every phase: a finished booking still gets its record
+            corrected, and a cancelled one is restored from the same modal. */}
+        <AdminEditBooking booking={booking} />
+        {booking.phase !== 'cancelled' ? <AdminBookingOrder booking={booking} /> : null}
         {canExtend ? (
           <Button
             size="sm"
@@ -64,14 +75,21 @@ function RowActions({ booking }: { booking: BookingDto }) {
             {m.admin_extend_1h()}
           </Button>
         ) : null}
-        <Button
-          size="sm"
-          variant="danger-soft"
-          isPending={cancel.isPending}
-          onPress={() => cancel.mutate()}
-        >
-          {m.phase_cancelled()}
-        </Button>
+        {live ? (
+          <Button
+            size="sm"
+            variant="danger-soft"
+            isPending={cancel.isPending}
+            onPress={() => cancel.mutate()}
+          >
+            {m.phase_cancelled()}
+          </Button>
+        ) : null}
+        {booking.phase === 'cancelled' ? (
+          <Button size="sm" isPending={restore.isPending} onPress={() => restore.mutate()}>
+            {m.admin_restore_btn()}
+          </Button>
+        ) : null}
       </div>
       {actionError ? (
         <span className="text-xs text-danger-soft-foreground">

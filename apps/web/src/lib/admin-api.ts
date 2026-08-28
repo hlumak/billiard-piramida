@@ -6,9 +6,16 @@ import type {
   MenuTranslationDto,
   NewsTranslationDto,
   AdminStatsDto,
+  AdminTournamentDto,
+  AdminTournamentRegistrationDto,
   BookingDto,
   BookingStatus,
-  IsoDate
+  IsoDate,
+  NewOrderItem,
+  TournamentRegistrationStatus,
+  TournamentStatus,
+  TournamentTranslationDto,
+  VenueConfigDto
 } from '@repo/shared';
 import { queryOptions } from '@tanstack/react-query';
 import { request } from './api';
@@ -22,6 +29,21 @@ export interface AdminCreateBookingInput {
   customerName: string;
   customerPhone: string;
   sportCardCount?: number;
+}
+
+/**
+ * Every field of a booking staff can correct after the fact. All optional: the
+ * server holds whatever is left out, so "just make it two hours" is one key.
+ */
+export interface AdminBookingPatch {
+  tableId?: number;
+  date?: IsoDate;
+  startHour?: number;
+  durationHours?: number;
+  customerName?: string;
+  customerPhone?: string;
+  sportCardCount?: number;
+  status?: BookingStatus;
 }
 
 /** The admin token is an HttpOnly cookie; this readable flag cookie tells the
@@ -42,6 +64,19 @@ export interface AdminNewsInput {
   linkUrl: string | null;
   sortOrder: number;
   translations: NewsTranslationDto[];
+}
+
+/** A tournament as the modal submits it — `null` clears an optional column. */
+export interface AdminTournamentInput {
+  status: TournamentStatus;
+  startsOn: IsoDate | null;
+  startHour: number | null;
+  registrationDeadline: IsoDate | null;
+  entryFeeGrosz: number | null;
+  minPlayers: number;
+  maxPlayers: number | null;
+  imageUrl: string | null;
+  translations: TournamentTranslationDto[];
 }
 
 export interface CustomerListParams {
@@ -80,6 +115,17 @@ export const adminApi = {
     request<BookingDto>('/api/admin/bookings', { method: 'POST', body: input }),
   cancelBooking: (id: string) =>
     request<BookingDto>(`/api/admin/bookings/${id}/cancel`, { method: 'POST' }),
+  updateBooking: (id: string, patch: AdminBookingPatch) =>
+    request<BookingDto>(`/api/admin/bookings/${id}`, { method: 'PATCH', body: patch }),
+  addBookingItems: (id: string, items: NewOrderItem[]) =>
+    request<BookingDto>(`/api/admin/bookings/${id}/items`, { method: 'POST', body: { items } }),
+  setBookingItemQuantity: (id: string, itemId: string, quantity: number) =>
+    request<BookingDto>(`/api/admin/bookings/${id}/items/${itemId}`, {
+      method: 'PATCH',
+      body: { quantity }
+    }),
+  removeBookingItem: (id: string, itemId: string) =>
+    request<BookingDto>(`/api/admin/bookings/${id}/items/${itemId}`, { method: 'DELETE' }),
   analytics: (days: number, signal?: AbortSignal) =>
     request<AdminAnalyticsDto>(`/api/admin/analytics?days=${days}`, { signal }),
   menu: (signal?: AbortSignal) => request<AdminMenuItemDto[]>('/api/admin/menu', { signal }),
@@ -105,7 +151,48 @@ export const adminApi = {
   updateNewsItem: (id: number, patch: Partial<AdminNewsInput> & { isPublished?: boolean }) =>
     request<AdminNewsItemDto>(`/api/admin/news/${id}`, { method: 'PATCH', body: patch }),
   deleteNewsItem: (id: number) =>
-    request<{ deleted: boolean }>(`/api/admin/news/${id}`, { method: 'DELETE' })
+    request<{ deleted: boolean }>(`/api/admin/news/${id}`, { method: 'DELETE' }),
+  venueConfig: (signal?: AbortSignal) =>
+    request<VenueConfigDto>('/api/admin/venue-config', { signal }),
+  saveVenueConfig: (config: VenueConfigDto) =>
+    request<VenueConfigDto>('/api/admin/venue-config', { method: 'PUT', body: config }),
+  tournaments: (signal?: AbortSignal) =>
+    request<AdminTournamentDto[]>('/api/admin/tournaments', { signal }),
+  createTournament: (input: AdminTournamentInput & { slug?: string }) =>
+    request<AdminTournamentDto>('/api/admin/tournaments', { method: 'POST', body: input }),
+  updateTournament: (id: number, patch: Partial<AdminTournamentInput>) =>
+    request<AdminTournamentDto>(`/api/admin/tournaments/${id}`, { method: 'PATCH', body: patch }),
+  deleteTournament: (id: number) =>
+    request<{ deleted: boolean }>(`/api/admin/tournaments/${id}`, { method: 'DELETE' }),
+  registrations: (tournamentId: number, signal?: AbortSignal) =>
+    request<AdminTournamentRegistrationDto[]>(
+      `/api/admin/tournaments/${tournamentId}/registrations`,
+      { signal }
+    ),
+  addRegistration: (tournamentId: number, input: { name: string; phone: string }) =>
+    request<AdminTournamentRegistrationDto>(
+      `/api/admin/tournaments/${tournamentId}/registrations`,
+      { method: 'POST', body: input }
+    ),
+  renameRegistration: (tournamentId: number, registrationId: string, name: string) =>
+    request<AdminTournamentRegistrationDto>(
+      `/api/admin/tournaments/${tournamentId}/registrations/${registrationId}`,
+      { method: 'PATCH', body: { name } }
+    ),
+  setRegistrationStatus: (
+    tournamentId: number,
+    registrationId: string,
+    status: TournamentRegistrationStatus
+  ) =>
+    request<AdminTournamentRegistrationDto>(
+      `/api/admin/tournaments/${tournamentId}/registrations/${registrationId}`,
+      { method: 'PATCH', body: { status } }
+    ),
+  deleteRegistration: (tournamentId: number, registrationId: string) =>
+    request<{ deleted: boolean }>(
+      `/api/admin/tournaments/${tournamentId}/registrations/${registrationId}`,
+      { method: 'DELETE' }
+    )
 };
 
 export const adminAnalyticsQuery = (days: number) =>
@@ -125,6 +212,24 @@ export const adminNewsQuery = () =>
   queryOptions({
     queryKey: ['admin', 'news'],
     queryFn: ({ signal }) => adminApi.news(signal)
+  });
+
+export const adminVenueConfigQuery = () =>
+  queryOptions({
+    queryKey: ['admin', 'venue-config'],
+    queryFn: ({ signal }) => adminApi.venueConfig(signal)
+  });
+
+export const adminTournamentsQuery = () =>
+  queryOptions({
+    queryKey: ['admin', 'tournaments'],
+    queryFn: ({ signal }) => adminApi.tournaments(signal)
+  });
+
+export const adminRegistrationsQuery = (tournamentId: number) =>
+  queryOptions({
+    queryKey: ['admin', 'tournaments', tournamentId, 'registrations'],
+    queryFn: ({ signal }) => adminApi.registrations(tournamentId, signal)
   });
 
 export const adminStatsQuery = () =>

@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import type { BookingDto, BookingPhase, BookingStatus, NewOrderItem } from '@repo/shared';
-import { spotPriceGrosz } from '@repo/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.ts';
 import { bookings, foodItems, orderItems, tables } from '../db/schema.ts';
@@ -37,7 +36,9 @@ function composeDto(
   const durationHours = Math.round(
     (booking.endsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
   );
-  const tableTotalGrosz = spotPriceGrosz(spot, durationHours);
+  // The rate locked onto the row, never today's — repricing the club leaves
+  // every existing receipt exactly as it was quoted.
+  const tableTotalGrosz = booking.hourlyRateGrosz * durationHours;
   const foodTotalGrosz = items.reduce((sum, i) => sum + i.quantity * i.unitPriceGrosz, 0);
   return {
     id: booking.id,

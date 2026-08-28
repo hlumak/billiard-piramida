@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { formatPln, hoursForDate, type BookingDto } from '@repo/shared';
+import { useVenueConfig } from '../../lib/venue-config';
 import { formatDayLong, intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
@@ -22,7 +23,7 @@ export function BookingDetails({
   const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
 
   const date = warsawDate(booking.startsAt);
-  const closeHour = hoursForDate(date).close;
+  const closeHour = hoursForDate(date, useVenueConfig().hours).close;
   const maxExtend = booking.status === 'confirmed' ? closeHour - warsawHour(booking.endsAt) : 0;
 
   const canManage = booking.phase === 'upcoming' || booking.phase === 'active';

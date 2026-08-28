@@ -15,4 +15,9 @@ export function warsawDateOf(instant: Date): IsoDate {
   return `${tz.getFullYear()}-${pad(tz.getMonth() + 1)}-${pad(tz.getDate())}` as IsoDate;
 }
 
+/** Warsaw-local wall-clock hour (0-23) of a UTC instant. */
+export function warsawHourOf(instant: Date): number {
+  return new TZDate(instant.getTime(), VENUE_TIMEZONE).getHours();
+}
+
 export const HOUR_MS = 3_600_000;

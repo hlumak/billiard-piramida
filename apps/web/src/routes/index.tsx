@@ -5,25 +5,36 @@ import { NewsCarousel } from '../components/NewsCarousel';
 import { Reveal } from '../components/motion';
 import { ButtonLink } from '../components/ButtonLink';
 import { formatHour, warsawToday } from '../lib/format';
-import { newsQuery } from '../lib/queries';
+import { newsQuery, tournamentsQuery, venueConfigQuery } from '../lib/queries';
+import { useVenueConfig } from '../lib/venue-config';
 import { pageMeta, venueJsonLd } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
 export const Route = createFileRoute('/')({
-  // Carousel content is server data, so SSR it — but never let a news outage
+  // Carousel content is server data, so SSR it — but never let a feed outage
   // take the landing page down with it (the carousel hides itself instead).
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(newsQuery(getLocale())).catch(() => null),
-  head: () => ({
+  // allSettled, not all: one dead feed must not blank the other.
+  loader: async ({ context }) => {
+    await Promise.allSettled([
+      context.queryClient.ensureQueryData(newsQuery(getLocale())),
+      context.queryClient.ensureQueryData(tournamentsQuery(getLocale()))
+    ]);
+    // Warmed by the root loader; read back here so `head` can build the
+    // structured data from the same rates and hours the page renders.
+    return {
+      venueConfig: context.queryClient.getQueryData(venueConfigQuery().queryKey) ?? null
+    };
+  },
+  head: ({ loaderData }) => ({
     meta: pageMeta(m.app_title(), m.seo_desc_home()),
-    scripts: [{ type: 'application/ld+json', children: venueJsonLd() }]
+    scripts: [{ type: 'application/ld+json', children: venueJsonLd(loaderData?.venueConfig) }]
   }),
   component: Home
 });
 
 function Home() {
-  const { open, close } = hoursForDate(warsawToday());
+  const { open, close } = hoursForDate(warsawToday(), useVenueConfig().hours);
 
   return (
     <div className="relative min-h-dvh overflow-hidden">

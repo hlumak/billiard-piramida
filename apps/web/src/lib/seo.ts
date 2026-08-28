@@ -1,14 +1,13 @@
-import { HOURLY_RATE_GROSZ } from '@repo/shared';
+import type { VenueConfigDto } from '@repo/shared';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 import { VENUE } from './venue';
+import { FALLBACK_VENUE_CONFIG, groupWeeklyHours } from './venue-config';
 
 /** Set VITE_SITE_URL to the real domain in production (og:image must be absolute). */
 export const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'http://localhost:8080';
 
 const OG_LOCALES = { uk: 'uk_UA', pl: 'pl_PL', en: 'en_GB' } as const;
-
-const RATES = Object.values(HOURLY_RATE_GROSZ);
 
 /** Standard head meta for an indexable page. */
 export function pageMeta(title: string, description: string) {
@@ -29,8 +28,28 @@ export function noindexMeta(title: string) {
   return [{ title }, { name: 'robots', content: 'noindex' }];
 }
 
-/** LocalBusiness structured data for the home page. */
-export function venueJsonLd(): string {
+/** schema.org day names, indexed by JS weekday (0 = Sunday). */
+const SCHEMA_DAYS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday'
+] as const;
+
+/**
+ * LocalBusiness structured data for the home page. Rates and hours come from
+ * the live config — the same numbers the page renders — so search results can
+ * never advertise a price the club stopped charging. `config` is null only when
+ * the fetch failed; the published defaults stand in.
+ */
+export function venueJsonLd(config: VenueConfigDto | null | undefined): string {
+  const { rates: rateTable, hours } = config ?? FALLBACK_VENUE_CONFIG;
+  const rates = Object.values(rateTable);
+  const pad = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
+
   return JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'EntertainmentBusiness',
@@ -41,7 +60,7 @@ export function venueJsonLd(): string {
     telephone: VENUE.phone,
     // Spans every tier and is derived, so a rate change — or a new tier — can't
     // leave stale structured data behind
-    priceRange: `${Math.min(...RATES) / 100}–${Math.max(...RATES) / 100} PLN/h`,
+    priceRange: `${Math.min(...rates) / 100}–${Math.max(...rates) / 100} PLN/h`,
     address: {
       '@type': 'PostalAddress',
       streetAddress: VENUE.street,
@@ -49,25 +68,19 @@ export function venueJsonLd(): string {
       addressLocality: VENUE.city,
       addressCountry: VENUE.country
     },
-    openingHoursSpecification: [
-      {
-        '@type': 'OpeningHoursSpecification',
-        dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-        opens: '16:00',
-        closes: '21:00'
-      },
-      {
-        '@type': 'OpeningHoursSpecification',
-        dayOfWeek: 'Friday',
-        opens: '16:00',
-        closes: '23:00'
-      },
-      {
-        '@type': 'OpeningHoursSpecification',
-        dayOfWeek: ['Saturday', 'Sunday'],
-        opens: '15:00',
-        closes: '23:00'
-      }
-    ]
+    // A day the club is shut is simply omitted, which is how schema.org reads
+    // an absent specification.
+    openingHoursSpecification: groupWeeklyHours(hours).flatMap(group =>
+      group.closed
+        ? []
+        : [
+            {
+              '@type': 'OpeningHoursSpecification',
+              dayOfWeek: group.weekdays.map(weekday => SCHEMA_DAYS[weekday]),
+              opens: pad(group.hours.open),
+              closes: pad(group.hours.close)
+            }
+          ]
+    )
   });
 }

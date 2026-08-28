@@ -5,4 +5,5 @@
   <url><loc>https://test.spravy.com.ua/menu</loc><priority>0.6</priority></url>
   <url><loc>https://test.spravy.com.ua/prices</loc><priority>0.8</priority></url>
   <url><loc>https://test.spravy.com.ua/contacts</loc><priority>0.8</priority></url>
+  <url><loc>https://test.spravy.com.ua/tournaments</loc><priority>0.8</priority></url>
 </urlset>

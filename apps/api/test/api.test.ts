@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import {
   BILLIARD_TABLES_COUNT,
   DARTBOARDS_COUNT,
-  HOURLY_RATE_GROSZ,
+  DEFAULT_HOURLY_RATE_GROSZ,
   SPORT_CARD_DISCOUNT_GROSZ,
   SPOTS_COUNT
 } from '@repo/shared';
@@ -18,9 +18,9 @@ import { bookings, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
 
 /** Derived from the shared constants — a rate change must not silently rot these. */
-const BILLIARD_HOUR = HOURLY_RATE_GROSZ['9ft'];
-const BILLIARD_12FT_HOUR = HOURLY_RATE_GROSZ['12ft'];
-const DARTS_HOUR = HOURLY_RATE_GROSZ.darts;
+const BILLIARD_HOUR = DEFAULT_HOURLY_RATE_GROSZ['9ft'];
+const BILLIARD_12FT_HOUR = DEFAULT_HOURLY_RATE_GROSZ['12ft'];
+const DARTS_HOUR = DEFAULT_HOURLY_RATE_GROSZ.darts;
 /** Seeded spot ids: 1..5 are 9ft tables, 6..7 dartboards, 8..11 the 12ft ones. */
 const DARTBOARD_ID = 6;
 const TABLE_12FT_ID = 8;
@@ -67,7 +67,10 @@ before(async () => {
     databaseUrl: TEST_URL,
     logger: false,
     adminToken: 'test-admin-token',
-    jwtSecret: 'test-jwt-secret'
+    jwtSecret: 'test-jwt-secret',
+    // inject reports one source address for every request, so the global bucket
+    // is shared by the whole suite. Route-level limits are still exercised below.
+    rateLimitMax: 1000
   });
   await app.ready();
 });
@@ -1125,7 +1128,10 @@ test('active booking: public cancel is rejected, admin cancel succeeds', async (
       customerName: 'Active Now',
       customerPhone: '+48512500500',
       startsAt: new Date(now - 30 * 60_000),
-      endsAt: new Date(now + 90 * 60_000)
+      endsAt: new Date(now + 90 * 60_000),
+      // Written straight to the table, so the rate the API would have locked in
+      // has to be supplied here too
+      hourlyRateGrosz: BILLIARD_HOUR
     })
     .returning({ id: bookings.id });
   await pool.end();
@@ -1292,4 +1298,681 @@ test('booking on a DST fall-back date computes correct Warsaw instants', async (
   assert.equal(res.statusCode, 201);
   assert.equal(res.json().startsAt, '2026-10-25T14:00:00.000Z');
   assert.equal(res.json().endsAt, '2026-10-25T16:00:00.000Z');
+});
+
+/* Tournaments. The seeded pyramid tournament carries a fixed real-world
+ * deadline, so only its copy and counters are asserted here — anything that
+ * depends on "is registration open right now" builds its own tournament with
+ * dates computed from today. */
+
+/** Staff calls carry the test's own IP too: the shared 127.0.0.1 bucket is
+ *  long spent by the time these tests run. */
+function staff(ip: string) {
+  return { 'x-admin-token': 'test-admin-token', 'x-forwarded-for': ip };
+}
+
+/** Create a tournament through the admin API and return its DTO. */
+async function createTournament(ip: string, payload: Record<string, unknown>) {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers: staff(ip),
+    payload: {
+      status: 'registration',
+      translations: [
+        { locale: 'uk', title: 'Тестовий турнір' },
+        { locale: 'pl', title: 'Turniej testowy' },
+        { locale: 'en', title: 'Test tournament' }
+      ],
+      ...payload
+    }
+  });
+  assert.equal(res.statusCode, 201, res.body);
+  return res.json();
+}
+
+test('tournaments are localized, seat counts start empty, unknown slugs 404', async () => {
+  const pl = await app.inject({ method: 'GET', url: '/api/tournaments?locale=pl' });
+  assert.equal(pl.statusCode, 200);
+  const seeded = pl.json().find((t: { slug: string }) => t.slug === 'pyramid-tournament');
+  assert.ok(seeded, 'seeded pyramid tournament is missing');
+  assert.equal(seeded.title, 'Turniej piramidy');
+  assert.equal(seeded.minPlayers, 16);
+  assert.equal(seeded.maxPlayers, 16);
+  assert.equal(seeded.confirmedCount, 0);
+  assert.equal(seeded.pendingCount, 0);
+  // No date until the roster fills — that is the whole point of the announcement
+  assert.equal(seeded.startsOn, null);
+
+  const uk = await app.inject({
+    method: 'GET',
+    url: '/api/tournaments/pyramid-tournament?locale=uk'
+  });
+  assert.equal(uk.statusCode, 200);
+  assert.equal(uk.json().title, 'Турнір з піраміди');
+
+  // Unknown locale falls back to the default locale's copy, not a crash
+  const bogus = await app.inject({
+    method: 'GET',
+    url: '/api/tournaments/pyramid-tournament?locale=xx'
+  });
+  assert.equal(bogus.json().title, 'Turniej piramidy');
+
+  const missing = await app.inject({ method: 'GET', url: '/api/tournaments/no-such-cup' });
+  assert.equal(missing.statusCode, 404);
+});
+
+test('sign-up holds a pending seat, staff confirm it, duplicates are refused', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.20' };
+  const otherIp = { 'x-forwarded-for': '198.51.100.21' };
+  const created = await createTournament('198.51.100.20', {
+    slug: 'seat-counting-cup',
+    registrationDeadline: nextDate(5),
+    minPlayers: 2,
+    maxPlayers: 2
+  });
+  assert.equal(created.registrationState, 'open');
+
+  const first = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/seat-counting-cup/register',
+    headers: ip,
+    payload: { name: '  Anna Nowak  ', phone: '512 300 300' }
+  });
+  assert.equal(first.statusCode, 201);
+  assert.equal(first.json().status, 'pending');
+  assert.equal(first.json().tournament.pendingCount, 1);
+  assert.equal(first.json().tournament.confirmedCount, 0);
+
+  // Same player, national format this time — the E.164 normalization must catch it
+  const duplicate = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/seat-counting-cup/register',
+    headers: ip,
+    payload: { name: 'Anna Nowak', phone: '+48512300300' }
+  });
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(duplicate.json().error, 'already_registered');
+
+  const badPhone = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/seat-counting-cup/register',
+    headers: ip,
+    payload: { name: 'Anna Nowak', phone: '12345' }
+  });
+  assert.equal(badPhone.statusCode, 422);
+  assert.equal(badPhone.json().error, 'invalid_phone');
+
+  // The roster — names and phones — is staff-only, and the name arrived trimmed
+  const roster = await app.inject({
+    method: 'GET',
+    url: `/api/admin/tournaments/${created.id}/registrations`,
+    headers: staff('198.51.100.20')
+  });
+  assert.equal(roster.statusCode, 200);
+  assert.equal(roster.json().length, 1);
+  assert.equal(roster.json()[0].name, 'Anna Nowak');
+  assert.equal(roster.json()[0].phone, '+48512300300');
+  assert.equal(roster.json()[0].status, 'pending');
+
+  const confirmed = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${created.id}/registrations/${roster.json()[0].id}`,
+    headers: staff('198.51.100.20'),
+    payload: { status: 'confirmed' }
+  });
+  assert.equal(confirmed.statusCode, 200);
+
+  const afterConfirm = await app.inject({
+    method: 'GET',
+    url: '/api/tournaments/seat-counting-cup'
+  });
+  assert.equal(afterConfirm.json().confirmedCount, 1);
+  assert.equal(afterConfirm.json().pendingCount, 0);
+
+  // Second seat fills the roster; the third finds it full
+  const second = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/seat-counting-cup/register',
+    headers: otherIp,
+    payload: { name: 'Piotr Lis', phone: '512 300 301' }
+  });
+  assert.equal(second.statusCode, 201);
+  assert.equal(second.json().tournament.registrationState, 'full');
+
+  const third = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/seat-counting-cup/register',
+    headers: otherIp,
+    payload: { name: 'Late Comer', phone: '512 300 302' }
+  });
+  assert.equal(third.statusCode, 409);
+  assert.equal(third.json().error, 'tournament_full');
+});
+
+test('drafts stay private and a passed deadline shuts sign-ups', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.22' };
+  const draft = await createTournament('198.51.100.22', { slug: 'secret-cup', status: 'draft' });
+  assert.equal(draft.status, 'draft');
+
+  const list = await app.inject({ method: 'GET', url: '/api/tournaments' });
+  assert.ok(!list.json().some((t: { slug: string }) => t.slug === 'secret-cup'));
+  const direct = await app.inject({ method: 'GET', url: '/api/tournaments/secret-cup' });
+  assert.equal(direct.statusCode, 404);
+  // A draft is invisible even to a would-be registrant, not merely unlisted
+  const blind = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/secret-cup/register',
+    headers: ip,
+    payload: { name: 'Sneaky', phone: '512 400 400' }
+  });
+  assert.equal(blind.statusCode, 404);
+
+  const expired = await createTournament('198.51.100.22', {
+    slug: 'expired-cup',
+    registrationDeadline: pastDate(3)
+  });
+  assert.equal(expired.registrationState, 'deadline_passed');
+  const late = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/expired-cup/register',
+    headers: ip,
+    payload: { name: 'Too Late', phone: '512 400 401' }
+  });
+  assert.equal(late.statusCode, 409);
+  assert.equal(late.json().error, 'registration_closed');
+
+  // Sign-ups that close after the first ball is struck are a data-entry slip
+  const backwards = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers: staff('198.51.100.22'),
+    payload: {
+      slug: 'backwards-cup',
+      startsOn: '2026-09-01',
+      registrationDeadline: '2026-09-05',
+      translations: [{ locale: 'en', title: 'Backwards cup' }]
+    }
+  });
+  assert.equal(backwards.statusCode, 422);
+  assert.equal(backwards.json().error, 'deadline_after_start');
+});
+
+test('admin roster: walk-ins, the delete guard, and cancelling frees a seat', async () => {
+  const created = await createTournament('198.51.100.24', {
+    slug: 'walk-in-cup',
+    registrationDeadline: nextDate(5),
+    minPlayers: 4
+  });
+
+  // Someone at the desk with the fee in hand: staff add them already confirmed
+  const walkIn = await app.inject({
+    method: 'POST',
+    url: `/api/admin/tournaments/${created.id}/registrations`,
+    headers: staff('198.51.100.24'),
+    payload: { name: 'Desk Player', phone: '512 500 500' }
+  });
+  assert.equal(walkIn.statusCode, 201);
+  assert.equal(walkIn.json().status, 'confirmed');
+  assert.equal(walkIn.json().userId, null);
+
+  const dupe = await app.inject({
+    method: 'POST',
+    url: `/api/admin/tournaments/${created.id}/registrations`,
+    headers: staff('198.51.100.24'),
+    payload: { name: 'Desk Player', phone: '+48512500500' }
+  });
+  assert.equal(dupe.statusCode, 409);
+
+  const withSeat = await app.inject({ method: 'GET', url: '/api/tournaments/walk-in-cup' });
+  assert.equal(withSeat.json().confirmedCount, 1);
+
+  // Deleting would cascade the roster away — refuse while anyone holds a seat
+  const guarded = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/tournaments/${created.id}`,
+    headers: staff('198.51.100.24')
+  });
+  assert.equal(guarded.statusCode, 409);
+  assert.equal(guarded.json().error, 'has_registrations');
+
+  const cancelled = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${created.id}/registrations/${walkIn.json().id}`,
+    headers: staff('198.51.100.24'),
+    payload: { status: 'cancelled' }
+  });
+  assert.equal(cancelled.statusCode, 200);
+  const freed = await app.inject({ method: 'GET', url: '/api/tournaments/walk-in-cup' });
+  assert.equal(freed.json().confirmedCount, 0);
+
+  const deleted = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/tournaments/${created.id}`,
+    headers: staff('198.51.100.24')
+  });
+  assert.equal(deleted.statusCode, 200);
+  const gone = await app.inject({ method: 'GET', url: '/api/tournaments/walk-in-cup' });
+  assert.equal(gone.statusCode, 404);
+
+  // The roster requires a session, the storefront counters do not
+  const unauthorized = await app.inject({ method: 'GET', url: '/api/admin/tournaments' });
+  assert.equal(unauthorized.statusCode, 401);
+});
+
+test('a cancelled seat can be taken again by the same player', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.23' };
+  const created = await createTournament('198.51.100.23', {
+    slug: 'second-chance-cup',
+    registrationDeadline: nextDate(5)
+  });
+
+  const first = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/second-chance-cup/register',
+    headers: ip,
+    payload: { name: 'Returning Player', phone: '512 600 600' }
+  });
+  assert.equal(first.statusCode, 201);
+
+  const roster = await app.inject({
+    method: 'GET',
+    url: `/api/admin/tournaments/${created.id}/registrations`,
+    headers: staff('198.51.100.23')
+  });
+  await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${created.id}/registrations/${roster.json()[0].id}`,
+    headers: staff('198.51.100.23'),
+    payload: { status: 'cancelled' }
+  });
+
+  // Re-registering reuses the row rather than tripping the unique index
+  const again = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/second-chance-cup/register',
+    headers: ip,
+    payload: { name: 'Returning Player', phone: '512 600 600' }
+  });
+  assert.equal(again.statusCode, 201);
+  assert.equal(again.json().tournament.pendingCount, 1);
+
+  const stillOne = await app.inject({
+    method: 'GET',
+    url: `/api/admin/tournaments/${created.id}/registrations`,
+    headers: staff('198.51.100.23')
+  });
+  assert.equal(stillOne.json().length, 1);
+});
+
+test('tournament sign-up is rate limited', async () => {
+  // Fastify's inject gives every request the same source address, so this bucket
+  // is shared with the sign-ups above rather than isolated by IP — hence a
+  // generous loop rather than an exact count.
+  let limited = false;
+  for (let i = 0; i < 25 && !limited; i++) {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/tournaments/pyramid-tournament/register',
+      headers: { 'x-forwarded-for': '198.51.100.25' },
+      payload: { name: `Flooder ${i}`, phone: `51270${String(i).padStart(4, '0')}` }
+    });
+    if (res.statusCode === 429) limited = true;
+  }
+  assert.ok(limited, 'expected a 429 from repeated sign-ups');
+});
+
+/* Admin CRM edits. Bookings arrive by phone and messenger, so staff need to
+ * move, retable and re-price one after the fact — and to run the food tab. */
+
+/** Hours a booking DTO spans, from the instants it reports. */
+function spanHours(booking: { startsAt: string; endsAt: string }): number {
+  return (Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3_600_000;
+}
+
+test('admin edits a booking: duration, table, customer, cards, restore', async () => {
+  const headers = staff('198.51.100.30');
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: TABLE_12FT_ID,
+      date: SATURDAY,
+      startHour: 15,
+      durationHours: 1,
+      customerName: 'Phone Caller',
+      customerPhone: '+48512700700'
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id;
+  assert.equal(created.json().tableTotalGrosz, BILLIARD_12FT_HOUR);
+
+  // Duration alone moves; date, hour and table hold their current values
+  const longer = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { durationHours: 2 }
+  });
+  assert.equal(longer.statusCode, 200);
+  assert.equal(spanHours(longer.json()), 2);
+  assert.equal(longer.json().tableTotalGrosz, BILLIARD_12FT_HOUR * 2);
+  assert.equal(longer.json().startsAt, created.json().startsAt);
+
+  // "Move me to 18:00 on a different table", the commonest phone call
+  const moved = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { startHour: 18, tableId: TABLE_12FT_ID + 1 }
+  });
+  assert.equal(moved.statusCode, 200);
+  assert.equal(moved.json().tableId, TABLE_12FT_ID + 1);
+  assert.equal(spanHours(moved.json()), 2);
+
+  // A card was declared after the fact — the discount is recomputed, not stale
+  const withCard = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { sportCardCount: 1 }
+  });
+  assert.equal(withCard.json().discountGrosz, SPORT_CARD_DISCOUNT_GROSZ);
+  assert.equal(withCard.json().totalGrosz, BILLIARD_12FT_HOUR * 2 - SPORT_CARD_DISCOUNT_GROSZ);
+
+  // Name and phone are correctable, and the phone is normalized like everywhere
+  const renamed = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { customerName: '  Corrected Name  ', customerPhone: '512 700 701' }
+  });
+  assert.equal(renamed.json().customerName, 'Corrected Name');
+  assert.equal(renamed.json().customerPhone, '+48512700701');
+
+  const badPhone = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { customerPhone: '12345' }
+  });
+  assert.equal(badPhone.statusCode, 422);
+  assert.equal(badPhone.json().error, 'invalid_phone');
+
+  // Closing time still binds: 22:00 + 2h runs past the 23:00 Saturday close
+  const tooLate = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { startHour: 22 }
+  });
+  assert.equal(tooLate.statusCode, 422);
+  assert.equal(tooLate.json().error, 'outside_operating_hours');
+
+  const empty = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: {}
+  });
+  assert.equal(empty.statusCode, 400);
+
+  // A second booking in the way makes the move a 409, never a double-booking
+  const neighbour = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: TABLE_12FT_ID + 2,
+      date: SATURDAY,
+      startHour: 18,
+      durationHours: 2,
+      customerName: 'Neighbour',
+      customerPhone: '+48512700702'
+    }
+  });
+  assert.equal(neighbour.statusCode, 201);
+  const collide = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { tableId: TABLE_12FT_ID + 2 }
+  });
+  assert.equal(collide.statusCode, 409);
+  assert.equal(collide.json().error, 'slot_taken');
+
+  // Cancelled by mistake, then restored — the overlap guard applies on the way back
+  const cancelled = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${id}/cancel`,
+    headers
+  });
+  assert.equal(cancelled.json().status, 'cancelled');
+  const restored = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { status: 'confirmed' }
+  });
+  assert.equal(restored.statusCode, 200);
+  assert.equal(restored.json().status, 'confirmed');
+});
+
+test('admin runs the food tab: add lines, fix a quantity, strike one', async () => {
+  const headers = staff('198.51.100.31');
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: TABLE_12FT_ID + 3,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Tab Runner',
+      customerPhone: '+48512700800'
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id;
+
+  const menu = await app.inject({ method: 'GET', url: '/api/menu?locale=en' });
+  const cola = menu.json().find((i: { slug: string }) => i.slug === 'cola');
+  const fries = menu.json().find((i: { slug: string }) => i.slug === 'fries');
+
+  const added = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${id}/items`,
+    headers,
+    payload: {
+      items: [
+        { foodItemId: cola.id, quantity: 2 },
+        { foodItemId: fries.id, quantity: 1 }
+      ]
+    }
+  });
+  assert.equal(added.statusCode, 200);
+  assert.equal(added.json().foodTotalGrosz, cola.priceGrosz * 2 + fries.priceGrosz);
+
+  const colaLine = added.json().items.find((i: { slug: string }) => i.slug === 'cola');
+  const fixed = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}/items/${colaLine.id}`,
+    headers,
+    payload: { quantity: 5 }
+  });
+  assert.equal(fixed.statusCode, 200);
+  const fixedLine = fixed.json().items.find((i: { id: string }) => i.id === colaLine.id);
+  assert.equal(fixedLine.quantity, 5);
+  // The line keeps the price it was sold at, whatever the menu says later
+  assert.equal(fixedLine.unitPriceGrosz, colaLine.unitPriceGrosz);
+  assert.equal(fixed.json().foodTotalGrosz, cola.priceGrosz * 5 + fries.priceGrosz);
+
+  const struck = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/bookings/${id}/items/${colaLine.id}`,
+    headers
+  });
+  assert.equal(struck.statusCode, 200);
+  assert.equal(struck.json().items.length, 1);
+  assert.equal(struck.json().foodTotalGrosz, fries.priceGrosz);
+
+  // A line belonging to another booking is not reachable through this one
+  const foreign = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/bookings/${id}/items/${colaLine.id}`,
+    headers
+  });
+  assert.equal(foreign.statusCode, 404);
+
+  // Nothing is ordered onto a cancelled booking
+  await app.inject({ method: 'POST', url: `/api/admin/bookings/${id}/cancel`, headers });
+  const onCancelled = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${id}/items`,
+    headers,
+    payload: { items: [{ foodItemId: cola.id, quantity: 1 }] }
+  });
+  assert.equal(onCancelled.statusCode, 409);
+  assert.equal(onCancelled.json().error, 'booking_cancelled');
+});
+
+/* Venue config. Rates and opening hours are staff-editable, and the point of
+ * locking the rate onto a booking is that repricing never rewrites history. */
+
+test('venue config is public, editable by staff, and drives the window rules', async () => {
+  const headers = staff('198.51.100.32');
+
+  const initial = await app.inject({ method: 'GET', url: '/api/venue-config' });
+  assert.equal(initial.statusCode, 200);
+  assert.deepEqual(initial.json().rates, DEFAULT_HOURLY_RATE_GROSZ);
+  assert.equal(initial.json().hours.length, 7);
+  // Index is the JS weekday: 1 = Monday, published as 16:00-21:00
+  assert.deepEqual(initial.json().hours[1], { open: 16, close: 21 });
+
+  const week = initial.json().hours;
+  // Monday opens an hour earlier, and the 9ft tables go up to 60 zł
+  const saved = await app.inject({
+    method: 'PUT',
+    url: '/api/admin/venue-config',
+    headers,
+    payload: {
+      rates: { ...DEFAULT_HOURLY_RATE_GROSZ, '9ft': 60_00 },
+      hours: week.map((day: { open: number; close: number }, weekday: number) =>
+        weekday === 1 ? { open: 15, close: 21 } : day
+      )
+    }
+  });
+  assert.equal(saved.statusCode, 200);
+  assert.equal(saved.json().rates['9ft'], 60_00);
+
+  // The storefront and the availability grid both move immediately
+  const republished = await app.inject({ method: 'GET', url: '/api/venue-config' });
+  assert.equal(republished.json().hours[1].open, 15);
+  const availability = await app.inject({
+    method: 'GET',
+    url: `/api/availability?date=${MONDAY}`
+  });
+  assert.equal(availability.json().open, 15);
+  assert.equal(availability.json().tables[0].slots[0].hour, 15);
+
+  // A booking in the newly opened hour is now accepted where it would have been
+  // outside_operating_hours a moment ago
+  const early = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: 2,
+      date: MONDAY,
+      startHour: 15,
+      durationHours: 1,
+      customerName: 'Early Bird',
+      customerPhone: '+48512900900'
+    }
+  });
+  assert.equal(early.statusCode, 201);
+  // ...and it is billed at the new 9ft rate
+  assert.equal(early.json().tableTotalGrosz, 60_00);
+
+  // Repricing again leaves the booking already written exactly as it was quoted
+  const repriced = await app.inject({
+    method: 'PUT',
+    url: '/api/admin/venue-config',
+    headers,
+    payload: {
+      rates: { ...DEFAULT_HOURLY_RATE_GROSZ, '9ft': 90_00 },
+      hours: republished.json().hours
+    }
+  });
+  assert.equal(repriced.statusCode, 200);
+  const unchanged = await app.inject({
+    method: 'GET',
+    url: `/api/admin/bookings?date=${MONDAY}`,
+    headers
+  });
+  const stillSixty = unchanged.json().find((b: { id: string }) => b.id === early.json().id);
+  assert.equal(stillSixty.tableTotalGrosz, 60_00);
+
+  // Restore the published config so later assertions keep their footing
+  const restored = await app.inject({
+    method: 'PUT',
+    url: '/api/admin/venue-config',
+    headers,
+    payload: { rates: DEFAULT_HOURLY_RATE_GROSZ, hours: week }
+  });
+  assert.equal(restored.statusCode, 200);
+  assert.deepEqual(restored.json().hours[1], { open: 16, close: 21 });
+
+  const unauthorized = await app.inject({ method: 'GET', url: '/api/admin/venue-config' });
+  assert.equal(unauthorized.statusCode, 401);
+});
+
+test('a day closed in the config takes no bookings', async () => {
+  const headers = staff('198.51.100.33');
+  const published = await app.inject({ method: 'GET', url: '/api/venue-config' });
+  const week = published.json().hours;
+  const wednesday = nextDate(3);
+
+  await app.inject({
+    method: 'PUT',
+    url: '/api/admin/venue-config',
+    headers,
+    payload: {
+      rates: published.json().rates,
+      // open === close leaves no bookable hour at all
+      hours: week.map((day: { open: number; close: number }, weekday: number) =>
+        weekday === 3 ? { open: 0, close: 0 } : day
+      )
+    }
+  });
+
+  const shut = await app.inject({ method: 'GET', url: `/api/availability?date=${wednesday}` });
+  assert.equal(shut.statusCode, 200);
+  assert.deepEqual(shut.json().tables[0].slots, []);
+
+  const refused = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: { 'x-forwarded-for': '198.51.100.33' },
+    payload: {
+      tableId: 1,
+      date: wednesday,
+      startHour: 18,
+      durationHours: 1,
+      customerName: 'Closed Day',
+      customerPhone: '+48512901000'
+    }
+  });
+  assert.equal(refused.statusCode, 422);
+  assert.equal(refused.json().error, 'outside_operating_hours');
+
+  await app.inject({
+    method: 'PUT',
+    url: '/api/admin/venue-config',
+    headers,
+    payload: { rates: published.json().rates, hours: week }
+  });
 });

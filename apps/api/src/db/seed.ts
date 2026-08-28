@@ -1,4 +1,4 @@
-import { SPOTS } from '@repo/shared';
+import { DEFAULT_HOURLY_RATE_GROSZ, DEFAULT_WEEKLY_HOURS, SPOTS } from '@repo/shared';
 import { count } from 'drizzle-orm';
 import { LOCAL_DATABASE_URL } from '../lib/config.ts';
 import { createDb } from './client.ts';
@@ -7,7 +7,11 @@ import {
   foodItemTranslations,
   newsItems,
   newsItemTranslations,
-  tables
+  tables,
+  tournaments,
+  tournamentTranslations,
+  venueHours,
+  venueRates
 } from './schema.ts';
 
 const databaseUrl = process.env.DATABASE_URL ?? LOCAL_DATABASE_URL;
@@ -133,6 +137,61 @@ const NEWS: SeedNews[] = [
   }
 ];
 
+interface SeedTournamentCopy {
+  title: string;
+  summary: string;
+  details: string;
+}
+
+interface SeedTournament {
+  slug: string;
+  registrationDeadline: string;
+  minPlayers: number;
+  maxPlayers: number;
+  uk: SeedTournamentCopy;
+  pl: SeedTournamentCopy;
+  en: SeedTournamentCopy;
+}
+
+/**
+ * The pyramid tournament as the club announced it in August 2026: the 2 August
+ * date fell through for lack of players, so there is no `startsOn` — it is
+ * played once 16 people are on the roster. The entry fee is deliberately left
+ * unset; staff fill in the real amount from the admin panel.
+ */
+const TOURNAMENTS: SeedTournament[] = [
+  {
+    slug: 'pyramid-tournament',
+    registrationDeadline: '2026-08-30',
+    minPlayers: 16,
+    maxPlayers: 16,
+    uk: {
+      title: 'Турнір з піраміди',
+      summary: 'Нова реєстрація до 30 серпня — турнір стартує, щойно буде 16 гравців.',
+      details:
+        'Турнір з піраміди, запланований на 2 серпня, переноситься: попередньо зареєстрованих учасників виявилося замало.\n\n' +
+        'Відкрито нову реєстрацію до 30 серпня. Турнір відбудеться, щойно буде 16 зареєстрованих гравців.\n\n' +
+        'Заявка з сайту закріплює за вами місце у списку. Щоб підтвердити участь, потрібно підійти на рецепцію клубу та внести турнірний внесок.'
+    },
+    pl: {
+      title: 'Turniej piramidy',
+      summary: 'Nowe zapisy do 30 sierpnia — turniej rusza, gdy zbierze się 16 graczy.',
+      details:
+        'Turniej piramidy zaplanowany na 2 sierpnia zostaje przełożony: zgłosiło się zbyt mało uczestników.\n\n' +
+        'Otwieramy nowe zapisy do 30 sierpnia. Turniej odbędzie się, gdy na liście będzie 16 zarejestrowanych graczy.\n\n' +
+        'Zgłoszenie ze strony rezerwuje miejsce na liście. Udział potwierdzasz osobiście w recepcji klubu, wpłacając wpisowe.'
+    },
+    en: {
+      title: 'Pyramid tournament',
+      summary: 'Sign-ups reopened until 30 August — we play as soon as 16 players are in.',
+      details:
+        'The pyramid tournament planned for 2 August has been postponed: too few players had signed up in advance.\n\n' +
+        'Registration is open again until 30 August. The tournament goes ahead as soon as 16 players are on the roster.\n\n' +
+        'Signing up here holds your place on the list. To confirm it, come to the club reception and pay the entry fee.'
+    }
+  }
+];
+
 export async function seed(url: string) {
   const { db, pool } = createDb(url);
   try {
@@ -142,6 +201,29 @@ export async function seed(url: string) {
     await db
       .insert(tables)
       .values(SPOTS.map(({ id, label, kind }) => ({ id, label, kind })))
+      .onConflictDoNothing();
+
+    // Rates and opening hours are staff-editable, so the seed only puts the
+    // opening values in place; onConflictDoNothing keeps a re-run from
+    // stamping over whatever the owner has since changed them to.
+    await db
+      .insert(venueRates)
+      .values(
+        Object.entries(DEFAULT_HOURLY_RATE_GROSZ).map(([tier, hourlyGrosz]) => ({
+          tier,
+          hourlyGrosz
+        }))
+      )
+      .onConflictDoNothing();
+    await db
+      .insert(venueHours)
+      .values(
+        DEFAULT_WEEKLY_HOURS.map((day, weekday) => ({
+          weekday,
+          opens: day.open,
+          closes: day.close
+        }))
+      )
       .onConflictDoNothing();
 
     for (const food of FOOD) {
@@ -186,6 +268,37 @@ export async function seed(url: string) {
               locale,
               title: news[locale][0],
               body: news[locale][1]
+            }))
+          );
+        });
+      }
+    }
+
+    // Same reasoning as the news cards: no natural key to re-run against, so
+    // the starter tournament only lands in an empty table.
+    const [existingTournaments] = await db.select({ n: count() }).from(tournaments);
+    if ((existingTournaments?.n ?? 0) === 0) {
+      for (const tournament of TOURNAMENTS) {
+        await db.transaction(async tx => {
+          const [row] = await tx
+            .insert(tournaments)
+            .values({
+              slug: tournament.slug,
+              status: 'registration',
+              registrationDeadline: tournament.registrationDeadline,
+              minPlayers: tournament.minPlayers,
+              maxPlayers: tournament.maxPlayers
+            })
+            .returning({ id: tournaments.id });
+          if (!row) return;
+
+          await tx.insert(tournamentTranslations).values(
+            (['uk', 'pl', 'en'] as const).map(locale => ({
+              tournamentId: row.id,
+              locale,
+              title: tournament[locale].title,
+              summary: tournament[locale].summary,
+              details: tournament[locale].details
             }))
           );
         });

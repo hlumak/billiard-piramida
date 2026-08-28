@@ -5,13 +5,11 @@ import {
   discountGroszFor,
   hourlyRateGrosz,
   hoursForDate,
-  HOURLY_RATE_GROSZ,
   isIsoDate,
   isSafeUrl,
   isValidBookingWindow,
+  MAX_ORDER_ITEM_QUANTITY,
   MAX_SPORT_CARDS_PER_BOOKING,
-  SPOTS,
-  spotPriceGrosz,
   MAX_SPOT_ID,
   type AdminAnalyticsDto,
   type AdminCustomerDto,
@@ -53,9 +51,17 @@ import {
 } from '../lib/schemas.ts';
 import { ADMIN_TOKEN_COOKIE, clearAdminCookies, setAdminCookies } from '../lib/cookies.ts';
 import { EXCLUSION_VIOLATION, FOREIGN_KEY_VIOLATION, pgErrorCode } from '../lib/errors.ts';
-import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
+import { adminTournamentRoutes } from './admin-tournaments.ts';
+import { adminVenueConfigRoutes } from './admin-venue-config.ts';
+import { slugify } from '../lib/slug.ts';
+import { HOUR_MS, warsawDateOf, warsawHourOf, warsawInstant } from '../lib/time.ts';
 import { normalizePhone } from '@repo/shared/phone';
-import { mustLoadBookingDto, phaseOf, toBookingDtos } from '../services/bookings.ts';
+import {
+  insertOrderItems,
+  mustLoadBookingDto,
+  phaseOf,
+  toBookingDtos
+} from '../services/bookings.ts';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import type { Db } from '../db/client.ts';
 import type { AppInstance } from '../app.ts';
@@ -70,21 +76,12 @@ function tokenMatches(provided: string, expected: string): boolean {
 }
 
 /**
- * Hourly rate of the spot a booking sits on. Every rental sum has to join
- * `tables` and go through this — dartboards, 9ft and 12ft tables all bill
- * differently, and the tier follows the spot id, so the CASE is generated from
- * SPOTS: the same definition the rows were seeded from and the same one
- * `hourlyRateGrosz` reads, so the two can never disagree.
+ * Rental revenue, from the rate each booking was written at. This used to be a
+ * CASE over SPOTS against the rate constant, which quietly restated history
+ * whenever a rate changed; now that `bookings.hourly_rate_grosz` locks the
+ * price in, last month's takings stay last month's takings.
  */
-// The ::int casts are load-bearing: inside a CASE, Postgres has no operand to
-// infer a bound parameter's type from and defaults it to text, which then blows
-// up on `numeric * text` when the rate is multiplied by the hours.
-const SPOT_RATE_GROSZ = sql<number>`case ${tables.id} ${sql.join(
-  SPOTS.map(spot => sql`when ${spot.id}::int then ${hourlyRateGrosz(spot)}::int`),
-  sql` `
-)} else ${HOURLY_RATE_GROSZ['9ft']}::int end`;
-
-const RENTAL_GROSZ = sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${SPOT_RATE_GROSZ}), 0)::int`;
+const RENTAL_GROSZ = sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${bookings.hourlyRateGrosz}), 0)::int`;
 
 /** Spot rental + food revenue of confirmed bookings starting in [from, to). */
 async function revenueBetween(db: Db, from: Date, to: Date): Promise<number> {
@@ -100,7 +97,6 @@ async function revenueBetween(db: Db, from: Date, to: Date): Promise<number> {
         grosz: sql<number>`${RENTAL_GROSZ} - coalesce(sum(${bookings.discountGrosz}), 0)::int`
       })
       .from(bookings)
-      .innerJoin(tables, eq(bookings.tableId, tables.id))
       .where(inRange),
     db
       .select({
@@ -135,6 +131,18 @@ function toAdminMenuItem(item: FoodItemRow, translations: TranslationRow[]) {
   };
 }
 
+/** Strict UUID shape: a loose 36-char pattern lets malformed ids reach Postgres
+ *  as a uuid cast and surface as a logged 500 (22P02) instead of a clean 404. */
+const UUID_PATTERN =
+  '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+
+const BOOKING_ID_PARAMS = Type.Object({ id: Type.String({ pattern: UUID_PATTERN }) });
+
+/** Either the booking is open for edits, or it is not and the reason maps to a code. */
+type OpenBookingLookup =
+  | { error: string; status: number; booking?: undefined }
+  | { error?: undefined; booking: typeof bookings.$inferSelect };
+
 type NewsItemRow = typeof newsItems.$inferSelect;
 type NewsTranslationRow = typeof newsItemTranslations.$inferSelect;
 
@@ -163,15 +171,6 @@ function cleanUrl(value: string | null | undefined): string | null | undefined {
   if (value === undefined) return undefined;
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
-}
-
-function slugify(name: string): string {
-  const base = name
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-  return base || 'dish';
 }
 
 export async function adminRoutes(app: AppInstance, adminToken: string | undefined) {
@@ -301,10 +300,9 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
             cancelledCount: sql<number>`count(*) filter (where ${bookings.status} = 'cancelled')::int`,
             firstSeen: min(bookings.startsAt),
             lastSeen: max(bookings.startsAt),
-            tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${SPOT_RATE_GROSZ}) filter (where ${bookings.status} = 'confirmed'), 0)::int`
+            tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${bookings.hourlyRateGrosz}) filter (where ${bookings.status} = 'confirmed'), 0)::int`
           })
           .from(bookings)
-          .innerJoin(tables, eq(bookings.tableId, tables.id))
           .where(phoneFilter)
           .groupBy(bookings.customerPhone)
           .orderBy(desc(max(bookings.startsAt)))
@@ -457,7 +455,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
         const customerPhone = normalizePhone(request.body.customerPhone);
         if (customerPhone === null) return reply.code(422).send({ error: 'invalid_phone' });
-        if (!isValidBookingWindow(date, startHour, durationHours)) {
+        const { rates, hours } = await admin.venueConfig.get();
+        if (!isValidBookingWindow(date, startHour, durationHours, hours)) {
           return reply.code(422).send({ error: 'outside_operating_hours' });
         }
         const startsAt = warsawInstant(date, startHour);
@@ -470,7 +469,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const [spot] = await admin.db.select().from(tables).where(eq(tables.id, tableId));
         if (!spot) return reply.code(422).send({ error: 'unknown_table' });
         const sportCardCount = request.body.sportCardCount ?? 0;
-        const discountGrosz = discountGroszFor(sportCardCount, spotPriceGrosz(spot, durationHours));
+        const lockedRateGrosz = hourlyRateGrosz(spot, rates);
+        const discountGrosz = discountGroszFor(sportCardCount, lockedRateGrosz * durationHours);
 
         try {
           const [created] = await admin.db
@@ -482,6 +482,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
               startsAt,
               endsAt,
               sportCardCount,
+              hourlyRateGrosz: lockedRateGrosz,
               discountGrosz
             })
             .returning({ id: bookings.id });
@@ -503,7 +504,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       '/api/admin/bookings/:id/cancel',
       {
         schema: {
-          params: Type.Object({ id: Type.String({ pattern: '^[0-9a-fA-F-]{36}$' }) }),
+          params: BOOKING_ID_PARAMS,
           response: { 200: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
         }
       },
@@ -523,6 +524,234 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
           .where(eq(bookings.id, booking.id));
         admin.availabilityHub.notify(warsawDateOf(booking.startsAt));
         return mustLoadBookingDto(admin.db, booking.id);
+      }
+    );
+
+    /**
+     * Edit an existing booking. The club takes bookings by phone and messenger,
+     * so "move me to 20:00" and "different table" arrive constantly — without
+     * this, staff had to cancel and re-create, losing the order and the record.
+     *
+     * Deliberately no start-in-past guard (unlike create): this is also how a
+     * mis-logged walk-in from earlier today gets corrected.
+     */
+    admin.patch(
+      '/api/admin/bookings/:id',
+      {
+        schema: {
+          params: BOOKING_ID_PARAMS,
+          body: Type.Object(
+            {
+              tableId: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID })),
+              date: Type.Optional(Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' })),
+              startHour: Type.Optional(Type.Integer({ minimum: 0, maximum: 23 })),
+              durationHours: Type.Optional(Type.Integer({ minimum: 1, maximum: 8 })),
+              customerName: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })),
+              customerPhone: Type.Optional(Type.String({ minLength: 5, maxLength: 25 })),
+              sportCardCount: Type.Optional(
+                Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })
+              ),
+              /** Restores a cancelled booking, or cancels one, in the same call */
+              status: Type.Optional(
+                Type.Union([Type.Literal('confirmed'), Type.Literal('cancelled')])
+              )
+            },
+            { additionalProperties: false }
+          ),
+          response: { 200: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
+        }
+      },
+      async (request, reply) => {
+        const patch = request.body;
+        if (Object.keys(patch).length === 0) return reply.code(400).send({ error: 'empty_patch' });
+
+        const [booking] = await admin.db
+          .select()
+          .from(bookings)
+          .where(eq(bookings.id, request.params.id));
+        if (!booking) return reply.code(404).send({ error: 'not_found' });
+
+        const previousDate = warsawDateOf(booking.startsAt);
+        // Any one of the three may move; the other two hold their current value,
+        // so "just make it two hours" needs no date or hour from the caller.
+        const date = patch.date ?? previousDate;
+        if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
+        const startHour = patch.startHour ?? warsawHourOf(booking.startsAt);
+        const durationHours =
+          patch.durationHours ??
+          Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS);
+        const { rates, hours } = await admin.venueConfig.get();
+        if (!isValidBookingWindow(date, startHour, durationHours, hours)) {
+          return reply.code(422).send({ error: 'outside_operating_hours' });
+        }
+
+        const customerPhone =
+          patch.customerPhone === undefined ? undefined : normalizePhone(patch.customerPhone);
+        if (customerPhone === null) return reply.code(422).send({ error: 'invalid_phone' });
+
+        const tableId = patch.tableId ?? booking.tableId;
+        const [spot] = await admin.db.select().from(tables).where(eq(tables.id, tableId));
+        if (!spot) return reply.code(422).send({ error: 'unknown_table' });
+
+        // Moving to a different spot means a different tier, so the rental is
+        // re-quoted at today's rate. Staying put keeps the locked rate: making a
+        // booking longer must not silently reprice it at a newer one.
+        const hourlyRate =
+          tableId === booking.tableId ? booking.hourlyRateGrosz : hourlyRateGrosz(spot, rates);
+
+        // Cards and duration both feed the cap, so the discount is recomputed
+        // whenever either could have moved — same rule as extend.
+        const sportCardCount = patch.sportCardCount ?? booking.sportCardCount;
+        const startsAt = warsawInstant(date, startHour);
+        const endsAt = new Date(startsAt.getTime() + durationHours * HOUR_MS);
+        const discountGrosz = discountGroszFor(sportCardCount, hourlyRate * durationHours);
+
+        try {
+          await admin.db
+            .update(bookings)
+            .set({
+              tableId,
+              startsAt,
+              endsAt,
+              sportCardCount,
+              hourlyRateGrosz: hourlyRate,
+              discountGrosz,
+              ...(patch.customerName !== undefined
+                ? { customerName: patch.customerName.trim() }
+                : {}),
+              ...(customerPhone !== undefined ? { customerPhone } : {}),
+              ...(patch.status !== undefined ? { status: patch.status } : {})
+            })
+            .where(eq(bookings.id, booking.id));
+        } catch (err) {
+          // The EXCLUDE guard covers updates too: moving onto a taken slot, or
+          // un-cancelling into one, lands here rather than double-booking.
+          if (pgErrorCode(err) === EXCLUSION_VIOLATION) {
+            return reply.code(409).send({ error: 'slot_taken' });
+          }
+          throw err;
+        }
+
+        // Both grids are now stale when the booking changed day
+        admin.availabilityHub.notify(date);
+        if (previousDate !== date) admin.availabilityHub.notify(previousDate);
+        return mustLoadBookingDto(admin.db, booking.id);
+      }
+    );
+
+    /* Order lines. Staff take food orders at the table and over the phone, so
+     * they need the same reach the guest has plus the two things the guest
+     * never gets: fixing a quantity and striking a line. Unlike the public
+     * endpoint these also work on a finished booking — that is when a tab is
+     * settled — but never on a cancelled one. */
+    const loadOpenBooking = async (id: string): Promise<OpenBookingLookup> => {
+      const [booking] = await admin.db.select().from(bookings).where(eq(bookings.id, id));
+      if (!booking) return { error: 'not_found', status: 404 };
+      if (booking.status === 'cancelled') return { error: 'booking_cancelled', status: 409 };
+      return { booking };
+    };
+
+    admin.post(
+      '/api/admin/bookings/:id/items',
+      {
+        schema: {
+          params: BOOKING_ID_PARAMS,
+          body: Type.Object(
+            {
+              items: Type.Array(
+                Type.Object(
+                  {
+                    foodItemId: Type.Integer({ minimum: 1 }),
+                    quantity: Type.Integer({ minimum: 1, maximum: MAX_ORDER_ITEM_QUANTITY })
+                  },
+                  { additionalProperties: false }
+                ),
+                { minItems: 1, maxItems: 50 }
+              )
+            },
+            { additionalProperties: false }
+          ),
+          response: { 200: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
+        }
+      },
+      async (request, reply) => {
+        const found = await loadOpenBooking(request.params.id);
+        if (found.error !== undefined) {
+          return reply.code(found.status).send({ error: found.error });
+        }
+
+        const itemError = await insertOrderItems(admin.db, found.booking.id, request.body.items);
+        if (itemError) return reply.code(422).send({ error: itemError });
+        return mustLoadBookingDto(admin.db, found.booking.id);
+      }
+    );
+
+    admin.patch(
+      '/api/admin/bookings/:id/items/:itemId',
+      {
+        schema: {
+          params: Type.Object({
+            id: Type.String({ pattern: UUID_PATTERN }),
+            itemId: Type.String({ pattern: UUID_PATTERN })
+          }),
+          body: Type.Object(
+            { quantity: Type.Integer({ minimum: 1, maximum: MAX_ORDER_ITEM_QUANTITY }) },
+            { additionalProperties: false }
+          ),
+          response: { 200: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
+        }
+      },
+      async (request, reply) => {
+        const found = await loadOpenBooking(request.params.id);
+        if (found.error !== undefined) {
+          return reply.code(found.status).send({ error: found.error });
+        }
+
+        // unit_price_grosz is untouched on purpose: a line keeps the price it
+        // was sold at, however the quantity is corrected afterwards.
+        const [updated] = await admin.db
+          .update(orderItems)
+          .set({ quantity: request.body.quantity })
+          .where(
+            and(
+              eq(orderItems.id, request.params.itemId),
+              eq(orderItems.bookingId, found.booking.id)
+            )
+          )
+          .returning({ id: orderItems.id });
+        if (!updated) return reply.code(404).send({ error: 'not_found' });
+        return mustLoadBookingDto(admin.db, found.booking.id);
+      }
+    );
+
+    admin.delete(
+      '/api/admin/bookings/:id/items/:itemId',
+      {
+        schema: {
+          params: Type.Object({
+            id: Type.String({ pattern: UUID_PATTERN }),
+            itemId: Type.String({ pattern: UUID_PATTERN })
+          }),
+          response: { 200: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
+        }
+      },
+      async (request, reply) => {
+        const found = await loadOpenBooking(request.params.id);
+        if (found.error !== undefined) {
+          return reply.code(found.status).send({ error: found.error });
+        }
+
+        const [deleted] = await admin.db
+          .delete(orderItems)
+          .where(
+            and(
+              eq(orderItems.id, request.params.itemId),
+              eq(orderItems.bookingId, found.booking.id)
+            )
+          )
+          .returning({ id: orderItems.id });
+        if (!deleted) return reply.code(404).send({ error: 'not_found' });
+        return mustLoadBookingDto(admin.db, found.booking.id);
       }
     );
 
@@ -590,6 +819,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
 
         const rentalMap = new Map(rentalByDay.map(r => [r.date, r]));
         const foodMap = new Map(foodByDay.map(f => [f.date, f.foodGrosz]));
+        const { hours } = await admin.venueConfig.get();
 
         // Dense series: every day in the window, oldest first
         const daily = [];
@@ -597,7 +827,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         for (let i = days - 1; i >= 0; i--) {
           const dayDate = warsawDateOf(new Date(windowEnd.getTime() - (i + 1) * DAY_MS + HOUR_MS));
           const rental = rentalMap.get(dayDate);
-          const { open, close } = hoursForDate(dayDate);
+          const { open, close } = hoursForDate(dayDate, hours);
           openHoursTotal += close - open;
           daily.push({
             date: dayDate,
@@ -676,7 +906,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const { category, priceGrosz, translations } = request.body;
         const en = translations.find(t => t.locale === 'en');
         const uk = translations.find(t => t.locale === 'uk');
-        const base = slugify((en ?? uk ?? translations[0]!).name);
+        const base = slugify((en ?? uk ?? translations[0]!).name, 'dish');
 
         const created = await admin.db.transaction(async tx => {
           // Unique slug: append a counter on collision
@@ -986,5 +1216,11 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         return { deleted: true };
       }
     );
+
+    // Tournaments + their rosters. Registered here rather than defined inline so
+    // this file stays about bookings, customers, menu and news; the plugin
+    // inherits the token hook above, which is the whole point of the scope.
+    await admin.register(adminTournamentRoutes);
+    await admin.register(adminVenueConfigRoutes);
   });
 }

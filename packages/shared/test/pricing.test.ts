@@ -3,10 +3,11 @@ import { test } from 'node:test';
 import {
   discountGroszFor,
   hourlyRateGrosz,
-  HOURLY_RATE_GROSZ,
+  DEFAULT_HOURLY_RATE_GROSZ,
   MAX_SPORT_CARDS_PER_BOOKING,
   spotPriceGrosz,
-  SPORT_CARD_DISCOUNT_GROSZ
+  SPORT_CARD_DISCOUNT_GROSZ,
+  type RateTable
 } from '../src/pricing.ts';
 import { SPOTS } from '../src/venue.ts';
 
@@ -15,21 +16,27 @@ const table9ft = { id: 1, kind: 'billiard' } as const;
 const table12ft = { id: 8, kind: 'billiard' } as const;
 const dartboard = { id: 6, kind: 'darts' } as const;
 
-const billiardHour = HOURLY_RATE_GROSZ['9ft'];
-const dartsHour = HOURLY_RATE_GROSZ.darts;
+/** The tests pin the opening rates; the table is now passed in explicitly. */
+const RATES = DEFAULT_HOURLY_RATE_GROSZ;
+
+const billiardHour = DEFAULT_HOURLY_RATE_GROSZ['9ft'];
+const dartsHour = DEFAULT_HOURLY_RATE_GROSZ.darts;
 
 test('rates are per rate tier, and billiard tiers split by cloth size', () => {
-  assert.equal(HOURLY_RATE_GROSZ['9ft'], 50_00);
-  assert.equal(HOURLY_RATE_GROSZ['12ft'], 70_00);
+  assert.equal(DEFAULT_HOURLY_RATE_GROSZ['9ft'], 50_00);
+  assert.equal(DEFAULT_HOURLY_RATE_GROSZ['12ft'], 70_00);
   assert.equal(dartsHour, 30_00);
-  assert.equal(spotPriceGrosz(table9ft, 3), 150_00);
-  assert.equal(spotPriceGrosz(table12ft, 3), 210_00);
-  assert.equal(spotPriceGrosz(dartboard, 2), 60_00);
+  assert.equal(spotPriceGrosz(table9ft, 3, RATES), 150_00);
+  assert.equal(spotPriceGrosz(table12ft, 3, RATES), 210_00);
+  assert.equal(spotPriceGrosz(dartboard, 2, RATES), 60_00);
 });
 
 test('the venue bills tables 1-5 at 9ft and 6-9 at 12ft', () => {
   const rateByLabel = new Map<string, number>(
-    SPOTS.filter(spot => spot.kind === 'billiard').map(spot => [spot.label, hourlyRateGrosz(spot)])
+    SPOTS.filter(spot => spot.kind === 'billiard').map(spot => [
+      spot.label,
+      hourlyRateGrosz(spot, RATES)
+    ])
   );
   for (const label of ['1', '2', '3', '4', '5']) {
     assert.equal(rateByLabel.get(label), 50_00, `table ${label}`);
@@ -40,8 +47,11 @@ test('the venue bills tables 1-5 at 9ft and 6-9 at 12ft', () => {
 });
 
 test('a billiard table missing from SPOTS falls back to the 9ft rate', () => {
-  assert.equal(hourlyRateGrosz({ id: 999, kind: 'billiard' }), HOURLY_RATE_GROSZ['9ft']);
-  assert.equal(hourlyRateGrosz({ id: 999, kind: 'darts' }), HOURLY_RATE_GROSZ.darts);
+  assert.equal(
+    hourlyRateGrosz({ id: 999, kind: 'billiard' }, RATES),
+    DEFAULT_HOURLY_RATE_GROSZ['9ft']
+  );
+  assert.equal(hourlyRateGrosz({ id: 999, kind: 'darts' }, RATES), DEFAULT_HOURLY_RATE_GROSZ.darts);
 });
 
 test('no cards → no discount', () => {
@@ -57,7 +67,7 @@ test('non-counts are treated as no card', () => {
 });
 
 test('each card takes a flat amount off, and they stack', () => {
-  const threeHours = spotPriceGrosz(table9ft, 3);
+  const threeHours = spotPriceGrosz(table9ft, 3, RATES);
   assert.equal(discountGroszFor(1, threeHours), SPORT_CARD_DISCOUNT_GROSZ);
   assert.equal(discountGroszFor(2, threeHours), 2 * SPORT_CARD_DISCOUNT_GROSZ);
 });
@@ -67,7 +77,7 @@ test('policy examples', () => {
   assert.equal(billiardHour - discountGroszFor(1, billiardHour), 35_00);
   // The owner's worked example: four players with a card each take a 9ft table
   // for four hours — 4 × 50 = 200, less 4 × 15, so 140, i.e. 35 each.
-  const fourHours = spotPriceGrosz(table9ft, 4);
+  const fourHours = spotPriceGrosz(table9ft, 4, RATES);
   assert.equal(fourHours - discountGroszFor(4, fourHours), 140_00);
   // One darts hour, one card: 30 − 15 = 15 PLN
   assert.equal(dartsHour - discountGroszFor(1, dartsHour), 15_00);
@@ -87,4 +97,15 @@ test('card count is clamped to the per-booking ceiling', () => {
     discountGroszFor(MAX_SPORT_CARDS_PER_BOOKING + 5, plenty),
     MAX_SPORT_CARDS_PER_BOOKING * SPORT_CARD_DISCOUNT_GROSZ
   );
+});
+
+test('a repriced table bills at the new rate, the others are untouched', () => {
+  const repriced: RateTable = { ...DEFAULT_HOURLY_RATE_GROSZ, '9ft': 60_00 };
+
+  assert.equal(hourlyRateGrosz(table9ft, repriced), 60_00);
+  assert.equal(spotPriceGrosz(table9ft, 3, repriced), 180_00);
+  assert.equal(hourlyRateGrosz(table12ft, repriced), DEFAULT_HOURLY_RATE_GROSZ['12ft']);
+  assert.equal(hourlyRateGrosz(dartboard, repriced), DEFAULT_HOURLY_RATE_GROSZ.darts);
+  // The discount cap follows the new rental, not the old one
+  assert.equal(discountGroszFor(9, spotPriceGrosz(dartboard, 1, repriced)), 30_00);
 });
