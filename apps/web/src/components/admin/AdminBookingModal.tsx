@@ -2,7 +2,10 @@ import { useReducer, useState } from 'react';
 import { Button, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  MAX_BOOKING_HOURS,
   MAX_SPORT_CARDS_PER_BOOKING,
+  MIN_BOOKING_HOURS,
+  maxDurationAt,
   slotStartsForDate,
   type BookingDto,
   type IsoDate,
@@ -170,13 +173,23 @@ export function AdminBookingModal({
   const { data: availability } = useQuery({ ...availabilityQuery(date), enabled: isOpen });
   const { hours: venueHours } = useVenueConfig();
 
+  // Bounded by closing time rather than a fixed list: a 15:00 start on a day
+  // that runs to 23:00 can legitimately be booked for eight hours, and the API
+  // accepts exactly that. Picking a new start can leave the stored duration
+  // over the limit, so the clamped value — not `duration` — drives the form.
+  const maxDuration =
+    startHour === null
+      ? MAX_BOOKING_HOURS
+      : Math.min(maxDurationAt(date, startHour, venueHours), MAX_BOOKING_HOURS);
+  const effectiveDuration = Math.min(duration, Math.max(maxDuration, MIN_BOOKING_HOURS));
+
   const create = useMutation({
     mutationFn: () => {
       const values = {
         tableId: tableId!,
         date,
         startHour: startHour!,
-        durationHours: duration,
+        durationHours: effectiveDuration,
         customerName: name.trim(),
         customerPhone: phone.trim(),
         sportCardCount: sportCards
@@ -218,7 +231,7 @@ export function AdminBookingModal({
   const freeForWindow = (candidateTable: TableAvailabilityDto) => {
     if (startHour === null) return false;
     const slotByHour = new Map(candidateTable.slots.map(s => [s.hour, s]));
-    for (let h = startHour; h < startHour + duration; h++) {
+    for (let h = startHour; h < startHour + effectiveDuration; h++) {
       const slot = slotByHour.get(h);
       if (!slot) return false;
       if (slot.booked && !heldByThisBooking(candidateTable.tableId, h)) return false;
@@ -267,13 +280,13 @@ export function AdminBookingModal({
                 <div>
                   <p className="mb-2 text-sm text-grey-cool">{m.time_duration()}</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {[1, 2, 3, 4].map(h => (
+                    {Array.from({ length: maxDuration }, (_, i) => i + 1).map(h => (
                       <button
                         key={h}
                         type="button"
-                        aria-pressed={duration === h}
+                        aria-pressed={effectiveDuration === h}
                         onClick={() => dispatch({ type: 'duration', duration: h })}
-                        className={chip(duration === h)}
+                        className={chip(effectiveDuration === h)}
                       >
                         {m.hours_n({ n: h })}
                       </button>

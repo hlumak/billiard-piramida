@@ -8,9 +8,11 @@ import {
   isIsoDate,
   isSafeUrl,
   isValidBookingWindow,
+  MAX_BOOKING_HOURS,
   MAX_ORDER_ITEM_QUANTITY,
   MAX_SPORT_CARDS_PER_BOOKING,
   MAX_SPOT_ID,
+  MIN_BOOKING_HOURS,
   type AdminAnalyticsDto,
   type AdminCustomerDto,
   type AdminStatsDto
@@ -438,7 +440,10 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
               tableId: Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }),
               date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
               startHour: Type.Integer({ minimum: 0, maximum: 23 }),
-              durationHours: Type.Integer({ minimum: 1, maximum: 8 }),
+              durationHours: Type.Integer({
+                minimum: MIN_BOOKING_HOURS,
+                maximum: MAX_BOOKING_HOURS
+              }),
               customerName: Type.String({ minLength: 1, maxLength: 120 }),
               customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
               sportCardCount: Type.Optional(
@@ -545,7 +550,9 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
               tableId: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID })),
               date: Type.Optional(Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' })),
               startHour: Type.Optional(Type.Integer({ minimum: 0, maximum: 23 })),
-              durationHours: Type.Optional(Type.Integer({ minimum: 1, maximum: 8 })),
+              durationHours: Type.Optional(
+                Type.Integer({ minimum: MIN_BOOKING_HOURS, maximum: MAX_BOOKING_HOURS })
+              ),
               customerName: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })),
               customerPhone: Type.Optional(Type.String({ minLength: 5, maxLength: 25 })),
               sportCardCount: Type.Optional(

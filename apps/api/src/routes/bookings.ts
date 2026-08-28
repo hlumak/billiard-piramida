@@ -5,8 +5,10 @@ import {
   hoursForDate,
   isIsoDate,
   isValidBookingWindow,
+  MAX_BOOKING_HOURS,
   MAX_ORDER_ITEM_QUANTITY,
   MAX_SPORT_CARDS_PER_BOOKING,
+  MIN_BOOKING_HOURS,
   hourlyRateGrosz,
   MAX_SPOT_ID
 } from '@repo/shared';
@@ -49,7 +51,7 @@ const CREATE_BOOKING_BODY = Type.Object(
     tableId: Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }),
     date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
     startHour: Type.Integer({ minimum: 0, maximum: 23 }),
-    durationHours: Type.Integer({ minimum: 1, maximum: 8 }),
+    durationHours: Type.Integer({ minimum: MIN_BOOKING_HOURS, maximum: MAX_BOOKING_HOURS }),
     customerName: Type.String({ minLength: 1, maxLength: 120 }),
     customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
     /** Self-declared and open to guests — staff check the cards at reception */
@@ -199,7 +201,12 @@ export function bookingRoutes(app: AppInstance) {
       schema: {
         params: BOOKING_ID_PARAM,
         body: Type.Object(
-          { additionalHours: Type.Integer({ minimum: 1, maximum: 8 }) },
+          {
+            additionalHours: Type.Integer({
+              minimum: MIN_BOOKING_HOURS,
+              maximum: MAX_BOOKING_HOURS
+            })
+          },
           { additionalProperties: false }
         ),
         response: { 200: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }

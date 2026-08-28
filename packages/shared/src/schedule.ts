@@ -1,4 +1,6 @@
 export const MIN_BOOKING_HOURS = 1;
+/** Upper bound on a single booking, whatever the day's closing time allows. */
+export const MAX_BOOKING_HOURS = 8;
 export const VENUE_TIMEZONE = 'Europe/Warsaw';
 
 /** A calendar date in YYYY-MM-DD form — narrow via `isIsoDate`, never cast at call sites. */
