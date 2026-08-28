@@ -987,18 +987,23 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
             .where(eq(foodItems.id, request.params.id))
             .returning();
           if (!item) return null;
-          for (const t of translations ?? []) {
+          if (translations !== undefined && translations.length > 0) {
+            // One statement for all the locales sent: `excluded` is the row
+            // Postgres was about to insert, so each locale updates to its own
+            // new copy.
             await tx
               .insert(foodItemTranslations)
-              .values({
-                foodItemId: item.id,
-                locale: t.locale,
-                name: t.name.trim(),
-                description: t.description?.trim() || null
-              })
+              .values(
+                translations.map(t => ({
+                  foodItemId: item.id,
+                  locale: t.locale,
+                  name: t.name.trim(),
+                  description: t.description?.trim() || null
+                }))
+              )
               .onConflictDoUpdate({
                 target: [foodItemTranslations.foodItemId, foodItemTranslations.locale],
-                set: { name: t.name.trim(), description: t.description?.trim() || null }
+                set: { name: sql`excluded.name`, description: sql`excluded.description` }
               });
           }
           return item;
@@ -1179,18 +1184,21 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
                   .returning()
               : await tx.select().from(newsItems).where(eq(newsItems.id, request.params.id));
           if (!item) return null;
-          for (const t of translations ?? []) {
+          if (translations !== undefined && translations.length > 0) {
+            // One statement for all the locales sent, as in the menu PATCH above.
             await tx
               .insert(newsItemTranslations)
-              .values({
-                newsItemId: item.id,
-                locale: t.locale,
-                title: t.title.trim(),
-                body: t.body?.trim() || null
-              })
+              .values(
+                translations.map(t => ({
+                  newsItemId: item.id,
+                  locale: t.locale,
+                  title: t.title.trim(),
+                  body: t.body?.trim() || null
+                }))
+              )
               .onConflictDoUpdate({
                 target: [newsItemTranslations.newsItemId, newsItemTranslations.locale],
-                set: { title: t.title.trim(), body: t.body?.trim() || null }
+                set: { title: sql`excluded.title`, body: sql`excluded.body` }
               });
           }
           return item;
