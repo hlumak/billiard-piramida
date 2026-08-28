@@ -60,6 +60,13 @@ export function formatDayLong(isoDate: IsoDate): string {
   }).format(utcDate(isoDate));
 }
 
+/** Localized weekday name for a JS weekday index (0 = Sunday). */
+export function weekdayName(weekday: number, style: 'long' | 'short' = 'long'): string {
+  // 2026-03-01 was a Sunday, so adding the index lands on the wanted weekday
+  const date = new Date(Date.UTC(2026, 2, 1 + weekday));
+  return formatter(intlTag(), { weekday: style, timeZone: 'UTC' }).format(date);
+}
+
 export function formatHour(hour: number): string {
   return `${String(hour).padStart(2, '0')}:00`;
 }

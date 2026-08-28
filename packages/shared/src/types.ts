@@ -1,5 +1,11 @@
 import type { Locale } from './locales.ts';
-import type { IsoDate } from './schedule.ts';
+import type { RateTable } from './pricing.ts';
+import type { IsoDate, WeeklyHours } from './schedule.ts';
+import type {
+  TournamentRegistrationState,
+  TournamentRegistrationStatus,
+  TournamentStatus
+} from './tournaments.ts';
 
 export type BookingStatus = 'confirmed' | 'cancelled';
 
@@ -43,6 +49,18 @@ export interface AvailabilityDto {
   open: number;
   close: number;
   tables: TableAvailabilityDto[];
+}
+
+/**
+ * What the club charges and when it is open — staff-editable, so every screen
+ * and every server-side check reads it from here rather than from a constant.
+ * Booked rentals are unaffected by a later change: the hourly rate is locked
+ * onto the booking when it is written, the way a dish keeps its unit price.
+ */
+export interface VenueConfigDto {
+  rates: RateTable;
+  /** Seven days, index = JS weekday (0 = Sunday … 6 = Saturday) */
+  hours: WeeklyHours;
 }
 
 export interface MenuItemDto {
@@ -156,6 +174,79 @@ export interface AdminNewsItemDto extends NewsItemDto {
   /** Ascending carousel position; ties break by newest first. */
   sortOrder: number;
   translations: NewsTranslationDto[];
+}
+
+/**
+ * A club tournament, already resolved to a single locale. Dates are venue-local
+ * calendar values rather than instants: the whole app speaks Warsaw wall clock
+ * (see `hoursForDate`), and a tournament whose date is still unknown has none.
+ */
+export interface TournamentDto {
+  id: number;
+  /** URL key — /tournaments/:slug */
+  slug: string;
+  title: string;
+  /** One-line pitch for the carousel and the list page */
+  summary: string | null;
+  /** Full announcement: format, rules, prizes */
+  details: string | null;
+  imageUrl: string | null;
+  status: TournamentStatus;
+  /** null while the date depends on filling the roster */
+  startsOn: IsoDate | null;
+  /** Venue-local start hour (18 = 18:00); null when only the date is settled */
+  startHour: number | null;
+  /** Last day sign-ups are accepted, inclusive */
+  registrationDeadline: IsoDate | null;
+  /** Paid at the reception desk; null when the club has not priced it yet */
+  entryFeeGrosz: number | null;
+  /** Players needed before the bracket is played; 0 = no threshold */
+  minPlayers: number;
+  /** Hard cap on the roster; null = uncapped */
+  maxPlayers: number | null;
+  /** Fee paid at the reception desk */
+  confirmedCount: number;
+  /** Signed up online, fee not paid yet */
+  pendingCount: number;
+  /** Derived from status + deadline + capacity — see `registrationStateOf` */
+  registrationState: TournamentRegistrationState;
+}
+
+/** What a visitor submits to hold a seat. */
+export interface TournamentRegistrationInput {
+  name: string;
+  /** Any format libphonenumber accepts; stored normalized to E.164 */
+  phone: string;
+}
+
+/** The seat that was just taken, plus the tournament with its counters refreshed. */
+export interface TournamentRegistrationResultDto {
+  status: TournamentRegistrationStatus;
+  tournament: TournamentDto;
+}
+
+export interface TournamentTranslationDto {
+  locale: Locale;
+  title: string;
+  summary: string | null;
+  details: string | null;
+}
+
+/** Tournament row for staff: includes drafts (uk display copy) + all translations. */
+export interface AdminTournamentDto extends TournamentDto {
+  translations: TournamentTranslationDto[];
+}
+
+/** One roster entry, staff view — the only place sign-up names and phones appear. */
+export interface AdminTournamentRegistrationDto {
+  id: string;
+  tournamentId: TournamentDto['id'];
+  name: string;
+  phone: string;
+  status: TournamentRegistrationStatus;
+  /** Set when a signed-in customer registered — sign-ups do not require an account */
+  userId: string | null;
+  createdAt: string;
 }
 
 export interface AdminDailyStatDto {

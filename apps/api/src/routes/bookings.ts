@@ -7,7 +7,7 @@ import {
   isValidBookingWindow,
   MAX_ORDER_ITEM_QUANTITY,
   MAX_SPORT_CARDS_PER_BOOKING,
-  spotPriceGrosz,
+  hourlyRateGrosz,
   MAX_SPOT_ID
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
@@ -85,7 +85,8 @@ export function bookingRoutes(app: AppInstance) {
       if (customerPhone === null) {
         return reply.code(422).send({ error: 'invalid_phone' });
       }
-      if (!isValidBookingWindow(date, startHour, durationHours)) {
+      const { rates, hours } = await app.venueConfig.get();
+      if (!isValidBookingWindow(date, startHour, durationHours, hours)) {
         return reply.code(422).send({ error: 'outside_operating_hours' });
       }
 
@@ -102,7 +103,9 @@ export function bookingRoutes(app: AppInstance) {
       // Optional sign-in: guests book exactly the same way, discounts included —
       // the cards belong to the players at the spot, not to an account
       const user = await app.authenticatedUser(request);
-      const discountGrosz = discountGroszFor(sportCardCount, spotPriceGrosz(spot, durationHours));
+      // Locked onto the row: a later reprice must not rewrite this receipt
+      const hourlyRateGroszNow = hourlyRateGrosz(spot, rates);
+      const discountGrosz = discountGroszFor(sportCardCount, hourlyRateGroszNow * durationHours);
 
       try {
         const bookingId = await app.db.transaction(async tx => {
@@ -116,6 +119,7 @@ export function bookingRoutes(app: AppInstance) {
               endsAt,
               userId: user?.id ?? null,
               sportCardCount,
+              hourlyRateGrosz: hourlyRateGroszNow,
               discountGrosz
             })
             .returning({ id: bookings.id });
@@ -216,21 +220,23 @@ export function bookingRoutes(app: AppInstance) {
 
       const newEndsAt = new Date(booking.endsAt.getTime() + request.body.additionalHours * HOUR_MS);
       const bookingDate = warsawDateOf(booking.startsAt);
-      const closesAt = warsawInstant(bookingDate, hoursForDate(bookingDate).close);
+      const { hours } = await app.venueConfig.get();
+      const closesAt = warsawInstant(bookingDate, hoursForDate(bookingDate, hours).close);
       if (newEndsAt.getTime() > closesAt.getTime()) {
         return reply.code(422).send({ error: 'past_closing_time' });
       }
 
       // The discount is capped by the rental, so a longer rental can uncap it
       // (three cards on one darts hour were clipped to 30 zł; at two hours the
-      // full 45 zł applies) — recompute against the new duration.
-      const [spot] = await app.db.select().from(tables).where(eq(tables.id, booking.tableId));
+      // full 45 zł applies) — recompute against the new duration, at the rate
+      // this booking was written at rather than today's.
       const newDurationHours = Math.round(
         (newEndsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
       );
-      const discountGrosz = spot
-        ? discountGroszFor(booking.sportCardCount, spotPriceGrosz(spot, newDurationHours))
-        : booking.discountGrosz;
+      const discountGrosz = discountGroszFor(
+        booking.sportCardCount,
+        booking.hourlyRateGrosz * newDurationHours
+      );
 
       try {
         await app.db

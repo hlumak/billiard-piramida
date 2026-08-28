@@ -17,6 +17,18 @@ export const tablesQuery = () =>
     staleTime: 60 * 60_000
   });
 
+/**
+ * Rates and opening hours. Loaded once in the root route so every screen can
+ * read it synchronously from the cache; staff changes are rare, so it is stale
+ * only briefly and never gates a decision the server does not re-check.
+ */
+export const venueConfigQuery = () =>
+  queryOptions({
+    queryKey: ['venue-config'],
+    queryFn: ({ signal }) => api.venueConfig(signal),
+    staleTime: 10 * 60_000
+  });
+
 export const menuQuery = (locale: string) =>
   queryOptions({
     queryKey: ['menu', locale],
@@ -30,6 +42,21 @@ export const newsQuery = (locale: string) =>
     queryKey: ['news', locale],
     queryFn: ({ signal }) => api.news(locale, signal),
     staleTime: 5 * 60_000
+  });
+
+/** Tournament announcements. Shorter than news: the seat counter moves. */
+export const tournamentsQuery = (locale: string) =>
+  queryOptions({
+    queryKey: ['tournaments', locale],
+    queryFn: ({ signal }) => api.tournaments(locale, signal),
+    staleTime: 60_000
+  });
+
+export const tournamentQuery = (slug: string, locale: string) =>
+  queryOptions({
+    queryKey: ['tournament', slug, locale],
+    queryFn: ({ signal }) => api.tournament(slug, locale, signal),
+    staleTime: 60_000
   });
 
 export const bookingQuery = (id: string) =>

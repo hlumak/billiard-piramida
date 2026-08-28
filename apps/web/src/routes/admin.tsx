@@ -12,6 +12,8 @@ import { AdminNews } from '../components/admin/AdminNews';
 import { AdminOverview } from '../components/admin/AdminOverview';
 import { AdminSchedule } from '../components/admin/AdminSchedule';
 import { AdminStats } from '../components/admin/AdminStats';
+import { AdminTournaments } from '../components/admin/AdminTournaments';
+import { AdminVenueConfig } from '../components/admin/AdminVenueConfig';
 import { adminApi, adminAuthFlag } from '../lib/admin-api';
 import { ApiError } from '../lib/api';
 import { useFlagCookie, useIsHydrated } from '../lib/hydration';
@@ -30,7 +32,9 @@ const TABS = [
   { id: 'bookings', label: m.admin_tab_bookings },
   { id: 'customers', label: m.admin_tab_customers },
   { id: 'menu', label: m.admin_tab_menu },
-  { id: 'news', label: m.admin_tab_news }
+  { id: 'news', label: m.admin_tab_news },
+  { id: 'tournaments', label: m.admin_tab_tournaments },
+  { id: 'settings', label: m.admin_tab_settings }
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -91,7 +95,7 @@ function AdminPage() {
         ) : (
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div role="tablist" className="flex gap-2">
+              <div role="tablist" className="flex flex-wrap gap-2">
                 {TABS.map(entry => (
                   <button
                     key={entry.id}
@@ -130,6 +134,8 @@ function AdminPage() {
               ) : null}
               {tab === 'menu' ? <AdminMenu /> : null}
               {tab === 'news' ? <AdminNews /> : null}
+              {tab === 'tournaments' ? <AdminTournaments /> : null}
+              {tab === 'settings' ? <AdminVenueConfig /> : null}
             </div>
           </div>
         )}

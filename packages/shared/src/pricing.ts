@@ -10,12 +10,22 @@ import { sizeOf, type TableSize } from './venue.ts';
  */
 export type RateTier = TableSize | 'darts';
 
-/** Hourly rate per rate tier. */
-export const HOURLY_RATE_GROSZ = {
+/** What each rate tier bills per hour, in grosze. */
+export type RateTable = Record<RateTier, number>;
+
+/**
+ * The rates the club opened with. These are only the seed for `venue_rates` and
+ * a display-side fallback — the database row is the price a booking is written
+ * at, so the owner can reprice without a deploy.
+ */
+export const DEFAULT_HOURLY_RATE_GROSZ: RateTable = {
   '9ft': 50_00,
   '12ft': 70_00,
   darts: 30_00
-} as const satisfies Record<RateTier, number>;
+};
+
+/** Ceiling on an hourly rate, in grosze — bounds the admin schema. */
+export const MAX_HOURLY_RATE_GROSZ = 1_000_00;
 
 /** Max quantity per order line (the API rejects more; the UI caps at this). */
 export const MAX_ORDER_ITEM_QUANTITY = 50;
@@ -38,12 +48,12 @@ export function rateTierOf(spot: SpotRef): RateTier {
   return sizeOf(spot.id) ?? '9ft';
 }
 
-export function hourlyRateGrosz(spot: SpotRef): number {
-  return HOURLY_RATE_GROSZ[rateTierOf(spot)];
+export function hourlyRateGrosz(spot: SpotRef, rates: RateTable): number {
+  return rates[rateTierOf(spot)];
 }
 
-export function spotPriceGrosz(spot: SpotRef, durationHours: number): number {
-  return durationHours * hourlyRateGrosz(spot);
+export function spotPriceGrosz(spot: SpotRef, durationHours: number, rates: RateTable): number {
+  return durationHours * hourlyRateGrosz(spot, rates);
 }
 
 /**

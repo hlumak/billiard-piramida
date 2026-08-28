@@ -20,6 +20,7 @@ import { formatDayLong, formatHour, intlTag } from '../../lib/format';
 import { availabilityQuery, bookingQuery, menuQuery } from '../../lib/queries';
 import { rememberBooking } from '../../lib/recent-bookings';
 import { profileQuery } from '../../lib/auth';
+import { useVenueConfig } from '../../lib/venue-config';
 import { Link } from '@tanstack/react-router';
 import { spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { SportCardPicker } from './SportCardPicker';
@@ -52,7 +53,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
   const spot = { id: draft.tableId, kind: draft.kind };
   const tableSize = sizeOf(draft.tableId);
-  const tableTotal = spotPriceGrosz(spot, draft.durationHours);
+  const tableTotal = spotPriceGrosz(spot, draft.durationHours, useVenueConfig().rates);
   const foodTotal = orderLines.reduce((sum, line) => sum + line.item.priceGrosz * line.quantity, 0);
   // Preview only — the server recomputes and locks the discount in
   const discount = discountGroszFor(sportCardCount, tableTotal);

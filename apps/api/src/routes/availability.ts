@@ -24,7 +24,7 @@ export function availabilityRoutes(app: AppInstance) {
         return reply.code(400).send({ error: 'invalid_date' });
       }
 
-      const { open, close } = hoursForDate(date);
+      const { open, close } = hoursForDate(date, (await app.venueConfig.get()).hours);
       const dayStart = warsawInstant(date, open);
       const dayEnd = warsawInstant(date, close);
       const now = new Date();

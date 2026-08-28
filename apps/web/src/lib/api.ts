@@ -5,7 +5,11 @@ import type {
   MenuItemDto,
   NewOrderItem,
   NewsItemDto,
-  TableDto
+  TableDto,
+  TournamentDto,
+  TournamentRegistrationInput,
+  TournamentRegistrationResultDto,
+  VenueConfigDto
 } from '@repo/shared';
 
 /**
@@ -95,10 +99,23 @@ export const api = {
   tables: (signal?: AbortSignal) => request<TableDto[]>('/api/tables', { signal }),
   availability: (date: string, signal?: AbortSignal) =>
     request<AvailabilityDto>(`/api/availability?date=${date}`, { signal }),
+  venueConfig: (signal?: AbortSignal) => request<VenueConfigDto>('/api/venue-config', { signal }),
   menu: (locale: string, signal?: AbortSignal) =>
     request<MenuItemDto[]>(`/api/menu?locale=${locale}`, { signal }),
   news: (locale: string, signal?: AbortSignal) =>
     request<NewsItemDto[]>(`/api/news?locale=${locale}`, { signal }),
+  tournaments: (locale: string, signal?: AbortSignal) =>
+    request<TournamentDto[]>(`/api/tournaments?locale=${locale}`, { signal }),
+  tournament: (slug: string, locale: string, signal?: AbortSignal) =>
+    request<TournamentDto>(`/api/tournaments/${encodeURIComponent(slug)}?locale=${locale}`, {
+      signal
+    }),
+  // Holds a seat; the entry fee is still paid at the reception desk
+  registerForTournament: (slug: string, locale: string, input: TournamentRegistrationInput) =>
+    request<TournamentRegistrationResultDto>(
+      `/api/tournaments/${encodeURIComponent(slug)}/register?locale=${locale}`,
+      { method: 'POST', body: input }
+    ),
   booking: (id: string, signal?: AbortSignal) =>
     request<BookingDto>(`/api/bookings/${id}`, { signal }),
   lookupBookings: (phone: string, signal?: AbortSignal) =>

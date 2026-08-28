@@ -5,13 +5,25 @@ import { StaggerGroup, StaggerItem } from '../components/motion';
 import { m } from '../paraglide/messages.js';
 import { pageMeta } from '../lib/seo';
 import { VENUE, VENUE_ADDRESS } from '../lib/venue';
+import { formatHour, weekdayName } from '../lib/format';
+import { groupWeeklyHours, useVenueConfig } from '../lib/venue-config';
 
 export const Route = createFileRoute('/contacts')({
   head: () => ({ meta: pageMeta(m.seo_title_contacts(), m.seo_desc_contacts()) }),
   component: ContactsPage
 });
 
+/** "понеділок" for one day, "понеділок–четвер" for a run. */
+function dayRangeLabel(weekdays: number[]): string {
+  const first = weekdays[0];
+  const last = weekdays.at(-1);
+  if (first === undefined || last === undefined) return '';
+  return first === last ? weekdayName(first) : `${weekdayName(first)}–${weekdayName(last)}`;
+}
+
 function ContactsPage() {
+  const { hours } = useVenueConfig();
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-3xl">
       <PageHeader title="contacts" />
@@ -40,19 +52,20 @@ function ContactsPage() {
 
           <StaggerItem className="rounded-[10px] bg-club-green-light p-4">
             <p className="mb-2 font-semibold text-golden">{m.opening_hours()}</p>
+            {/* Rows come from the live config, so an owner who moves a closing
+                time does not leave this card advertising the old one. Adjacent
+                days with matching hours collapse into one range. */}
             <dl className="flex flex-col gap-1 text-sm text-creme">
-              <div className="flex justify-between">
-                <dt className="text-grey-cool">{m.days_mon_thu()}</dt>
-                <dd>16:00–21:00</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-grey-cool">{m.day_fri()}</dt>
-                <dd>16:00–23:00</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-grey-cool">{m.days_sat_sun()}</dt>
-                <dd>15:00–23:00</dd>
-              </div>
+              {groupWeeklyHours(hours).map(group => (
+                <div key={group.weekdays.join('-')} className="flex justify-between gap-3">
+                  <dt className="capitalize text-grey-cool">{dayRangeLabel(group.weekdays)}</dt>
+                  <dd>
+                    {group.closed
+                      ? m.hours_closed()
+                      : `${formatHour(group.hours.open)}–${formatHour(group.hours.close)}`}
+                  </dd>
+                </div>
+              ))}
             </dl>
           </StaggerItem>
         </StaggerGroup>

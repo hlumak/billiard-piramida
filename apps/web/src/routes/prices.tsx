@@ -1,7 +1,7 @@
 import { Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { HOURLY_RATE_GROSZ, SPORT_CARD_DISCOUNT_GROSZ, formatPln } from '@repo/shared';
+import { SPORT_CARD_DISCOUNT_GROSZ, formatPln } from '@repo/shared';
 import { PageHeader } from '../components/AppHeader';
 import { PartnerCardLogos } from '../components/PartnerCardLogos';
 import { QueryError } from '../components/QueryError';
@@ -9,6 +9,7 @@ import { Reveal, StaggerGroup, StaggerItem } from '../components/motion';
 import { intlTag } from '../lib/format';
 import { categoryLabel, groupMenu } from '../lib/menu';
 import { menuQuery } from '../lib/queries';
+import { useVenueConfig } from '../lib/venue-config';
 import { m } from '../paraglide/messages.js';
 import { pageMeta } from '../lib/seo';
 import { getLocale } from '../paraglide/runtime.js';
@@ -22,6 +23,7 @@ export const Route = createFileRoute('/prices')({
 
 function PricesPage() {
   const { data: menu, isPending, isError, refetch } = useQuery(menuQuery(getLocale()));
+  const { rates } = useVenueConfig();
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
@@ -50,7 +52,7 @@ function PricesPage() {
                 <p className="text-xs text-grey-cool">{m.min_booking_note()}</p>
               </div>
               <p className="text-lg font-bold text-golden">
-                {formatPln(HOURLY_RATE_GROSZ[tier], intlTag())}{' '}
+                {formatPln(rates[tier], intlTag())}{' '}
                 <span className="text-sm font-medium text-creme/80">/ {m.per_hour()}</span>
               </p>
             </div>

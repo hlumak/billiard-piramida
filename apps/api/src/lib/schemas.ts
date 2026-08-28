@@ -1,10 +1,13 @@
 import { Type, type Static } from '@sinclair/typebox';
+import { MAX_HOURLY_RATE_GROSZ } from '@repo/shared';
 import type {
   AdminAnalyticsDto,
   AdminCustomerDto,
   AdminMenuItemDto,
   AdminNewsItemDto,
   AdminStatsDto,
+  AdminTournamentDto,
+  AdminTournamentRegistrationDto,
   AuthResponseDto,
   AvailabilityDto,
   BookingDto,
@@ -12,7 +15,10 @@ import type {
   MenuItemDto,
   NewsItemDto,
   TableDto,
-  UserProfileDto
+  TournamentDto,
+  TournamentRegistrationResultDto,
+  UserProfileDto,
+  VenueConfigDto
 } from '@repo/shared';
 
 /**
@@ -53,6 +59,33 @@ export const AVAILABILITY_RESPONSE = Type.Object({
       )
     })
   )
+});
+
+export const DAY_HOURS = Type.Object({
+  open: Type.Integer({ minimum: 0, maximum: 24 }),
+  close: Type.Integer({ minimum: 0, maximum: 24 })
+});
+
+/** Exactly seven, index = JS weekday, so the tuple mirrors `WeeklyHours`. */
+export const WEEKLY_HOURS = Type.Tuple([
+  DAY_HOURS,
+  DAY_HOURS,
+  DAY_HOURS,
+  DAY_HOURS,
+  DAY_HOURS,
+  DAY_HOURS,
+  DAY_HOURS
+]);
+
+export const RATE_TABLE = Type.Object({
+  '9ft': Type.Integer({ minimum: 0, maximum: MAX_HOURLY_RATE_GROSZ }),
+  '12ft': Type.Integer({ minimum: 0, maximum: MAX_HOURLY_RATE_GROSZ }),
+  darts: Type.Integer({ minimum: 0, maximum: MAX_HOURLY_RATE_GROSZ })
+});
+
+export const VENUE_CONFIG_RESPONSE = Type.Object({
+  rates: RATE_TABLE,
+  hours: WEEKLY_HOURS
 });
 
 export const MENU_ITEM_RESPONSE = Type.Object({
@@ -138,6 +171,79 @@ export const ADMIN_NEWS_ITEM_RESPONSE = Type.Object({
   isPublished: Type.Boolean(),
   sortOrder: Type.Integer(),
   translations: Type.Array(NEWS_TRANSLATION)
+});
+
+/* Tournaments. The literal unions are spelled out rather than mapped from the
+ * shared tuples: TypeBox only carries a precise static type through explicit
+ * Type.Literal members, and the drift guards below are what keep them honest. */
+export const TOURNAMENT_STATUS = Type.Union([
+  Type.Literal('draft'),
+  Type.Literal('registration'),
+  Type.Literal('closed'),
+  Type.Literal('completed'),
+  Type.Literal('cancelled')
+]);
+
+export const TOURNAMENT_REGISTRATION_STATUS = Type.Union([
+  Type.Literal('pending'),
+  Type.Literal('confirmed'),
+  Type.Literal('cancelled')
+]);
+
+export const TOURNAMENT_REGISTRATION_STATE = Type.Union([
+  Type.Literal('open'),
+  Type.Literal('full'),
+  Type.Literal('deadline_passed'),
+  Type.Literal('closed'),
+  Type.Literal('completed'),
+  Type.Literal('cancelled')
+]);
+
+export const TOURNAMENT_RESPONSE = Type.Object({
+  id: Type.Integer(),
+  slug: Type.String(),
+  title: Type.String(),
+  summary: Type.Union([Type.String(), Type.Null()]),
+  details: Type.Union([Type.String(), Type.Null()]),
+  imageUrl: Type.Union([Type.String(), Type.Null()]),
+  status: TOURNAMENT_STATUS,
+  startsOn: Type.Union([ISO_DATE, Type.Null()]),
+  startHour: Type.Union([Type.Integer(), Type.Null()]),
+  registrationDeadline: Type.Union([ISO_DATE, Type.Null()]),
+  entryFeeGrosz: Type.Union([Type.Integer(), Type.Null()]),
+  minPlayers: Type.Integer(),
+  maxPlayers: Type.Union([Type.Integer(), Type.Null()]),
+  confirmedCount: Type.Integer(),
+  pendingCount: Type.Integer(),
+  registrationState: TOURNAMENT_REGISTRATION_STATE
+});
+
+export const TOURNAMENT_REGISTRATION_RESULT = Type.Object({
+  status: TOURNAMENT_REGISTRATION_STATUS,
+  tournament: TOURNAMENT_RESPONSE
+});
+
+export const TOURNAMENT_TRANSLATION = Type.Object({
+  locale: LOCALE_SCHEMA,
+  title: Type.String(),
+  summary: Type.Union([Type.String(), Type.Null()]),
+  details: Type.Union([Type.String(), Type.Null()])
+});
+
+export const ADMIN_TOURNAMENT_RESPONSE = Type.Object({
+  ...TOURNAMENT_RESPONSE.properties,
+  translations: Type.Array(TOURNAMENT_TRANSLATION)
+});
+
+/** Names and phones live here and nowhere else — the public DTO carries counts only. */
+export const ADMIN_TOURNAMENT_REGISTRATION_RESPONSE = Type.Object({
+  id: Type.String(),
+  tournamentId: Type.Integer(),
+  name: Type.String(),
+  phone: Type.String(),
+  status: TOURNAMENT_REGISTRATION_STATUS,
+  userId: Type.Union([Type.String(), Type.Null()]),
+  createdAt: Type.String()
 });
 
 export const ADMIN_ANALYTICS_RESPONSE = Type.Object({
@@ -226,5 +332,12 @@ export type SchemaDriftChecks = [
   Expect<Equals<Static<typeof ADMIN_ANALYTICS_RESPONSE>, AdminAnalyticsDto>>,
   Expect<Equals<Static<typeof ADMIN_MENU_ITEM_RESPONSE>, AdminMenuItemDto>>,
   Expect<Equals<Static<typeof NEWS_ITEM_RESPONSE>, NewsItemDto>>,
-  Expect<Equals<Static<typeof ADMIN_NEWS_ITEM_RESPONSE>, AdminNewsItemDto>>
+  Expect<Equals<Static<typeof ADMIN_NEWS_ITEM_RESPONSE>, AdminNewsItemDto>>,
+  Expect<Equals<Static<typeof VENUE_CONFIG_RESPONSE>, VenueConfigDto>>,
+  Expect<Equals<Static<typeof TOURNAMENT_RESPONSE>, TournamentDto>>,
+  Expect<Equals<Static<typeof TOURNAMENT_REGISTRATION_RESULT>, TournamentRegistrationResultDto>>,
+  Expect<Equals<Static<typeof ADMIN_TOURNAMENT_RESPONSE>, AdminTournamentDto>>,
+  Expect<
+    Equals<Static<typeof ADMIN_TOURNAMENT_REGISTRATION_RESPONSE>, AdminTournamentRegistrationDto>
+  >
 ];

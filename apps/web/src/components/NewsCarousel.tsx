@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { isExternalUrl, type NewsItemDto } from '@repo/shared';
-import { newsQuery } from '../lib/queries';
+import { isExternalUrl, type NewsItemDto, type TournamentDto } from '@repo/shared';
+import { newsQuery, tournamentsQuery } from '../lib/queries';
+import { TournamentCardBody } from './TournamentCard';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
@@ -53,19 +54,53 @@ function NewsCard({ item }: { item: NewsItemDto }) {
   );
 }
 
+/** Tournaments taking sign-ups lead the carousel — the card is the way in. */
+function TournamentSlide({ tournament }: { tournament: TournamentDto }) {
+  return (
+    <Link
+      to="/tournaments/$slug"
+      params={{ slug: tournament.slug }}
+      className={`${CARD} transition-colors hover:ring-golden/60`}
+    >
+      <TournamentCardBody tournament={tournament} />
+    </Link>
+  );
+}
+
 /**
  * Home-screen news, one card per view. The track is a scroll-snap container, so
  * swiping is the browser's own (no gesture library, no dependency): dots and
  * arrows just scroll it, and the active dot is read back from scroll position —
  * which keeps them honest during a swipe the JS never initiated.
  *
- * Renders nothing when there is no news, and deliberately shows no error state:
- * a failed /api/news must not intrude on the first screen every customer sees.
+ * Open tournaments ride in front of the staff-authored cards: a sign-up that
+ * closes on a date is the one thing here with a deadline.
+ *
+ * Renders nothing when there is nothing to show, and deliberately shows no
+ * error state: a failed feed must not intrude on the first screen every
+ * customer sees.
  */
 export function NewsCarousel({ className }: { className?: string | undefined }) {
-  const { data } = useQuery(newsQuery(getLocale()));
-  const items = data ?? [];
-  const count = items.length;
+  const locale = getLocale();
+  const { data: news } = useQuery(newsQuery(locale));
+  const { data: tournaments } = useQuery(tournamentsQuery(locale));
+
+  // Only tournaments still taking sign-ups earn a slot on the landing page;
+  // finished and cancelled ones live on /tournaments.
+  const slides = [
+    ...(tournaments ?? []).flatMap(tournament =>
+      tournament.registrationState === 'open'
+        ? [
+            {
+              key: `tournament-${tournament.id}`,
+              node: <TournamentSlide tournament={tournament} />
+            }
+          ]
+        : []
+    ),
+    ...(news ?? []).map(item => ({ key: `news-${item.id}`, node: <NewsCard item={item} /> }))
+  ];
+  const count = slides.length;
   const trackRef = useRef<HTMLUListElement>(null);
   const [active, setActive] = useState(0);
   // Read by the auto-advance timer, which must not restart on every scroll tick
@@ -144,14 +179,14 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
           onScroll={handleScroll}
           className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
-          {items.map((item, index) => (
+          {slides.map((slide, index) => (
             <li
-              key={item.id}
+              key={slide.key}
               aria-roledescription="slide"
               aria-label={m.news_position({ n: index + 1, total: count })}
               className="w-full shrink-0 snap-center"
             >
-              <NewsCard item={item} />
+              {slide.node}
             </li>
           ))}
         </ul>
@@ -180,9 +215,9 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
 
       {count > 1 ? (
         <div role="group" aria-label={m.news_title()} className="mt-1 flex justify-center">
-          {items.map((item, index) => (
+          {slides.map((slide, index) => (
             <button
-              key={item.id}
+              key={slide.key}
               type="button"
               aria-label={m.news_go_to({ n: index + 1 })}
               aria-current={index === active}

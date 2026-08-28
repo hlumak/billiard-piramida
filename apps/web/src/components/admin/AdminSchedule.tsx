@@ -3,6 +3,7 @@ import { Button, Spinner } from '@heroui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { hoursForDate, type BookingDto, type IsoDate, type TableDto } from '@repo/shared';
+import { useVenueConfig } from '../../lib/venue-config';
 import { formatPhone } from '@repo/shared/phone';
 import { adminBookingsQuery } from '../../lib/admin-api';
 import { tablesQuery } from '../../lib/queries';
@@ -12,7 +13,7 @@ import { addDays, formatDayLong, formatHour, warsawHour, warsawToday } from '../
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { AdminDatePicker } from './AdminDatePicker';
-import { AdminNewBookingModal, type NewBookingPrefill } from './AdminNewBooking';
+import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
 
 /** (tableId, hour) → the confirmed booking covering that hour. Bookings are
  *  hour-aligned and never cross midnight (close is 23 at the latest). */
@@ -139,7 +140,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
 
   const today = warsawToday();
   const nowHour = date === today ? warsawHour(new Date()) : null;
-  const { open, close } = hoursForDate(date);
+  const { open, close } = hoursForDate(date, useVenueConfig().hours);
   const hours = Array.from({ length: close - open }, (_, i) => open + i);
   const occupancy = occupancyOf(bookings ?? []);
 
@@ -237,7 +238,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
       </div>
 
       {prefill ? (
-        <AdminNewBookingModal
+        <AdminBookingModal
           key={`${prefill.date}:${prefill.startHour}:${prefill.tableId}`}
           isOpen={creating}
           onOpenChange={setCreating}

@@ -10,6 +10,7 @@ import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyError } from 'fastify';
 import { createDb, type Db } from './db/client.ts';
 import { AvailabilityHub } from './lib/availability-hub.ts';
+import { VenueConfigStore } from './services/venue-config.ts';
 import { ERROR_RESPONSE } from './lib/schemas.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
@@ -21,12 +22,16 @@ import type { FastifyRequest } from 'fastify';
 import { bookingRoutes } from './routes/bookings.ts';
 import { menuRoutes } from './routes/menu.ts';
 import { newsRoutes } from './routes/news.ts';
+import { venueConfigRoutes } from './routes/venue-config.ts';
 import { tableRoutes } from './routes/tables.ts';
+import { tournamentRoutes } from './routes/tournaments.ts';
 
 declare module 'fastify' {
   interface FastifyInstance {
     db: Db;
     availabilityHub: AvailabilityHub;
+    /** Staff-editable rates and opening hours, cached — see VenueConfigStore */
+    venueConfig: VenueConfigStore;
     /** Secure flag for auth cookies (true in prod/https). */
     cookieSecure: boolean;
     /** Resolves the signed-in user from the JWT (Authorization header or cookie), or null. */
@@ -45,6 +50,13 @@ export interface AppOptions {
   jwtSecret?: string | undefined;
   /** Secure flag on auth cookies — on in prod (https), off in dev (http). */
   cookieSecure?: boolean | undefined;
+  /**
+   * Global per-IP request ceiling per minute. Routes that set their own
+   * `config.rateLimit` are unaffected. Tests raise it because Fastify's
+   * `inject` gives every request the same source address, so the whole suite
+   * shares one bucket that a real client never would.
+   */
+  rateLimitMax?: number | undefined;
 }
 
 export async function buildApp({
@@ -53,7 +65,8 @@ export async function buildApp({
   allowedOrigins,
   adminToken,
   jwtSecret,
-  cookieSecure = false
+  cookieSecure = false,
+  rateLimitMax = 100
 }: AppOptions) {
   const app = Fastify({
     logger:
@@ -73,6 +86,7 @@ export async function buildApp({
   pool.on('error', err => app.log.error({ err }, 'idle postgres client error'));
   app.decorate('db', db);
   app.decorate('availabilityHub', new AvailabilityHub());
+  app.decorate('venueConfig', new VenueConfigStore(db));
   app.decorate('cookieSecure', cookieSecure);
   app.addHook('onClose', async () => {
     await pool.end();
@@ -89,7 +103,7 @@ export async function buildApp({
     credentials: true
   });
   await app.register(rateLimit, {
-    max: 100,
+    max: rateLimitMax,
     timeWindow: '1 minute'
   });
   await app.register(websocket, {
@@ -160,9 +174,11 @@ export async function buildApp({
   );
 
   tableRoutes(app);
+  venueConfigRoutes(app);
   availabilityRoutes(app);
   menuRoutes(app);
   newsRoutes(app);
+  tournamentRoutes(app);
   bookingRoutes(app);
   liveRoutes(app);
   authRoutes(app, jwtSecret !== undefined);
