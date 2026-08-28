@@ -29,10 +29,10 @@
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/react-store": "latest",
-    "lucide-react": "^1.32.0",
+    "lucide-react": "^1.34.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "srvx": "^0.12.5",
+    "srvx": "^0.12.7",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
@@ -40,16 +40,16 @@
     "@tailwindcss/typography": "^0.5.20",
     "@tanstack/devtools-event-client": "latest",
     "@tanstack/devtools-vite": "latest",
-    "@tanstack/router-cli": "^1.167.31",
+    "@tanstack/router-cli": "^1.167.33",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
     "jsdom": "^30.0.1",
     "typescript": "^7.0.2",
-    "vite": "^8.2.1",
+    "vite": "^8.2.2",
     "vitest": "^4.1.11"
   }
 }
