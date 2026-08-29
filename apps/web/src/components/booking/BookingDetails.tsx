@@ -3,7 +3,7 @@ import { formatPln, hoursForDate, type BookingDto } from '@repo/shared';
 import { useVenueConfig } from '../../lib/venue-config';
 import { formatDayLong, intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
-import { spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
+import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { StaggerGroup, StaggerItem } from '../motion';
@@ -61,6 +61,14 @@ export function BookingDetails({
             <dt className="text-grey-cool">{spotSummaryLabel(booking.kind)}</dt>
             <dd>{spotName(booking.kind, booking.tableLabel)}</dd>
           </div>
+          {/* Absent on a dartboard, and on rentals taken before the club began
+              recording it — either way there is nothing truthful to show. */}
+          {booking.game ? (
+            <div className="flex justify-between">
+              <dt className="text-grey-cool">{m.game_label()}</dt>
+              <dd>{gameName(booking.game)}</dd>
+            </div>
+          ) : null}
           <div className="flex justify-between">
             <dt className="text-grey-cool">{m.name_label()}</dt>
             <dd>{booking.customerName}</dd>

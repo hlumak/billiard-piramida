@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -10,9 +10,11 @@ import { getLocale } from '../paraglide/runtime.js';
 
 const AUTO_ADVANCE_MS = 6_000;
 
-// Sits on the hero photo, so the panel needs enough body to keep copy readable
+// Sits on the hero photo, so the panel needs enough body to keep copy readable.
+// Height is the card's own: a two-line news item must not be stretched to the
+// height of a tournament card and end in a slab of empty green.
 const CARD =
-  'block h-full overflow-hidden rounded-[10px] bg-club-green/90 ring-1 ring-golden/25 backdrop-blur-sm';
+  'block w-full overflow-hidden rounded-[10px] bg-club-green/90 ring-1 ring-golden/25 backdrop-blur-sm';
 
 function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -103,6 +105,9 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
   const count = slides.length;
   const trackRef = useRef<HTMLUListElement>(null);
   const [active, setActive] = useState(0);
+  // Which way the dot indicator travels — the edge that leads the move is the
+  // one that starts first, and that is what makes the pill stretch
+  const [forward, setForward] = useState(true);
   // Read by the auto-advance timer, which must not restart on every scroll tick
   const activeRef = useRef(0);
   const [paused, setPaused] = useState(false);
@@ -137,6 +142,7 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
           nearest = index;
         }
       }
+      if (nearest !== activeRef.current) setForward(nearest > activeRef.current);
       activeRef.current = nearest;
       setActive(nearest);
     });
@@ -184,7 +190,9 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
               key={slide.key}
               aria-roledescription="slide"
               aria-label={m.news_position({ n: index + 1, total: count })}
-              className="w-full shrink-0 snap-center"
+              // The track keeps the tallest slide's height so the hero never
+              // reflows mid-rotation; a shorter card floats centred in it
+              className="flex w-full shrink-0 snap-center items-center"
             >
               {slide.node}
             </li>
@@ -214,24 +222,37 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
       </div>
 
       {count > 1 ? (
-        <div role="group" aria-label={m.news_title()} className="mt-1 flex justify-center">
-          {slides.map((slide, index) => (
-            <button
-              key={slide.key}
-              type="button"
-              aria-label={m.news_go_to({ n: index + 1 })}
-              aria-current={index === active}
-              onClick={() => scrollToIndex(index)}
-              // Dots read as 6px but the tap target is a full 24px square
-              className="flex size-6 items-center justify-center"
-            >
-              <span
-                className={`h-1.5 rounded-full transition-all ${
-                  index === active ? 'w-5 bg-golden' : 'w-1.5 bg-creme/40'
-                }`}
-              />
-            </button>
-          ))}
+        <div className="mt-1 flex justify-center">
+          <div
+            role="group"
+            aria-label={m.news_title()}
+            className="carousel-dots"
+            style={
+              {
+                '--dot-count': count,
+                '--dot-index': active,
+                // Leading edge leaves at once, trailing edge lags behind: the gap
+                // between them is the stretch
+                '--dot-left-delay': forward ? '90ms' : '0ms',
+                '--dot-right-delay': forward ? '0ms' : '90ms'
+              } as CSSProperties
+            }
+          >
+            <span aria-hidden className="carousel-dot-pill bg-golden" />
+            {slides.map((slide, index) => (
+              <button
+                key={slide.key}
+                type="button"
+                aria-label={m.news_go_to({ n: index + 1 })}
+                aria-current={index === active}
+                onClick={() => scrollToIndex(index)}
+                // Dots read as 6px but the tap target fills the whole 24px slot
+                className="flex size-[var(--dot-slot)] items-center justify-center"
+              >
+                <span className="size-[var(--dot-size)] rounded-full bg-creme/40" />
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
     </section>

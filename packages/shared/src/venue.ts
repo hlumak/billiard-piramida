@@ -1,4 +1,4 @@
-import type { ActivityKind } from './types.ts';
+import type { ActivityKind, BilliardGame } from './types.ts';
 
 /**
  * Cloth size of a billiard table. Hall 1 is all 9-foot, hall 2 all 12-foot, and
@@ -25,20 +25,32 @@ export interface SpotDef {
   hall: 1 | 2;
   /** Billiard only — a dartboard has no size and bills at the flat darts rate. */
   size?: TableSize;
+  /**
+   * Billiard only — the cue games this table is equipped for, most likely
+   * first (that one is what a booking gets when the guest expresses no
+   * preference). Spelled out per table rather than derived from `size`: it is
+   * a fact about how the room is kitted out, so a table that gets pool balls
+   * tomorrow is one edit here, not a rule to rewrite.
+   */
+  games?: readonly BilliardGame[];
 }
 
+/** Hall 1's 9ft tables are racked for either game; hall 2's 12ft are pyramid only. */
+const BOTH_GAMES = ['piramida', 'pool'] as const satisfies readonly BilliardGame[];
+const PIRAMIDA_ONLY = ['piramida'] as const satisfies readonly BilliardGame[];
+
 export const SPOTS = [
-  { id: 1, label: '1', kind: 'billiard', hall: 1, size: '9ft' },
-  { id: 2, label: '2', kind: 'billiard', hall: 1, size: '9ft' },
-  { id: 3, label: '3', kind: 'billiard', hall: 1, size: '9ft' },
-  { id: 4, label: '4', kind: 'billiard', hall: 1, size: '9ft' },
-  { id: 5, label: '5', kind: 'billiard', hall: 1, size: '9ft' },
+  { id: 1, label: '1', kind: 'billiard', hall: 1, size: '9ft', games: BOTH_GAMES },
+  { id: 2, label: '2', kind: 'billiard', hall: 1, size: '9ft', games: BOTH_GAMES },
+  { id: 3, label: '3', kind: 'billiard', hall: 1, size: '9ft', games: BOTH_GAMES },
+  { id: 4, label: '4', kind: 'billiard', hall: 1, size: '9ft', games: BOTH_GAMES },
+  { id: 5, label: '5', kind: 'billiard', hall: 1, size: '9ft', games: BOTH_GAMES },
   { id: 6, label: '1', kind: 'darts', hall: 1 },
   { id: 7, label: '2', kind: 'darts', hall: 1 },
-  { id: 8, label: '6', kind: 'billiard', hall: 2, size: '12ft' },
-  { id: 9, label: '7', kind: 'billiard', hall: 2, size: '12ft' },
-  { id: 10, label: '8', kind: 'billiard', hall: 2, size: '12ft' },
-  { id: 11, label: '9', kind: 'billiard', hall: 2, size: '12ft' }
+  { id: 8, label: '6', kind: 'billiard', hall: 2, size: '12ft', games: PIRAMIDA_ONLY },
+  { id: 9, label: '7', kind: 'billiard', hall: 2, size: '12ft', games: PIRAMIDA_ONLY },
+  { id: 10, label: '8', kind: 'billiard', hall: 2, size: '12ft', games: PIRAMIDA_ONLY },
+  { id: 11, label: '9', kind: 'billiard', hall: 2, size: '12ft', games: PIRAMIDA_ONLY }
 ] as const satisfies readonly SpotDef[];
 
 export const SPOTS_COUNT = SPOTS.length;
@@ -58,4 +70,40 @@ export function sizeOf(spotId: number): TableSize | null {
   // `size` key at all, so the literal union has nothing to read it off.
   const spot: SpotDef | undefined = SPOTS.find(s => s.id === spotId);
   return spot?.size ?? null;
+}
+
+/**
+ * Games this spot can host, most likely first. Empty for a dartboard and for
+ * an unknown id, which is what makes it safe to drive "does this booking need
+ * a game?" straight off the length.
+ */
+export function gamesFor(spotId: number): readonly BilliardGame[] {
+  // Widened to SpotDef for the same reason as sizeOf: the `as const` literals
+  // give the dartboard entries no `games` key for the union to read off.
+  const spot: SpotDef | undefined = SPOTS.find(s => s.id === spotId);
+  return spot?.games ?? [];
+}
+
+/** What a spot gets when the guest expresses no preference. */
+export function defaultGameFor(spotId: number): BilliardGame | null {
+  return gamesFor(spotId)[0] ?? null;
+}
+
+export type GameResolution = { ok: true; game: BilliardGame | null } | { ok: false };
+
+/**
+ * The game to store against a booking on `spotId`. Shared by the public and
+ * the staff create paths, and by the staff edit path, so all three agree on
+ * what a dartboard means (`null`) and on which requests are simply impossible
+ * — asking for pool on a 12ft table, or for any game on a dartboard.
+ */
+export function resolveBookingGame(
+  spotId: number,
+  requested: BilliardGame | undefined
+): GameResolution {
+  const games = gamesFor(spotId);
+  if (games.length === 0) return requested === undefined ? { ok: true, game: null } : { ok: false };
+  const game = requested ?? games[0];
+  if (game === undefined || !games.includes(game)) return { ok: false };
+  return { ok: true, game };
 }

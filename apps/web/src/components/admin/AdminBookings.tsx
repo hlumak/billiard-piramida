@@ -15,6 +15,7 @@ import { intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
+import { gameName } from '../../lib/spots';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
 import { PHASE_LABELS, PHASE_STYLES, mutationErrorText } from '../booking/phase';
@@ -177,6 +178,11 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
                       </span>
                       <span className="text-sm text-grey-cool">
                         {m.table_n({ n: booking.tableId })}
+                        {/* Which balls to rack — the one thing on this row that
+                            is an instruction to the person reading it */}
+                        {booking.game ? (
+                          <span className="ml-1 text-creme">· {gameName(booking.game)}</span>
+                        ) : null}
                       </span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PHASE_STYLES[booking.phase]}`}

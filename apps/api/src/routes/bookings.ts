@@ -10,13 +10,14 @@ import {
   MAX_SPORT_CARDS_PER_BOOKING,
   MIN_BOOKING_HOURS,
   hourlyRateGrosz,
-  MAX_SPOT_ID
+  MAX_SPOT_ID,
+  resolveBookingGame
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, asc, eq, gt } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
-import { BOOKING_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
+import { BILLIARD_GAME, BOOKING_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
 import {
   insertOrderItems,
@@ -58,7 +59,9 @@ const CREATE_BOOKING_BODY = Type.Object(
     sportCardCount: Type.Optional(
       Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })
     ),
-    items: Type.Optional(NEW_ITEMS)
+    items: Type.Optional(NEW_ITEMS),
+    /** Billiard only. Omitted, the spot's first offered game is stored. */
+    game: Type.Optional(BILLIARD_GAME)
   },
   { additionalProperties: false }
 );
@@ -102,6 +105,11 @@ export function bookingRoutes(app: AppInstance) {
       const [spot] = await app.db.select().from(tables).where(eq(tables.id, tableId));
       if (!spot) return reply.code(422).send({ error: 'unknown_table' });
 
+      // Pool on a 12ft table, or any game on a dartboard, is not a thing the
+      // room can serve — reject rather than quietly storing something else.
+      const game = resolveBookingGame(tableId, request.body.game);
+      if (!game.ok) return reply.code(422).send({ error: 'game_not_available' });
+
       // Optional sign-in: guests book exactly the same way, discounts included —
       // the cards belong to the players at the spot, not to an account
       const user = await app.authenticatedUser(request);
@@ -115,6 +123,7 @@ export function bookingRoutes(app: AppInstance) {
             .insert(bookings)
             .values({
               tableId,
+              game: game.game,
               customerName,
               customerPhone,
               startsAt,

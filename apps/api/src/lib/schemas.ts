@@ -35,6 +35,8 @@ export const ERROR_RESPONSE = Type.Object({ error: Type.String() });
 
 export const ACTIVITY_KIND = Type.Union([Type.Literal('billiard'), Type.Literal('darts')]);
 
+export const BILLIARD_GAME = Type.Union([Type.Literal('pool'), Type.Literal('piramida')]);
+
 export const TABLE_RESPONSE = Type.Object({
   id: Type.Integer(),
   label: Type.String(),
@@ -101,6 +103,7 @@ export const BOOKING_RESPONSE = Type.Object({
   id: Type.String(),
   tableId: Type.Integer(),
   kind: ACTIVITY_KIND,
+  game: Type.Union([BILLIARD_GAME, Type.Null()]),
   tableLabel: Type.String(),
   customerName: Type.String(),
   customerPhone: Type.String(),

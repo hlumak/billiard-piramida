@@ -1976,3 +1976,166 @@ test('a day closed in the config takes no bookings', async () => {
     payload: { rates: published.json().rates, hours: week }
   });
 });
+
+test('game choice: 9ft tables take either, 12ft is pyramid-only, dartboards take none', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.40' };
+
+  // Hall 1 is racked for both, so an explicit pool request is honoured
+  const pool = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: 2,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Pool Player',
+      customerPhone: '+48512800100',
+      game: 'pool'
+    }
+  });
+  assert.equal(pool.statusCode, 201);
+  assert.equal(pool.json().game, 'pool');
+  // The game is a note for staff, never a price: 9ft bills 9ft either way
+  assert.equal(pool.json().tableTotalGrosz, BILLIARD_HOUR);
+
+  // Saying nothing leaves the guest with the table's first offered game
+  const implied = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: 3,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'No Preference',
+      customerPhone: '+48512800101'
+    }
+  });
+  assert.equal(implied.statusCode, 201);
+  assert.equal(implied.json().game, 'piramida');
+
+  // Hall 2's cloth has no pool pockets — the request is refused, not coerced
+  const wrongTable = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: TABLE_12FT_ID,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Pool On 12ft',
+      customerPhone: '+48512800102',
+      game: 'pool'
+    }
+  });
+  assert.equal(wrongTable.statusCode, 422);
+  assert.equal(wrongTable.json().error, 'game_not_available');
+
+  // A dartboard has no cue game at all, and none is stored for it
+  const darts = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: DARTBOARD_ID,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Darts Player',
+      customerPhone: '+48512800103'
+    }
+  });
+  assert.equal(darts.statusCode, 201);
+  assert.equal(darts.json().game, null);
+
+  const dartsWithGame = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      tableId: DARTBOARD_ID,
+      date: SATURDAY,
+      startHour: 18,
+      durationHours: 1,
+      customerName: 'Darts Pool',
+      customerPhone: '+48512800104',
+      game: 'pool'
+    }
+  });
+  assert.equal(dartsWithGame.statusCode, 422);
+  assert.equal(dartsWithGame.json().error, 'game_not_available');
+});
+
+test('staff edit the game, and a move to a 12ft table settles it to pyramid', async () => {
+  const headers = staff('198.51.100.41');
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: 4,
+      date: SATURDAY,
+      startHour: 20,
+      durationHours: 1,
+      customerName: 'Walk In',
+      customerPhone: '+48512800200',
+      game: 'pool'
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().game, 'pool');
+  const id = created.json().id;
+
+  // "They actually want pyramid" — the commonest correction
+  const switched = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { game: 'piramida' }
+  });
+  assert.equal(switched.statusCode, 200);
+  assert.equal(switched.json().game, 'piramida');
+
+  // An unrelated edit must not disturb the stored game
+  const backToPool = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { game: 'pool' }
+  });
+  assert.equal(backToPool.json().game, 'pool');
+  const longer = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { durationHours: 2 }
+  });
+  assert.equal(longer.statusCode, 200);
+  assert.equal(longer.json().game, 'pool');
+
+  // Moved to hall 2, where pool cannot be played: the edit goes through and
+  // the game settles to what that table can actually host
+  const moved = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { tableId: TABLE_12FT_ID + 1, startHour: 20 }
+  });
+  assert.equal(moved.statusCode, 200);
+  assert.equal(moved.json().tableId, TABLE_12FT_ID + 1);
+  assert.equal(moved.json().game, 'piramida');
+
+  // Asking outright for pool there is still a refusal, not a silent downgrade
+  const refused = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${id}`,
+    headers,
+    payload: { game: 'pool' }
+  });
+  assert.equal(refused.statusCode, 422);
+  assert.equal(refused.json().error, 'game_not_available');
+});

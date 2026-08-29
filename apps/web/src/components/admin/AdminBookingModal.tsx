@@ -5,8 +5,11 @@ import {
   MAX_BOOKING_HOURS,
   MAX_SPORT_CARDS_PER_BOOKING,
   MIN_BOOKING_HOURS,
+  defaultGameFor,
+  gamesFor,
   maxDurationAt,
   slotStartsForDate,
+  type BilliardGame,
   type BookingDto,
   type IsoDate,
   type TableAvailabilityDto
@@ -16,7 +19,7 @@ import { adminApi } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { formatHour, warsawDate, warsawHour, warsawToday } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
-import { spotName } from '../../lib/spots';
+import { gameName, spotName } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
 import { AdminDatePicker } from './AdminDatePicker';
 import { useVenueConfig } from '../../lib/venue-config';
@@ -45,6 +48,8 @@ interface FormState {
   name: string;
   phone: string;
   sportCards: number;
+  /** Null until a spot is picked, and on dartboards, which rack nothing */
+  game: BilliardGame | null;
 }
 
 type FormAction =
@@ -52,6 +57,7 @@ type FormAction =
   | { type: 'startHour'; startHour: number }
   | { type: 'duration'; duration: number }
   | { type: 'tableId'; tableId: number }
+  | { type: 'game'; game: BilliardGame }
   | { type: 'name'; name: string }
   | { type: 'phone'; phone: string }
   | { type: 'sportCards'; sportCards: number }
@@ -72,7 +78,8 @@ function initialForm({ prefill, booking }: FormSeed): FormState {
       tableId: booking.tableId,
       name: booking.customerName,
       phone: booking.customerPhone,
-      sportCards: booking.sportCardCount
+      sportCards: booking.sportCardCount,
+      game: booking.game
     };
   }
   return {
@@ -82,7 +89,8 @@ function initialForm({ prefill, booking }: FormSeed): FormState {
     tableId: prefill?.tableId ?? null,
     name: '',
     phone: '',
-    sportCards: 0
+    sportCards: 0,
+    game: prefill ? defaultGameFor(prefill.tableId) : null
   };
 }
 
@@ -94,13 +102,16 @@ function initialForm({ prefill, booking }: FormSeed): FormState {
 function formReducer(state: FormState, action: FormAction): FormState {
   switch (action.type) {
     case 'date':
-      return { ...state, date: action.date, startHour: null, tableId: null };
+      return { ...state, date: action.date, startHour: null, tableId: null, game: null };
     case 'startHour':
-      return { ...state, startHour: action.startHour, tableId: null };
+      return { ...state, startHour: action.startHour, tableId: null, game: null };
     case 'duration':
-      return { ...state, duration: action.duration, tableId: null };
+      return { ...state, duration: action.duration, tableId: null, game: null };
+    // The spot decides what can be racked on it, so the game follows it here
     case 'tableId':
-      return { ...state, tableId: action.tableId };
+      return { ...state, tableId: action.tableId, game: defaultGameFor(action.tableId) };
+    case 'game':
+      return { ...state, game: action.game };
     case 'name':
       return { ...state, name: action.name };
     case 'phone':
@@ -110,7 +121,15 @@ function formReducer(state: FormState, action: FormAction): FormState {
     // Date and duration survive so staff can log the next walk-in in the same
     // window; everything tied to the booking just created is cleared.
     case 'created':
-      return { ...state, startHour: null, tableId: null, name: '', phone: '', sportCards: 0 };
+      return {
+        ...state,
+        startHour: null,
+        tableId: null,
+        game: null,
+        name: '',
+        phone: '',
+        sportCards: 0
+      };
   }
 }
 
@@ -168,7 +187,7 @@ export function AdminBookingModal({
   // Remounted by the caller on a prefill/booking change (keyed), so the initial
   // state never needs syncing back from props.
   const [form, dispatch] = useReducer(formReducer, { prefill, booking }, initialForm);
-  const { date, startHour, duration, tableId, name, phone, sportCards } = form;
+  const { date, startHour, duration, tableId, name, phone, sportCards, game } = form;
 
   const { data: availability } = useQuery({ ...availabilityQuery(date), enabled: isOpen });
   const { hours: venueHours } = useVenueConfig();
@@ -192,7 +211,9 @@ export function AdminBookingModal({
         durationHours: effectiveDuration,
         customerName: name.trim(),
         customerPhone: phone.trim(),
-        sportCardCount: sportCards
+        sportCardCount: sportCards,
+        // Left out on a dartboard, which the API refuses a game for
+        ...(game === null ? {} : { game })
       };
       return booking ? adminApi.updateBooking(booking.id, values) : adminApi.createBooking(values);
     },
@@ -318,6 +339,27 @@ export function AdminBookingModal({
                     </div>
                   )}
                 </div>
+
+                {/* Only where the room actually offers a choice — hall 2's 12ft
+                    cloth and the dartboards have nothing to pick between. */}
+                {tableId !== null && gamesFor(tableId).length > 1 ? (
+                  <div>
+                    <p className="mb-2 text-sm text-grey-cool">{m.game_label()}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {gamesFor(tableId).map(option => (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={game === option}
+                          onClick={() => dispatch({ type: 'game', game: option })}
+                          className={chip(game === option, false)}
+                        >
+                          {gameName(option)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div>
                   <p className="mb-2 text-sm text-grey-cool">{m.admin_sport_cards()}</p>

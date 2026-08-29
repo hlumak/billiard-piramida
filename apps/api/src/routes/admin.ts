@@ -13,7 +13,10 @@ import {
   MAX_SPORT_CARDS_PER_BOOKING,
   MAX_SPOT_ID,
   MIN_BOOKING_HOURS,
+  defaultGameFor,
+  resolveBookingGame,
   type AdminAnalyticsDto,
+  type BilliardGame,
   type AdminCustomerDto,
   type AdminStatsDto
 } from '@repo/shared';
@@ -47,6 +50,7 @@ import {
   ADMIN_MENU_ITEM_RESPONSE,
   ADMIN_NEWS_ITEM_RESPONSE,
   ADMIN_STATS_RESPONSE,
+  BILLIARD_GAME,
   BOOKING_RESPONSE,
   ERROR_RESPONSE,
   LOCALE_SCHEMA
@@ -448,7 +452,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
               customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
               sportCardCount: Type.Optional(
                 Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })
-              )
+              ),
+              game: Type.Optional(BILLIARD_GAME)
             },
             { additionalProperties: false }
           ),
@@ -473,6 +478,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
 
         const [spot] = await admin.db.select().from(tables).where(eq(tables.id, tableId));
         if (!spot) return reply.code(422).send({ error: 'unknown_table' });
+        const game = resolveBookingGame(tableId, request.body.game);
+        if (!game.ok) return reply.code(422).send({ error: 'game_not_available' });
         const sportCardCount = request.body.sportCardCount ?? 0;
         const lockedRateGrosz = hourlyRateGrosz(spot, rates);
         const discountGrosz = discountGroszFor(sportCardCount, lockedRateGrosz * durationHours);
@@ -482,6 +489,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
             .insert(bookings)
             .values({
               tableId,
+              game: game.game,
               customerName,
               customerPhone,
               startsAt,
@@ -558,6 +566,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
               sportCardCount: Type.Optional(
                 Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })
               ),
+              game: Type.Optional(BILLIARD_GAME),
               /** Restores a cancelled booking, or cancels one, in the same call */
               status: Type.Optional(
                 Type.Union([Type.Literal('confirmed'), Type.Literal('cancelled')])
@@ -600,6 +609,21 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const [spot] = await admin.db.select().from(tables).where(eq(tables.id, tableId));
         if (!spot) return reply.code(422).send({ error: 'unknown_table' });
 
+        // An explicitly requested game must fit the (possibly new) spot.
+        let game: BilliardGame | null;
+        if (patch.game !== undefined) {
+          const requested = resolveBookingGame(tableId, patch.game);
+          if (!requested.ok) return reply.code(422).send({ error: 'game_not_available' });
+          game = requested.game;
+        } else {
+          // Otherwise the stored game rides along — unless the move lands on a
+          // table that cannot host it, where the table decides. Staff moving a
+          // pool game onto a 12ft table have already made their call; failing
+          // the whole edit over a detail they did not mention would be worse.
+          const carried = resolveBookingGame(tableId, booking.game ?? undefined);
+          game = carried.ok ? carried.game : defaultGameFor(tableId);
+        }
+
         // Moving to a different spot means a different tier, so the rental is
         // re-quoted at today's rate. Staying put keeps the locked rate: making a
         // booking longer must not silently reprice it at a newer one.
@@ -618,6 +642,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
             .update(bookings)
             .set({
               tableId,
+              game,
               startsAt,
               endsAt,
               sportCardCount,

@@ -13,6 +13,10 @@
   --color-deep-cream: #dbdabc;
   --color-club-green: #0b4e31;
   --color-club-green-light: #176b47;
+  /* Sunken ground for the booking wizard: club-green darkened ~35% (sampled
+     from the Figma "pyramida 2" step panel). Dark enough that the
+     club-green-light option buttons read as lifted off it. */
+  --color-club-green-dark: #083220;
   --color-btn-text: #373328;
   --color-grey-warm: #585650;
   /* Secondary text: lightened from #b2b2b2 to clear WCAG AA (4.5:1) on the
@@ -129,6 +133,32 @@ body {
   }
 }
 
+/* Carousel dots: the dots themselves never change — a single golden pill sits on
+   top and travels between them. The edge leading the move starts immediately
+   while the trailing edge is held back, so the pill stretches out of the dot it
+   leaves and contracts into the one it arrives at: the squash belongs to the
+   travel, not to the resting "you are here". All the geometry lives here so the
+   slot width that spaces the dots and the pill's offsets cannot drift apart. */
+.carousel-dots {
+  --dot-slot: 1.5rem;
+  --dot-size: 0.375rem;
+  position: relative;
+  display: flex;
+}
+
+.carousel-dot-pill {
+  position: absolute;
+  top: 50%;
+  height: var(--dot-size);
+  margin-top: calc(var(--dot-size) / -2);
+  border-radius: 9999px;
+  left: calc(var(--dot-index) * var(--dot-slot) + (var(--dot-slot) - var(--dot-size)) / 2);
+  right: calc(
+    (var(--dot-count) - 1 - var(--dot-index)) * var(--dot-slot) +
+      (var(--dot-slot) - var(--dot-size)) / 2
+  );
+}
+
 /* Springy confirmation pop (overshoot ≈ the old stiffness-320 spring) */
 @keyframes pop-in {
   from {
@@ -152,6 +182,12 @@ body {
 
   .anim-pop {
     animation: pop-in 0.35s cubic-bezier(0.34, 1.3, 0.64, 1) backwards;
+  }
+
+  .carousel-dot-pill {
+    transition:
+      left 0.3s cubic-bezier(0.4, 0, 0.2, 1) var(--dot-left-delay),
+      right 0.3s cubic-bezier(0.4, 0, 0.2, 1) var(--dot-right-delay);
   }
 
   .anim-stagger-item {

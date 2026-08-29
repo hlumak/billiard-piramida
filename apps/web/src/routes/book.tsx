@@ -44,7 +44,7 @@ function permittedStep(state: WizardState): WizardStep {
  * so the steps receive non-null props instead of asserting store fields.
  */
 function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) {
-  const { date, startHour, durationHours, tableId, kind, tableLabel } = state;
+  const { date, startHour, durationHours, tableId, kind, tableLabel, game } = state;
   if (step === 'date' || date == null) return <DateStep />;
   if (step === 'time' || startHour == null) return <TimeStep date={date} />;
   // `kind` is written together with `tableId`, so a spot without one can only
@@ -53,7 +53,9 @@ function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) 
     return <TableStep date={date} startHour={startHour} durationHours={durationHours} />;
   }
   if (step === 'food') return <FoodStep />;
-  return <DetailsStep draft={{ date, startHour, durationHours, tableId, kind, tableLabel }} />;
+  return (
+    <DetailsStep draft={{ date, startHour, durationHours, tableId, kind, tableLabel, game }} />
+  );
 }
 
 function BookingWizard() {
@@ -91,12 +93,18 @@ function BookingWizard() {
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="booking" onBack={handleBack} />
       <WizardProgress step={index + 1} total={WIZARD_STEPS.length} />
-      {/* Clip box extends into the page padding so input focus rings aren't shaved off */}
-      <main className="-mx-6 mt-8 flex-1 overflow-x-clip px-6">
-        {/* key remounts the wrapper per step so the CSS slide-in replays;
-            enter-only on purpose — see step-in-* keyframes in styles.css */}
-        <div key={step} className={direction === 1 ? 'anim-step-forward' : 'anim-step-back'}>
-          <CurrentStep state={state} step={step} />
+      <main className="mt-8 flex-1">
+        {/* Every step shares one sunken panel: the darker ground marks off the
+            wizard's working area and gives the club-green-light option buttons
+            something to lift from. It is also the clip box — the step slide-in
+            is contained by the panel rather than by the viewport — and its own
+            padding keeps input focus rings well clear of that clipped edge. */}
+        <div className="overflow-x-clip rounded-3xl bg-club-green-dark p-4 md:p-6">
+          {/* key remounts the wrapper per step so the CSS slide-in replays;
+              enter-only on purpose — see step-in-* keyframes in styles.css */}
+          <div key={step} className={direction === 1 ? 'anim-step-forward' : 'anim-step-back'}>
+            <CurrentStep state={state} step={step} />
+          </div>
         </div>
       </main>
     </div>
