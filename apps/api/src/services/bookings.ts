@@ -87,14 +87,19 @@ export async function toBookingDtos(
   ]);
 
   const spotById = new Map(spots.map(s => [s.id, s]));
+  // Bucketed in one pass rather than re-scanning every order line per booking:
+  // a staff day view is dozens of bookings against hundreds of lines.
+  const itemsByBooking = new Map<string, BookingDto['items']>();
+  for (const { bookingId, ...item } of items) {
+    const bucket = itemsByBooking.get(bookingId);
+    if (bucket) bucket.push(item);
+    else itemsByBooking.set(bookingId, [item]);
+  }
   const now = new Date();
   return rows.map(booking => {
-    const bookingItems = items
-      .filter(item => item.bookingId === booking.id)
-      .map(({ bookingId: _bookingId, ...item }) => item);
     const spot = spotById.get(booking.tableId);
     assert(spot, `booking ${booking.id} references missing spot ${booking.tableId}`);
-    return composeDto(booking, spot, bookingItems, now);
+    return composeDto(booking, spot, itemsByBooking.get(booking.id) ?? [], now);
   });
 }
 
