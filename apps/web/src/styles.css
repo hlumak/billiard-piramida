@@ -13,6 +13,10 @@
   --color-deep-cream: #dbdabc;
   --color-club-green: #0b4e31;
   --color-club-green-light: #176b47;
+  /* Sunken ground for the booking wizard: club-green darkened ~35% (sampled
+     from the Figma "pyramida 2" step panel). Dark enough that the
+     club-green-light option buttons read as lifted off it. */
+  --color-club-green-dark: #083220;
   --color-btn-text: #373328;
   --color-grey-warm: #585650;
   /* Secondary text: lightened from #b2b2b2 to clear WCAG AA (4.5:1) on the
