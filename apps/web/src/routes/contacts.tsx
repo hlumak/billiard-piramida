@@ -3,8 +3,9 @@ import { MapPin, Navigation, Phone } from 'lucide-react';
 import { PageHeader } from '../components/AppHeader';
 import { StaggerGroup, StaggerItem } from '../components/motion';
 import { m } from '../paraglide/messages.js';
+import { getLocale } from '../paraglide/runtime.js';
 import { pageMeta } from '../lib/seo';
-import { VENUE, VENUE_ADDRESS, VENUE_DIRECTIONS_URL, VENUE_MAP_EMBED_URL } from '../lib/venue';
+import { VENUE, VENUE_ADDRESS, VENUE_DIRECTIONS_URL, venueMapEmbedUrl } from '../lib/venue';
 import { formatHour, weekdayName } from '../lib/format';
 import { groupWeeklyHours, useVenueConfig } from '../lib/venue-config';
 
@@ -74,25 +75,26 @@ function ContactsPage() {
           </StaggerItem>
 
           {/* Spans the row under the three cards, where the page used to run out
-              of content. OpenStreetMap's embed rather than Google's: no API key,
-              no third-party cookies on load. Lazy so the tiles are not fetched
-              for a visitor who only wanted the phone number. */}
+              of content. Google's embed of the club's own listing: it is the
+              only map that has the club as a place at all, so the pin cannot
+              drift onto a neighbour the way a geocoded one did. Lazy so the
+              map is not fetched for a visitor who only wanted the phone. */}
           <StaggerItem className="md:col-span-3">
             {/* The ring matters here: light map tiles on the dark page read as a
                 hole punched in the layout without an edge to sit inside. */}
             <div className="overflow-hidden rounded-[10px] bg-club-green-light ring-1 ring-creme/10">
               <iframe
-                src={VENUE_MAP_EMBED_URL}
+                src={venueMapEmbedUrl(getLocale())}
                 title={m.map_label()}
                 loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                // Scripts because the map is Leaflet, popups so its own links
-                // can open out (escaping the sandbox, or the new tab would be
-                // opaque too). Deliberately NO allow-same-origin: paired with
-                // allow-scripts a frame can strip its own sandbox, and this
-                // embed needs no origin of its own — its bundle touches no
-                // storage, no cookies, no IndexedDB, and loads tiles as plain
-                // images. Top-level navigation, forms and downloads stay blocked.
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+                // Scripts to draw the map, popups so its own links can open out
+                // (escaping the sandbox, or the new tab would be opaque too).
+                // Deliberately NO allow-same-origin: paired with allow-scripts a
+                // frame can strip its own sandbox, and none of the embed's
+                // bundles reach for storage, cookies or IndexedDB. Top-level
+                // navigation, forms and downloads stay blocked.
                 sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
                 className="h-64 w-full border-0 md:h-80"
               />

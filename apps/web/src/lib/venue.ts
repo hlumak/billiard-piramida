@@ -1,7 +1,10 @@
+import type { Locale } from '@repo/shared';
+
 /** Single source for real-world venue facts (contacts page, SEO, JSON-LD). */
 export const VENUE = {
   name: 'piramida',
-  street: 'ul. Tatrzańska 42/44',
+  /** The club is upstairs — guests who do not know that walk past the door. */
+  street: 'ul. Tatrzańska 42/44, 1 piętro',
   postalCode: '93-219',
   city: 'Łódź',
   country: 'PL',
@@ -11,40 +14,34 @@ export const VENUE = {
 export const VENUE_ADDRESS = `${VENUE.street}, ${VENUE.postalCode} ${VENUE.city}`;
 
 /**
- * The club's shopfront, on the row of building "42" between the post office and
- * the Grot butcher — where the owner places it.
+ * Google's embed for the club's own Maps listing. The place id inside the `pb`
+ * blob is "Klub Bilardowy Piramida" itself, which is the whole reason this
+ * replaced a coordinate pin: the club is not a POI in OpenStreetMap, and
+ * geocoding the street address lands on a neighbouring building.
  *
- * Not what geocoding the address returns: Nominatim resolves "Tatrzańska 42/44"
- * to a separate building to the north (the Taki Pan Pstrąg restaurant), so a
- * plain lookup drops the pin a block off. These are the midpoint of the two
- * mapped neighbours, which are the landmarks a guest actually navigates by.
- * The club itself is not a POI in OSM, so there is nothing more exact to use.
+ * The blob is Google's own share payload, kept verbatim except for the two
+ * language/region fields, which follow the site locale — every locale was
+ * checked to return a shell carrying this same place id.
+ *
+ * Unlike the OSM embed this replaced, Google's does set third-party cookies
+ * once it loads. That is the club's call, taken knowingly.
  */
-const VENUE_LAT = 51.747_558;
-const VENUE_LON = 19.494_337;
+const MAP_EMBED_PB =
+  '!1m18!1m12!1m3!1d4940.42048659591!2d19.491529976840894!3d51.74747897186878' +
+  '!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1' +
+  '!3m3!1m2!1s0x471a35059efecc95%3A0x4175fac4554ad079!2sKlub%20Bilardowy%20Piramida!5e0';
 
-// Roughly 500 m across, 270 m tall: enough of the surrounding streets to place
-// the club, close enough to still read the house numbers.
-const MAP_SPAN_LON = 0.0035;
-const MAP_SPAN_LAT = 0.0012;
+export function venueMapEmbedUrl(locale: Locale): string {
+  // Region stays pl — the venue's country, not the reader's
+  const localeFields = `!1s${locale}!2spl`;
+  return `https://www.google.com/maps/embed?pb=${MAP_EMBED_PB}!3m2${localeFields}!5m2${localeFields}`;
+}
 
 /**
- * OpenStreetMap's own embed, deliberately not Google's: it needs no API key and
- * sets no third-party cookies, so the contacts page stays free of consent
- * machinery the rest of the site does not have. Directions still hand off to
- * Google — but only once the visitor clicks.
+ * Directions to the listing by name plus address rather than to a point: the
+ * club is on the first floor, and Google routes to its own pin better than to
+ * a coordinate we would have to keep in sync by hand.
  */
-export const VENUE_MAP_EMBED_URL =
-  'https://www.openstreetmap.org/export/embed.html?' +
-  new URLSearchParams({
-    bbox: [
-      VENUE_LON - MAP_SPAN_LON,
-      VENUE_LAT - MAP_SPAN_LAT,
-      VENUE_LON + MAP_SPAN_LON,
-      VENUE_LAT + MAP_SPAN_LAT
-    ].join(','),
-    layer: 'mapnik',
-    marker: `${VENUE_LAT},${VENUE_LON}`
-  }).toString();
-
-export const VENUE_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${VENUE_LAT},${VENUE_LON}`;
+export const VENUE_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+  `Klub Bilardowy Piramida, ${VENUE_ADDRESS}`
+)}`;
