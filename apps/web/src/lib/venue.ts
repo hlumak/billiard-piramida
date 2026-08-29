@@ -10,9 +10,18 @@ export const VENUE = {
 
 export const VENUE_ADDRESS = `${VENUE.street}, ${VENUE.postalCode} ${VENUE.city}`;
 
-/** The building itself, geocoded from the address against OpenStreetMap. */
-const VENUE_LAT = 51.747_717;
-const VENUE_LON = 19.494_798;
+/**
+ * The club's shopfront, on the row of building "42" between the post office and
+ * the Grot butcher — where the owner places it.
+ *
+ * Not what geocoding the address returns: Nominatim resolves "Tatrzańska 42/44"
+ * to a separate building to the north (the Taki Pan Pstrąg restaurant), so a
+ * plain lookup drops the pin a block off. These are the midpoint of the two
+ * mapped neighbours, which are the landmarks a guest actually navigates by.
+ * The club itself is not a POI in OSM, so there is nothing more exact to use.
+ */
+const VENUE_LAT = 51.747_558;
+const VENUE_LON = 19.494_337;
 
 // Roughly 500 m across, 270 m tall: enough of the surrounding streets to place
 // the club, close enough to still read the house numbers.
