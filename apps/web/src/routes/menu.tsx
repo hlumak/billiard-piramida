@@ -42,14 +42,22 @@ function MenuPage() {
       </picture>
       <div className="absolute inset-0 bg-club-green/70" />
 
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col px-10 pb-10 pt-16">
-        <Reveal className="flex justify-center">
+      {/* Sized to the viewport rather than min-sized by it, so the gap below the
+          logo is a flex item that can yield. Scrolls only if even a collapsed
+          gap is not enough (a phone held sideways), which beats clipping. */}
+      <div className="relative mx-auto flex h-dvh w-full max-w-md flex-col overflow-y-auto px-10 pb-10 pt-16">
+        <Reveal className="flex shrink-0 justify-center">
           <Link to="/">
             <BrandLogo className="w-44" />
           </Link>
         </Reveal>
 
-        <StaggerGroup className="mt-[26dvh]">
+        {/* The design drops the nav well down the page, but that space is the
+            first thing to give on a short screen: as a fixed margin it did not,
+            and the language row ended up sitting on the last button. */}
+        <div aria-hidden className="h-[26dvh] shrink" />
+
+        <StaggerGroup className="shrink-0">
           <nav className="flex flex-col gap-5">
             <StaggerItem>
               <ButtonLink to="/book">{m.menu_booking()}</ButtonLink>
@@ -77,7 +85,9 @@ function MenuPage() {
           </nav>
         </StaggerGroup>
 
-        <Reveal delay={0.3} className="mt-auto">
+        {/* pt-8 is the floor: mt-auto contributes nothing once the screen is
+            full, and the row must still clear the button above it. */}
+        <Reveal delay={0.3} className="mt-auto shrink-0 pt-8">
           <LocaleSwitcher />
         </Reveal>
       </div>
