@@ -4,12 +4,7 @@ import { PageHeader } from '../components/AppHeader';
 import { StaggerGroup, StaggerItem } from '../components/motion';
 import { m } from '../paraglide/messages.js';
 import { pageMeta } from '../lib/seo';
-import {
-  VENUE,
-  VENUE_ADDRESS,
-  VENUE_DIRECTIONS_URL,
-  VENUE_MAP_EMBED_URL
-} from '../lib/venue';
+import { VENUE, VENUE_ADDRESS, VENUE_DIRECTIONS_URL, VENUE_MAP_EMBED_URL } from '../lib/venue';
 import { formatHour, weekdayName } from '../lib/format';
 import { groupWeeklyHours, useVenueConfig } from '../lib/venue-config';
 
