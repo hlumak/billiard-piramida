@@ -1,5 +1,5 @@
 import { createStore } from '@tanstack/react-store';
-import type { ActivityKind, IsoDate } from '@repo/shared';
+import { defaultGameFor, type ActivityKind, type BilliardGame, type IsoDate } from '@repo/shared';
 
 export const WIZARD_STEPS = ['date', 'time', 'table', 'food', 'details'] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
@@ -14,6 +14,9 @@ export interface WizardState {
    *  it without refetching availability */
   kind: ActivityKind | null;
   tableLabel: string | null;
+  /** Which cue game the table gets racked for. Null on a dartboard and before
+   *  a spot is picked; set to the table's default the moment one is. */
+  game: BilliardGame | null;
   /** Sport cards the players will present, 15 zł off each */
   sportCardCount: number;
   /** foodItemId → quantity */
@@ -28,6 +31,7 @@ const initialState: WizardState = {
   tableId: null,
   kind: null,
   tableLabel: null,
+  game: null,
   sportCardCount: 0,
   items: {}
 };
@@ -69,6 +73,7 @@ export function selectDate(date: IsoDate): void {
       tableId: null,
       kind: null,
       tableLabel: null,
+      game: null,
       step: 'time'
     };
   });
@@ -82,12 +87,27 @@ export function selectTime(startHour: number, durationHours: number): void {
     tableId: null,
     kind: null,
     tableLabel: null,
+    game: null,
     step: 'table'
   }));
 }
 
 export function selectTable(tableId: number, kind: ActivityKind, tableLabel: string): void {
-  wizardStore.setState(state => ({ ...state, tableId, kind, tableLabel, step: 'food' }));
+  // The spot decides what is playable on it, so the game is picked here rather
+  // than left null for a later step to guess at — the guest only ever changes
+  // it, never has to supply it.
+  wizardStore.setState(state => ({
+    ...state,
+    tableId,
+    kind,
+    tableLabel,
+    game: defaultGameFor(tableId),
+    step: 'food'
+  }));
+}
+
+export function selectGame(game: BilliardGame): void {
+  wizardStore.setState(state => ({ ...state, game }));
 }
 
 export function setSportCardCount(sportCardCount: number): void {

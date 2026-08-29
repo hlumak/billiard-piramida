@@ -9,6 +9,7 @@ import type {
   AdminTournamentDto,
   AdminTournamentRegistrationDto,
   BookingDto,
+  BilliardGame,
   BookingStatus,
   IsoDate,
   NewOrderItem,
@@ -29,6 +30,8 @@ export interface AdminCreateBookingInput {
   customerName: string;
   customerPhone: string;
   sportCardCount?: number;
+  /** Billiard only; the spot's default is stored when it is left out */
+  game?: BilliardGame;
 }
 
 /**
@@ -43,6 +46,7 @@ export interface AdminBookingPatch {
   customerName?: string;
   customerPhone?: string;
   sportCardCount?: number;
+  game?: BilliardGame;
   status?: BookingStatus;
 }
 

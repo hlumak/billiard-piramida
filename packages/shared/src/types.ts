@@ -16,6 +16,15 @@ export type BookingPhase = 'upcoming' | 'active' | 'finished' | 'cancelled';
 export type ActivityKind = 'billiard' | 'darts';
 
 /**
+ * Cue game a billiard table is racked for. Which games a table can host is a
+ * property of the table, not of the booking — see `games` on SpotDef: the 9ft
+ * tables in hall 1 take either, the 12ft ones in hall 2 are pyramid-only.
+ * Booked per rental so staff know which balls to set out; it does not move the
+ * price, which follows cloth size alone.
+ */
+export type BilliardGame = 'pool' | 'piramida';
+
+/**
  * A bookable spot: a billiard table or a dartboard. Still named "table"
  * throughout the DB and the DTOs — `bookings.table_id` is load-bearing for the
  * hand-written overlap EXCLUDE constraint, so the column keeps its name and
@@ -84,6 +93,9 @@ export interface BookingDto {
   id: string;
   tableId: TableDto['id'];
   kind: ActivityKind;
+  /** Null on a dartboard, and on billiard bookings taken before the club
+   *  started asking — never assume "no game" means pool. */
+  game: BilliardGame | null;
   /** Number within the kind ("Table 3", "Dartboard 1") — not the global id */
   tableLabel: TableDto['label'];
   customerName: string;
@@ -296,4 +308,7 @@ export interface CreateBookingInput {
   /** Self-declared, guests included — staff verify the physical cards on site */
   sportCardCount?: number;
   items?: NewOrderItem[];
+  /** Omitted on a dartboard; omitted on a billiard table it defaults to the
+   *  spot's first offered game (pyramid everywhere today). */
+  game?: BilliardGame;
 }

@@ -6,10 +6,12 @@ import { useStore } from '@tanstack/react-store';
 import {
   discountGroszFor,
   formatPln,
+  gamesFor,
   MAX_SPORT_CARDS_PER_BOOKING,
   sizeOf,
   spotPriceGrosz,
   type ActivityKind,
+  type BilliardGame,
   type IsoDate
 } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
@@ -22,9 +24,15 @@ import { rememberBooking } from '../../lib/recent-bookings';
 import { profileQuery } from '../../lib/auth';
 import { useVenueConfig } from '../../lib/venue-config';
 import { Link } from '@tanstack/react-router';
-import { spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
+import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { SportCardPicker } from './SportCardPicker';
-import { goToStep, resetWizard, setSportCardCount, wizardStore } from '../../store/booking-wizard';
+import {
+  goToStep,
+  resetWizard,
+  selectGame,
+  setSportCardCount,
+  wizardStore
+} from '../../store/booking-wizard';
 
 /** All picks made in earlier steps — non-null by construction (see book.tsx). */
 export interface BookingDraft {
@@ -34,6 +42,8 @@ export interface BookingDraft {
   tableId: number;
   kind: ActivityKind;
   tableLabel: string;
+  /** Null on a dartboard — nothing to rack, nothing to ask */
+  game: BilliardGame | null;
 }
 
 export function DetailsStep({ draft }: { draft: BookingDraft }) {
@@ -53,6 +63,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
   const spot = { id: draft.tableId, kind: draft.kind };
   const tableSize = sizeOf(draft.tableId);
+  const games = gamesFor(draft.tableId);
   const tableTotal = spotPriceGrosz(spot, draft.durationHours, useVenueConfig().rates);
   const foodTotal = orderLines.reduce((sum, line) => sum + line.item.priceGrosz * line.quantity, 0);
   // Preview only — the server recomputes and locks the discount in
@@ -77,8 +88,12 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const form = useForm({
     defaultValues: { customerName: profile?.name ?? '', customerPhone: profile?.phone ?? '' },
     onSubmit: ({ value }) => {
+      const { game, ...picks } = draft;
       createBooking.mutate({
-        ...draft,
+        ...picks,
+        // Omitted rather than sent as null: on a dartboard the API refuses the
+        // key outright, and omitting it is also what "no preference" means
+        ...(game === null ? {} : { game }),
         customerName: value.customerName.trim(),
         customerPhone: value.customerPhone.trim(),
         sportCardCount,
@@ -136,6 +151,36 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
                 {tableSize ? <span className="text-grey-cool"> · {tableSize}</span> : null}
               </dd>
             </div>
+            {/* Only tables offer a game, and only hall 1 offers a choice of one
+                — elsewhere this reads as the plain fact that it is pyramid. */}
+            {games.length > 0 ? (
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-grey-cool">{m.game_label()}</dt>
+                <dd>
+                  {games.length > 1 ? (
+                    <div role="group" aria-label={m.game_label()} className="flex gap-1.5">
+                      {games.map(option => (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={draft.game === option}
+                          onClick={() => selectGame(option)}
+                          className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-colors ${
+                            draft.game === option
+                              ? 'bg-golden text-btn-text'
+                              : 'bg-club-green text-creme hover:bg-surface-hover'
+                          }`}
+                        >
+                          {gameName(option)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : draft.game ? (
+                    gameName(draft.game)
+                  ) : null}
+                </dd>
+              </div>
+            ) : null}
           </dl>
 
           <div className="mt-3 border-t border-deep-cream/30 pt-3 text-sm">

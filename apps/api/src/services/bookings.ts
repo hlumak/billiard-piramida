@@ -44,6 +44,7 @@ function composeDto(
     id: booking.id,
     tableId: booking.tableId,
     kind: spot.kind,
+    game: booking.game,
     tableLabel: spot.label,
     customerName: booking.customerName,
     customerPhone: booking.customerPhone,

@@ -23,6 +23,9 @@ export const sportCardTypeEnum = pgEnum('sport_card_type', [
 
 export const activityKindEnum = pgEnum('activity_kind', ['billiard', 'darts']);
 
+/** Which cue game a billiard rental is racked for — see `games` on SpotDef. */
+export const billiardGameEnum = pgEnum('billiard_game', ['pool', 'piramida']);
+
 /** Both tournament enums are built from the shared literal tuples, so a new
  *  status is one edit in @repo/shared rather than three that can drift. */
 export const tournamentStatusEnum = pgEnum('tournament_status', TOURNAMENT_STATUSES);
@@ -64,6 +67,10 @@ export const bookings = pgTable(
     tableId: integer('table_id')
       .notNull()
       .references(() => tables.id),
+    /** Null on a dartboard, and on the billiard rentals written before the club
+     *  started asking — deliberately not backfilled to 'piramida', which would
+     *  invent a fact about games nobody recorded. */
+    game: billiardGameEnum('game'),
     customerName: text('customer_name').notNull(),
     customerPhone: text('customer_phone').notNull(),
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),

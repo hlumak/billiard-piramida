@@ -44,7 +44,7 @@ function permittedStep(state: WizardState): WizardStep {
  * so the steps receive non-null props instead of asserting store fields.
  */
 function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) {
-  const { date, startHour, durationHours, tableId, kind, tableLabel } = state;
+  const { date, startHour, durationHours, tableId, kind, tableLabel, game } = state;
   if (step === 'date' || date == null) return <DateStep />;
   if (step === 'time' || startHour == null) return <TimeStep date={date} />;
   // `kind` is written together with `tableId`, so a spot without one can only
@@ -53,7 +53,9 @@ function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) 
     return <TableStep date={date} startHour={startHour} durationHours={durationHours} />;
   }
   if (step === 'food') return <FoodStep />;
-  return <DetailsStep draft={{ date, startHour, durationHours, tableId, kind, tableLabel }} />;
+  return (
+    <DetailsStep draft={{ date, startHour, durationHours, tableId, kind, tableLabel, game }} />
+  );
 }
 
 function BookingWizard() {
