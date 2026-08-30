@@ -6,6 +6,10 @@ export type WizardStep = (typeof WIZARD_STEPS)[number];
 
 export interface WizardState {
   step: WizardStep;
+  /** Which way the last step change travelled: 1 forward, -1 back. Lives here
+   *  rather than being recomputed per render so the slide-in class only moves
+   *  when the step does — a mid-step update (picking food) must not replay it. */
+  direction: 1 | -1;
   date: IsoDate | null;
   startHour: number | null;
   durationHours: number;
@@ -25,6 +29,7 @@ export interface WizardState {
 
 const initialState: WizardState = {
   step: 'date',
+  direction: 1,
   date: null,
   startHour: null,
   durationHours: 1,
@@ -58,13 +63,17 @@ export function stepIndex(step: WizardStep): number {
 }
 
 export function goToStep(step: WizardStep): void {
-  wizardStore.setState(state => ({ ...state, step }));
+  wizardStore.setState(state => ({
+    ...state,
+    step,
+    direction: stepIndex(step) < stepIndex(state.step) ? -1 : 1
+  }));
 }
 
 export function selectDate(date: IsoDate): void {
   wizardStore.setState(state => {
     // Re-confirming the same date keeps downstream picks; a new date invalidates them
-    if (state.date === date) return { ...state, step: 'time' };
+    if (state.date === date) return { ...state, step: 'time', direction: 1 };
     return {
       ...state,
       date,
@@ -74,7 +83,8 @@ export function selectDate(date: IsoDate): void {
       kind: null,
       tableLabel: null,
       game: null,
-      step: 'time'
+      step: 'time',
+      direction: 1
     };
   });
 }
@@ -88,7 +98,8 @@ export function selectTime(startHour: number, durationHours: number): void {
     kind: null,
     tableLabel: null,
     game: null,
-    step: 'table'
+    step: 'table',
+    direction: 1
   }));
 }
 
@@ -102,7 +113,8 @@ export function selectTable(tableId: number, kind: ActivityKind, tableLabel: str
     kind,
     tableLabel,
     game: defaultGameFor(tableId),
-    step: 'food'
+    step: 'food',
+    direction: 1
   }));
 }
 

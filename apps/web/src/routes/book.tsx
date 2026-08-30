@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
@@ -68,17 +68,18 @@ function BookingWizard() {
   }, []);
 
   const step = permittedStep(state);
+  // The store carries the direction of the last step change, so a mid-step
+  // update (adding a menu item on the food step) can't flip the wrapper's
+  // animation class and replay the slide-in over the whole step. A clamp only
+  // ever sends the guest backwards, and holds that until the effect below
+  // writes the corrected step to the store.
+  const direction = step === state.step ? state.direction : -1;
 
   useEffect(() => {
     if (step !== state.step) goToStep(step);
   }, [step, state.step]);
 
   const index = stepIndex(step);
-  const previousIndex = useRef(index);
-  const direction = index >= previousIndex.current ? 1 : -1;
-  useEffect(() => {
-    previousIndex.current = index;
-  }, [index]);
 
   const handleBack = () => {
     const previous = WIZARD_STEPS[index - 1];
