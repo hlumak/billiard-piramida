@@ -22,6 +22,7 @@ import { availabilityQuery } from '../../lib/queries';
 import { gameName, spotName } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
 import { AdminDatePicker } from './AdminDatePicker';
+import { PhoneField } from '../PhoneField';
 import { useVenueConfig } from '../../lib/venue-config';
 
 const chip = (selected: boolean, disabled = false) =>
@@ -386,15 +387,11 @@ export function AdminBookingModal({
                   <Label>{m.name_label()}</Label>
                   <Input placeholder={m.name_placeholder()} />
                 </TextField>
-                <TextField
+                <PhoneField
                   name="customerPhone"
-                  type="tel"
                   value={phone}
                   onChange={value => dispatch({ type: 'phone', phone: value })}
-                >
-                  <Label>{m.phone_label()}</Label>
-                  <Input placeholder={m.phone_placeholder()} />
-                </TextField>
+                />
 
                 {create.error ? (
                   <p className="text-sm text-danger-soft-foreground">

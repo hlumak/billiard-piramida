@@ -1,6 +1,9 @@
 @import './fonts.css';
 @import 'tailwindcss';
 @import '@heroui/styles';
+/* Imported here rather than from PhoneField.tsx so the club's overrides below
+   always come after the library's own rules. */
+@import 'react-phone-number-input/style.css';
 
 @theme {
   --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
@@ -53,10 +56,14 @@
   --muted: #b2b2b2;
   --scrollbar: #176b47;
 
-  --field-background: #176b47;
+  /* Outlined fields per the Figma "Number output" screen: the ground shows
+     through and a deep-cream hairline draws the box (both values sampled from
+     that mockup — #0b4e31 inside, #dbdabc on the edge). Applies to every
+     field, not just the phone one, so forms stay of a piece. */
+  --field-background: transparent;
   --field-foreground: #f9f9e1;
   --field-placeholder: #b2b2b2;
-  --field-border: transparent;
+  --field-border: #dbdabc;
 
   --segment: #176b47;
   --segment-foreground: #f9f9e1;
@@ -93,6 +100,75 @@ body {
   font-family: var(--font-sans);
   background: var(--background);
   color: var(--foreground);
+}
+
+/* Phone field (react-phone-number-input): ONE control, not two boxes side by
+   side — the field skin lives on the `.PhoneInput` wrapper, and the flag chip
+   and the number input inside it are stripped bare. Reading order inside the
+   box is flag › chevron › dial code › number, and the country `<select>` is
+   the library's invisible native one stretched over the flag and the code. */
+.PhoneInput {
+  --PhoneInput-color--focus: var(--focus);
+  --PhoneInputCountrySelect-marginRight: 0.5rem;
+  /* A touch under the text size: the flag reads as an icon beside the dial
+     code rather than competing with it (the library's own default is 1em). */
+  --PhoneInputCountryFlag-height: 0.9375em;
+  --PhoneInputCountryFlag-borderColor: color-mix(in oklab, black 35%, transparent);
+
+  padding: 0.5rem 0.75rem;
+  border: var(--border-width-field) solid var(--field-border);
+  /* Same corner as HeroUI's own inputs, so the two sit level in a form. */
+  border-radius: var(--field-radius);
+  background-color: var(--field-background);
+  color: var(--field-foreground);
+  transition:
+    background-color 150ms var(--ease-smooth),
+    border-color 150ms var(--ease-smooth),
+    box-shadow 150ms var(--ease-out);
+}
+
+/* The number input is only the text run: the box around it is the wrapper's. */
+.PhoneInputInput {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1.5rem;
+  outline: none;
+}
+
+.PhoneInputInput::placeholder {
+  color: var(--field-placeholder);
+}
+
+/* Dial code beside the flag, so the picked country is readable and not just a
+   small image (and stays readable where flags render poorly). It sits in the
+   picker, so tapping it opens the country list like the flag does. */
+.PhoneInputCountryCode {
+  margin-left: 0.375rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Focus and invalid states belong to the whole control now. */
+.PhoneInput:focus-within {
+  border-color: var(--field-border-focus);
+  background-color: var(--field-focus);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+[data-invalid='true'] > .PhoneInput {
+  border-color: var(--danger);
+}
+
+/* The native option list is drawn by the OS, so it needs a SOLID ground —
+   the field's own background is transparent, which would leave cream text on
+   whatever the platform paints behind it. */
+.PhoneInputCountrySelect option {
+  background-color: var(--surface);
+  color: var(--surface-foreground);
 }
 
 /* Script page titles ("booking", "prices"…) — Great Vibes, Latin-only, English in all locales */

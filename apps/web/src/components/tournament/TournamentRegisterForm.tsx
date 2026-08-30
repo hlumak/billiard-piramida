@@ -7,6 +7,7 @@ import { isValidPhone } from '@repo/shared/phone';
 import { ApiError, api } from '../../lib/api';
 import { profileQuery } from '../../lib/auth';
 import { tournamentQuery, tournamentsQuery } from '../../lib/queries';
+import { PhoneField } from '../PhoneField';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 
@@ -111,20 +112,17 @@ export function TournamentRegisterForm({ tournament }: { tournament: TournamentD
         }}
       >
         {field => (
-          <TextField
+          <PhoneField
             name={field.name}
-            type="tel"
             value={field.state.value}
             onChange={value => {
               register.reset();
               field.handleChange(value);
             }}
+            onBlur={field.handleBlur}
             isInvalid={field.state.meta.errors.length > 0}
-          >
-            <Label>{m.phone_label()}</Label>
-            <Input placeholder={m.phone_placeholder()} onBlur={field.handleBlur} />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </TextField>
+            errorMessage={field.state.meta.errors[0]}
+          />
         )}
       </form.Field>
 

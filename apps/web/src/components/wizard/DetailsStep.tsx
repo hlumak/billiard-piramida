@@ -22,6 +22,7 @@ import { formatDayLong, formatHour, intlTag } from '../../lib/format';
 import { availabilityQuery, bookingQuery, menuQuery } from '../../lib/queries';
 import { rememberBooking } from '../../lib/recent-bookings';
 import { profileQuery } from '../../lib/auth';
+import { PhoneField } from '../PhoneField';
 import { useVenueConfig } from '../../lib/venue-config';
 import { Link } from '@tanstack/react-router';
 import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
@@ -252,17 +253,14 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             }}
           >
             {field => (
-              <TextField
+              <PhoneField
                 name={field.name}
-                type="tel"
                 value={field.state.value}
                 onChange={value => field.handleChange(value)}
+                onBlur={field.handleBlur}
                 isInvalid={field.state.meta.errors.length > 0}
-              >
-                <Label>{m.phone_label()}</Label>
-                <Input placeholder={m.phone_placeholder()} onBlur={field.handleBlur} />
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </TextField>
+                errorMessage={field.state.meta.errors[0]}
+              />
             )}
           </form.Field>
 
