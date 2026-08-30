@@ -33,7 +33,7 @@
   "name_label": "Ім'я",
   "name_placeholder": "Ваше ім'я",
   "phone_label": "Телефон",
-  "phone_placeholder": "+48 123 456 789",
+  "phone_placeholder": "123 456 789",
   "err_name_required": "Вкажіть ім'я",
   "err_phone_invalid": "Вкажіть коректний номер телефону",
   "summary_title": "Ваше бронювання",

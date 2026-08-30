@@ -3,6 +3,7 @@ import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isValidPhone } from '@repo/shared/phone';
 import { CardFields, type CardsState } from './CardFields';
+import { PhoneField } from '../PhoneField';
 import { Reveal } from '../motion';
 import { ApiError } from '../../lib/api';
 import { authApi, storeSession, type RegisterInput } from '../../lib/auth';
@@ -87,19 +88,15 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
           </TextField>
         ) : null}
 
-        <TextField
+        <PhoneField
           name="phone"
-          type="tel"
           value={phone}
           onChange={value => {
             setPhone(value);
             submit.reset();
           }}
           isRequired
-        >
-          <Label>{m.phone_label()}</Label>
-          <Input placeholder={m.phone_placeholder()} />
-        </TextField>
+        />
 
         <TextField
           name="password"

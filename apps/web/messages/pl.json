@@ -33,7 +33,7 @@
   "name_label": "Imię",
   "name_placeholder": "Twoje imię",
   "phone_label": "Telefon",
-  "phone_placeholder": "+48 123 456 789",
+  "phone_placeholder": "123 456 789",
   "err_name_required": "Podaj imię",
   "err_phone_invalid": "Podaj poprawny numer telefonu",
   "summary_title": "Twoja rezerwacja",
