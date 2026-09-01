@@ -56,14 +56,21 @@
   --muted: #b2b2b2;
   --scrollbar: #176b47;
 
-  /* Outlined fields per the Figma "Number output" screen: the ground shows
-     through and a deep-cream hairline draws the box (both values sampled from
-     that mockup — #0b4e31 inside, #dbdabc on the edge). Applies to every
-     field, not just the phone one, so forms stay of a piece. */
-  --field-background: transparent;
+  /* Filled fields per the Figma "Booking — piramida" / "profile — piramida"
+     desktop screens: a light-green (#176b47) box, no border, 15px corners and
+     a whisper of shadow — the earlier "outlined" attempt set `--field-border`
+     without `--field-border-width`, and HeroUI's theme defaults that width to
+     0, so the hairline never painted and the fields were invisible. Applies to
+     every field, not just the phone one, so forms stay of a piece. */
+  --field-background: #176b47;
   --field-foreground: #f9f9e1;
   --field-placeholder: #b2b2b2;
-  --field-border: #dbdabc;
+  --field-border-width: 0px;
+  --field-border: transparent;
+  --field-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 0 1px rgba(0, 0, 0, 0.06);
 
   --segment: #176b47;
   --segment-foreground: #f9f9e1;
@@ -120,6 +127,7 @@ body {
   /* Same corner as HeroUI's own inputs, so the two sit level in a form. */
   border-radius: var(--field-radius);
   background-color: var(--field-background);
+  box-shadow: var(--field-shadow);
   color: var(--field-foreground);
   transition:
     background-color 150ms var(--ease-smooth),
@@ -159,13 +167,14 @@ body {
   outline-offset: 2px;
 }
 
-[data-invalid='true'] > .PhoneInput {
-  border-color: var(--danger);
+/* Fields have no border, so the error state is a 1px danger outline — the same
+   thing HeroUI's own `.input[data-invalid]` draws. */
+[data-invalid='true'] > .PhoneInput:not(:focus-within) {
+  outline: 1px solid var(--danger);
 }
 
-/* The native option list is drawn by the OS, so it needs a SOLID ground —
-   the field's own background is transparent, which would leave cream text on
-   whatever the platform paints behind it. */
+/* The native option list is drawn by the OS, so it needs a SOLID ground of
+   its own rather than inheriting whatever the platform paints behind it. */
 .PhoneInputCountrySelect option {
   background-color: var(--surface);
   color: var(--surface-foreground);
