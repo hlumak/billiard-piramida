@@ -4,10 +4,10 @@ import { ButtonLink } from '../components/ButtonLink';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { Reveal, StaggerGroup, StaggerItem } from '../components/motion';
 import { m } from '../paraglide/messages.js';
-import { pageMeta } from '../lib/seo';
+import { pageHead } from '../lib/seo';
 
 export const Route = createFileRoute('/menu')({
-  head: () => ({ meta: pageMeta(m.seo_title_menu(), m.seo_desc_menu()) }),
+  head: ({ match }) => pageHead(m.seo_title_menu(), m.seo_desc_menu(), match.pathname),
   component: MenuPage
 });
 

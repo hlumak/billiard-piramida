@@ -9,21 +9,37 @@ export const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'http://localho
 
 const OG_LOCALES = { uk: 'uk_UA', pl: 'pl_PL', en: 'en_GB' } as const;
 
-/** Standard head meta for an indexable page. */
-export function pageMeta(title: string, description: string) {
-  return [
-    { title },
-    { name: 'description', content: description },
-    { property: 'og:title', content: title },
-    { property: 'og:description', content: description },
-    { property: 'og:locale', content: OG_LOCALES[getLocale()] },
-    // Per-page twins of the og:* pair; the card type and image are global (__root)
-    { name: 'twitter:title', content: title },
-    { name: 'twitter:description', content: description }
-  ];
+/**
+ * Standard `head` for an indexable page. `pathname` is the route match's, so
+ * the canonical and the og:url agree with each other and with the sitemap
+ * (locale is a cookie, not a URL segment, so one canonical serves all three).
+ */
+export function pageHead(title: string, description: string, pathname: string) {
+  // Index routes match with a trailing slash ("/tournaments/"); the sitemap and
+  // every internal link use the bare form, and a canonical must pick one.
+  const url = `${SITE_URL}${pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname}`;
+  return {
+    meta: [
+      { title },
+      { name: 'description', content: description },
+      { property: 'og:title', content: title },
+      { property: 'og:description', content: description },
+      { property: 'og:url', content: url },
+      { property: 'og:locale', content: OG_LOCALES[getLocale()] },
+      // Per-page twins of the og:* set; the card type and image are global (__root)
+      { name: 'twitter:title', content: title },
+      { name: 'twitter:description', content: description },
+      { name: 'twitter:url', content: url }
+    ],
+    links: [{ rel: 'canonical', href: url }]
+  };
 }
 
-/** Private/app pages: keep them out of search results. */
+/**
+ * Private/app pages: keep them out of search results. No description or og
+ * tags on purpose — these are not meant to be shared, and unfurlers fall back
+ * to the <title> anyway, so the devtools SEO panel flagging them is expected.
+ */
 export function noindexMeta(title: string) {
   return [{ title }, { name: 'robots', content: 'noindex' }];
 }

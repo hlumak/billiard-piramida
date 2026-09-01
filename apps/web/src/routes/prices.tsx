@@ -11,13 +11,13 @@ import { categoryLabel, groupMenu } from '../lib/menu';
 import { menuQuery } from '../lib/queries';
 import { useVenueConfig } from '../lib/venue-config';
 import { m } from '../paraglide/messages.js';
-import { pageMeta } from '../lib/seo';
+import { pageHead } from '../lib/seo';
 import { getLocale } from '../paraglide/runtime.js';
 
 export const Route = createFileRoute('/prices')({
   // SSR + hover-preload: menu is stable server data
   loader: ({ context }) => context.queryClient.ensureQueryData(menuQuery(getLocale())),
-  head: () => ({ meta: pageMeta(m.seo_title_prices(), m.seo_desc_prices()) }),
+  head: ({ match }) => pageHead(m.seo_title_prices(), m.seo_desc_prices(), match.pathname),
   component: PricesPage
 });
 

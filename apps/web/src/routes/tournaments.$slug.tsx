@@ -5,7 +5,7 @@ import { PageHeader } from '../components/AppHeader';
 import { TournamentView } from '../components/tournament/TournamentView';
 import { ApiError } from '../lib/api';
 import { tournamentQuery } from '../lib/queries';
-import { pageMeta } from '../lib/seo';
+import { pageHead } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
@@ -16,12 +16,12 @@ export const Route = createFileRoute('/tournaments/$slug')({
       .ensureQueryData(tournamentQuery(params.slug, getLocale()))
       .catch(() => null),
   // Named after the tournament: this is the URL that gets shared around
-  head: ({ loaderData }) => ({
-    meta: pageMeta(
+  head: ({ match, loaderData }) =>
+    pageHead(
       loaderData ? `${loaderData.title} — piramida` : m.seo_title_tournaments(),
-      loaderData?.summary ?? m.seo_desc_tournaments()
-    )
-  }),
+      loaderData?.summary ?? m.seo_desc_tournaments(),
+      match.pathname
+    ),
   component: TournamentPage
 });
 

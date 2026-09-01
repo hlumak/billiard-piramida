@@ -7,7 +7,7 @@ import { ButtonLink } from '../components/ButtonLink';
 import { formatHour, warsawToday } from '../lib/format';
 import { newsQuery, tournamentsQuery, venueConfigQuery } from '../lib/queries';
 import { useVenueConfig } from '../lib/venue-config';
-import { pageMeta, venueJsonLd } from '../lib/seo';
+import { pageHead, venueJsonLd } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
@@ -26,8 +26,8 @@ export const Route = createFileRoute('/')({
       venueConfig: context.queryClient.getQueryData(venueConfigQuery().queryKey) ?? null
     };
   },
-  head: ({ loaderData }) => ({
-    meta: pageMeta(m.app_title(), m.seo_desc_home()),
+  head: ({ match, loaderData }) => ({
+    ...pageHead(m.app_title(), m.seo_desc_home(), match.pathname),
     scripts: [{ type: 'application/ld+json', children: venueJsonLd(loaderData?.venueConfig) }]
   }),
   component: Home

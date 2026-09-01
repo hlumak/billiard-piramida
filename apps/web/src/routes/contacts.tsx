@@ -4,13 +4,13 @@ import { PageHeader } from '../components/AppHeader';
 import { StaggerGroup, StaggerItem } from '../components/motion';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
-import { pageMeta } from '../lib/seo';
+import { pageHead } from '../lib/seo';
 import { VENUE, VENUE_ADDRESS, VENUE_DIRECTIONS_URL, venueMapEmbedUrl } from '../lib/venue';
 import { formatHour, weekdayName } from '../lib/format';
 import { groupWeeklyHours, useVenueConfig } from '../lib/venue-config';
 
 export const Route = createFileRoute('/contacts')({
-  head: () => ({ meta: pageMeta(m.seo_title_contacts(), m.seo_desc_contacts()) }),
+  head: ({ match }) => pageHead(m.seo_title_contacts(), m.seo_desc_contacts(), match.pathname),
   component: ContactsPage
 });
 

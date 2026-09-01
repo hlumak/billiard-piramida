@@ -6,14 +6,14 @@ import { QueryError } from '../components/QueryError';
 import { TournamentCardBody } from '../components/TournamentCard';
 import { StaggerGroup, StaggerItem } from '../components/motion';
 import { tournamentsQuery } from '../lib/queries';
-import { pageMeta } from '../lib/seo';
+import { pageHead } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
 export const Route = createFileRoute('/tournaments/')({
   // SSR + hover-preload: the list is server data and the page is indexable
   loader: ({ context }) => context.queryClient.ensureQueryData(tournamentsQuery(getLocale())),
-  head: () => ({ meta: pageMeta(m.seo_title_tournaments(), m.seo_desc_tournaments()) }),
+  head: ({ match }) => pageHead(m.seo_title_tournaments(), m.seo_desc_tournaments(), match.pathname),
   component: TournamentsPage
 });
 
