@@ -16,10 +16,11 @@ import type {
   TournamentRegistrationStatus,
   TournamentStatus,
   TournamentTranslationDto,
+  UploadedImageDto,
   VenueConfigDto
 } from '@repo/shared';
 import { queryOptions } from '@tanstack/react-query';
-import { request } from './api';
+import { request, upload } from './api';
 import { createFlagCookieStore } from './hydration';
 
 export interface AdminCreateBookingInput {
@@ -64,6 +65,8 @@ export interface AdminBookingFilters {
 
 /** A news card as the modal submits it — `null` clears the URL columns. */
 export interface AdminNewsInput {
+  /** Create only; omitted = derived from the Polish headline */
+  slug?: string;
   imageUrl: string | null;
   linkUrl: string | null;
   sortOrder: number;
@@ -156,6 +159,14 @@ export const adminApi = {
     request<AdminNewsItemDto>(`/api/admin/news/${id}`, { method: 'PATCH', body: patch }),
   deleteNewsItem: (id: number) =>
     request<{ deleted: boolean }>(`/api/admin/news/${id}`, { method: 'DELETE' }),
+  uploadImage: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return upload<UploadedImageDto>('/api/admin/images', form);
+  },
+  // Server-side: fetch the post page, take its og:image, store it like an upload
+  importPostImage: (url: string) =>
+    request<UploadedImageDto>('/api/admin/images/from-post', { method: 'POST', body: { url } }),
   venueConfig: (signal?: AbortSignal) =>
     request<VenueConfigDto>('/api/admin/venue-config', { signal }),
   saveVenueConfig: (config: VenueConfigDto) =>

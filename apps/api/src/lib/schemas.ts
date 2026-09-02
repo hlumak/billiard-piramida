@@ -13,10 +13,12 @@ import type {
   BookingDto,
   IsoDate,
   MenuItemDto,
+  NewsArticleDto,
   NewsItemDto,
   TableDto,
   TournamentDto,
   TournamentRegistrationResultDto,
+  UploadedImageDto,
   UserProfileDto,
   VenueConfigDto
 } from '@repo/shared';
@@ -157,16 +159,29 @@ export const ADMIN_MENU_ITEM_RESPONSE = Type.Object({
 
 export const NEWS_ITEM_RESPONSE = Type.Object({
   id: Type.Integer(),
+  slug: Type.String(),
   title: Type.String(),
   body: Type.Union([Type.String(), Type.Null()]),
   imageUrl: Type.Union([Type.String(), Type.Null()]),
-  linkUrl: Type.Union([Type.String(), Type.Null()])
+  linkUrl: Type.Union([Type.String(), Type.Null()]),
+  publishedAt: Type.String(),
+  hasArticle: Type.Boolean()
+});
+
+export const NEWS_ARTICLE_RESPONSE = Type.Object({
+  ...NEWS_ITEM_RESPONSE.properties,
+  content: Type.Union([Type.String(), Type.Null()])
+});
+
+export const UPLOADED_IMAGE_RESPONSE = Type.Object({
+  url: Type.String()
 });
 
 export const NEWS_TRANSLATION = Type.Object({
   locale: LOCALE_SCHEMA,
   title: Type.String(),
-  body: Type.Union([Type.String(), Type.Null()])
+  body: Type.Union([Type.String(), Type.Null()]),
+  content: Type.Union([Type.String(), Type.Null()])
 });
 
 export const ADMIN_NEWS_ITEM_RESPONSE = Type.Object({
@@ -335,7 +350,9 @@ export type SchemaDriftChecks = [
   Expect<Equals<Static<typeof ADMIN_ANALYTICS_RESPONSE>, AdminAnalyticsDto>>,
   Expect<Equals<Static<typeof ADMIN_MENU_ITEM_RESPONSE>, AdminMenuItemDto>>,
   Expect<Equals<Static<typeof NEWS_ITEM_RESPONSE>, NewsItemDto>>,
+  Expect<Equals<Static<typeof NEWS_ARTICLE_RESPONSE>, NewsArticleDto>>,
   Expect<Equals<Static<typeof ADMIN_NEWS_ITEM_RESPONSE>, AdminNewsItemDto>>,
+  Expect<Equals<Static<typeof UPLOADED_IMAGE_RESPONSE>, UploadedImageDto>>,
   Expect<Equals<Static<typeof VENUE_CONFIG_RESPONSE>, VenueConfigDto>>,
   Expect<Equals<Static<typeof TOURNAMENT_RESPONSE>, TournamentDto>>,
   Expect<Equals<Static<typeof TOURNAMENT_REGISTRATION_RESULT>, TournamentRegistrationResultDto>>,

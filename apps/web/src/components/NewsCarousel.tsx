@@ -3,6 +3,8 @@ import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { isExternalUrl, type NewsItemDto, type TournamentDto } from '@repo/shared';
+import { resolveAssetUrl } from '../lib/api';
+import { newsHref } from '../lib/news';
 import { newsQuery, tournamentsQuery } from '../lib/queries';
 import { TournamentCardBody } from './TournamentCard';
 import { m } from '../paraglide/messages.js';
@@ -25,7 +27,12 @@ function CardContent({ item }: { item: NewsItemDto }) {
     <>
       {item.imageUrl ? (
         // Decorative: the headline right below carries the same information
-        <img src={item.imageUrl} alt="" loading="lazy" className="h-24 w-full object-cover" />
+        <img
+          src={resolveAssetUrl(item.imageUrl)}
+          alt=""
+          loading="lazy"
+          className="h-24 w-full object-cover"
+        />
       ) : null}
       <div className="px-4 py-3">
         <p className="font-semibold text-golden">{item.title}</p>
@@ -35,9 +42,10 @@ function CardContent({ item }: { item: NewsItemDto }) {
   );
 }
 
-/** Cards may link to an app route (client-side nav) or off-site; most link nowhere. */
+/** Cards open their own page, an explicit app route or an off-site link; some link nowhere. */
 function NewsCard({ item }: { item: NewsItemDto }) {
-  if (item.linkUrl === null) {
+  const href = newsHref(item);
+  if (href === null) {
     return (
       <div className={CARD}>
         <CardContent item={item} />
@@ -45,12 +53,12 @@ function NewsCard({ item }: { item: NewsItemDto }) {
     );
   }
   const interactive = `${CARD} transition-colors hover:ring-golden/60`;
-  return isExternalUrl(item.linkUrl) ? (
-    <a href={item.linkUrl} target="_blank" rel="noreferrer" className={interactive}>
+  return isExternalUrl(href) ? (
+    <a href={href} target="_blank" rel="noreferrer" className={interactive}>
       <CardContent item={item} />
     </a>
   ) : (
-    <Link to={item.linkUrl} className={interactive}>
+    <Link to={href} className={interactive}>
       <CardContent item={item} />
     </Link>
   );

@@ -164,20 +164,43 @@ export interface AdminMenuItemDto extends MenuItemDto {
   translations: MenuTranslationDto[];
 }
 
+/**
+ * A staff-uploaded picture. `url` is app-relative (`/api/uploads/<hash>.<ext>`)
+ * so it passes `isSafeUrl` and can be stored in any `imageUrl` column as-is.
+ */
+export interface UploadedImageDto {
+  url: string;
+}
+
 /** One card of the home-screen carousel, already resolved to a single locale. */
 export interface NewsItemDto {
   id: number;
+  /** URL key of the item's own page — /news/:slug */
+  slug: string;
   title: string;
+  /** One-line teaser */
   body: string | null;
-  /** App-relative path or absolute http(s) URL — see `isSafeUrl` */
+  /** App-relative path or absolute http(s) URL — see `isSafeUrl`; doubles as the article cover */
   imageUrl: string | null;
+  /** Explicit target the card links to; when null the card opens its page if it has an article */
   linkUrl: string | null;
+  /** ISO instant the item was created — the date shown on the page */
+  publishedAt: string;
+  /** True when the resolved locale has article content — the card then links to /news/:slug */
+  hasArticle: boolean;
+}
+
+/** The item's own page: the card plus its full text in the light article markup. */
+export interface NewsArticleDto extends NewsItemDto {
+  content: string | null;
 }
 
 export interface NewsTranslationDto {
   locale: Locale;
   title: string;
   body: string | null;
+  /** Article body (see `parseArticle` in the web app); null = card only */
+  content: string | null;
 }
 
 /** News row for staff: includes hidden items (uk display copy) + all translations. */

@@ -1,5 +1,6 @@
 import { CalendarDays, Users } from 'lucide-react';
 import type { TournamentDto } from '@repo/shared';
+import { resolveAssetUrl } from '../lib/api';
 import { formatDayLong } from '../lib/format';
 import { isLive, rosterProgress, stateLabel, whenLabel } from '../lib/tournaments';
 import { m } from '../paraglide/messages.js';
@@ -70,7 +71,12 @@ export function TournamentCardBody({ tournament }: { tournament: TournamentDto }
     <>
       {tournament.imageUrl ? (
         // Decorative: the headline right below carries the same information
-        <img src={tournament.imageUrl} alt="" loading="lazy" className="h-24 w-full object-cover" />
+        <img
+          src={resolveAssetUrl(tournament.imageUrl)}
+          alt=""
+          loading="lazy"
+          className="h-24 w-full object-cover"
+        />
       ) : null}
       <div className="flex flex-col gap-2 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">

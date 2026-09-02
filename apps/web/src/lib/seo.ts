@@ -14,10 +14,14 @@ const OG_LOCALES = { uk: 'uk_UA', pl: 'pl_PL', en: 'en_GB' } as const;
  * the canonical and the og:url agree with each other and with the sitemap
  * (locale is a cookie, not a URL segment, so one canonical serves all three).
  */
-export function pageHead(title: string, description: string, pathname: string) {
+export function pageHead(title: string, description: string, pathname: string, image?: string) {
   // Index routes match with a trailing slash ("/tournaments/"); the sitemap and
   // every internal link use the bare form, and a canonical must pick one.
   const url = `${SITE_URL}${pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname}`;
+  // Unfurlers need an absolute image URL; app-relative covers (uploads included)
+  // are same-origin with the site in production.
+  const imageUrl =
+    image === undefined ? undefined : image.startsWith('/') ? `${SITE_URL}${image}` : image;
   return {
     meta: [
       { title },
@@ -26,10 +30,17 @@ export function pageHead(title: string, description: string, pathname: string) {
       { property: 'og:description', content: description },
       { property: 'og:url', content: url },
       { property: 'og:locale', content: OG_LOCALES[getLocale()] },
-      // Per-page twins of the og:* set; the card type and image are global (__root)
+      // Per-page twins of the og:* set; the card type is global (__root), and so
+      // is the image unless the page brings its own
       { name: 'twitter:title', content: title },
       { name: 'twitter:description', content: description },
-      { name: 'twitter:url', content: url }
+      { name: 'twitter:url', content: url },
+      ...(imageUrl === undefined
+        ? []
+        : [
+            { property: 'og:image', content: imageUrl },
+            { name: 'twitter:image', content: imageUrl }
+          ])
     ],
     links: [{ rel: 'canonical', href: url }]
   };

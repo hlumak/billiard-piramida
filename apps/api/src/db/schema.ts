@@ -146,9 +146,11 @@ export const newsItems = pgTable(
   'news_items',
   {
     id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-    /** Optional illustration: app-relative path or absolute http(s) URL */
+    /** URL key of the item's own page — /news/:slug; stable once published */
+    slug: text('slug').notNull().unique(),
+    /** Optional illustration (also the article's cover): app-relative path or http(s) URL */
     imageUrl: text('image_url'),
-    /** Optional target the whole card links to */
+    /** Optional target the card links to instead of its own page */
     linkUrl: text('link_url'),
     isPublished: boolean('is_published').notNull().default(true),
     /** Staff-controlled carousel position, ascending */
@@ -167,7 +169,10 @@ export const newsItemTranslations = pgTable(
       .references(() => newsItems.id, { onDelete: 'cascade' }),
     locale: text('locale').notNull(),
     title: text('title').notNull(),
-    body: text('body')
+    /** One-line teaser for the carousel card */
+    body: text('body'),
+    /** Full article for /news/:slug in the light markup `parseArticle` reads; null = card only */
+    content: text('content')
   },
   t => [primaryKey({ columns: [t.newsItemId, t.locale] })]
 );

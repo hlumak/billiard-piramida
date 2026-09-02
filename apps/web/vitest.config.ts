@@ -10,6 +10,6 @@ export default defineConfig({
   plugins: [viteReact()],
   test: {
     environment: 'jsdom',
-    include: ['test/**/*.test.tsx']
+    include: ['test/**/*.test.{ts,tsx}']
   }
 });

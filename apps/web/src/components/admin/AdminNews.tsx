@@ -40,7 +40,19 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
         <div className="min-w-0 flex-1">
           <p className="font-medium text-creme">{item.title}</p>
           {item.body ? <p className="truncate text-xs text-grey-cool">{item.body}</p> : null}
-          {item.linkUrl ? <p className="truncate text-xs text-grey-cool">{item.linkUrl}</p> : null}
+          {/* Where the card leads: its own page when it has an article, else the explicit link */}
+          {item.hasArticle ? (
+            <a
+              href={`/news/${item.slug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="truncate text-xs text-golden hover:text-golden-hover"
+            >
+              /news/{item.slug}
+            </a>
+          ) : item.linkUrl ? (
+            <p className="truncate text-xs text-grey-cool">{item.linkUrl}</p>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

@@ -57,6 +57,8 @@ import {
 } from '../lib/schemas.ts';
 import { ADMIN_TOKEN_COOKIE, clearAdminCookies, setAdminCookies } from '../lib/cookies.ts';
 import { EXCLUSION_VIOLATION, FOREIGN_KEY_VIOLATION, pgErrorCode } from '../lib/errors.ts';
+import { adminImageRoutes } from './admin-images.ts';
+import { hasArticleText } from './news.ts';
 import { adminTournamentRoutes } from './admin-tournaments.ts';
 import { adminVenueConfigRoutes } from './admin-venue-config.ts';
 import { slugify } from '../lib/slug.ts';
@@ -158,16 +160,21 @@ function toAdminNewsItem(item: NewsItemRow, translations: NewsTranslationRow[]) 
   const uk = forItem.find(t => t.locale === 'uk');
   return {
     id: item.id,
+    slug: item.slug,
     title: uk?.title ?? forItem[0]?.title ?? '',
     body: uk?.body ?? forItem[0]?.body ?? null,
     imageUrl: item.imageUrl,
     linkUrl: item.linkUrl,
+    publishedAt: item.createdAt.toISOString(),
+    // Staff care whether ANY locale has a page, not just the one they read in
+    hasArticle: forItem.some(t => hasArticleText(t.content)),
     isPublished: item.isPublished,
     sortOrder: item.sortOrder,
     translations: forItem.map(t => ({
       locale: t.locale as 'uk' | 'pl' | 'en',
       title: t.title,
-      body: t.body
+      body: t.body,
+      content: t.content
     }))
   };
 }
@@ -1085,12 +1092,15 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         {
           locale: LOCALE_SCHEMA,
           title: Type.String({ minLength: 1, maxLength: 120 }),
-          body: Type.Optional(Type.Union([Type.String({ maxLength: 500 }), Type.Null()]))
+          body: Type.Optional(Type.Union([Type.String({ maxLength: 500 }), Type.Null()])),
+          /** Full article in the light markup the web app renders; omitted/blank = card only */
+          content: Type.Optional(Type.Union([Type.String({ maxLength: 20_000 }), Type.Null()]))
         },
         { additionalProperties: false }
       ),
       { minItems: 1, maxItems: 3 }
     );
+    const NEWS_SLUG = Type.Optional(Type.String({ minLength: 1, maxLength: 80 }));
     const NEWS_URL = Type.Optional(Type.Union([Type.String({ maxLength: 500 }), Type.Null()]));
     const NEWS_SORT_ORDER = Type.Optional(Type.Integer({ minimum: 0, maximum: 9999 }));
 
@@ -1115,6 +1125,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         schema: {
           body: Type.Object(
             {
+              /** Omitted: derived from the Polish (or first) title */
+              slug: NEWS_SLUG,
               imageUrl: NEWS_URL,
               linkUrl: NEWS_URL,
               sortOrder: NEWS_SORT_ORDER,
@@ -1134,10 +1146,28 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
           return reply.code(422).send({ error: 'invalid_url' });
         }
 
+        // Polish is the required copy, so it names the page; an all-Cyrillic
+        // title slugifies to nothing and `slugify`'s fallback owns that
+        const pl = translations.find(t => t.locale === 'pl');
+        const titleForSlug = pl?.title ?? translations[0]?.title ?? '';
+        const base = slugify(request.body.slug ?? titleForSlug, 'news');
+
         const created = await admin.db.transaction(async tx => {
+          // Unique slug: append a counter on collision, same as tournaments
+          let slug = base;
+          for (let attempt = 2; attempt < 20; attempt++) {
+            const [existing] = await tx
+              .select({ id: newsItems.id })
+              .from(newsItems)
+              .where(eq(newsItems.slug, slug));
+            if (!existing) break;
+            slug = `${base}-${attempt}`;
+          }
+
           const [item] = await tx
             .insert(newsItems)
             .values({
+              slug,
               imageUrl,
               linkUrl,
               ...(sortOrder !== undefined ? { sortOrder } : {}),
@@ -1150,7 +1180,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
               newsItemId: item.id,
               locale: t.locale,
               title: t.title.trim(),
-              body: t.body?.trim() || null
+              body: t.body?.trim() || null,
+              content: t.content?.trim() || null
             }))
           );
           return item;
@@ -1218,12 +1249,17 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
                   newsItemId: item.id,
                   locale: t.locale,
                   title: t.title.trim(),
-                  body: t.body?.trim() || null
+                  body: t.body?.trim() || null,
+                  content: t.content?.trim() || null
                 }))
               )
               .onConflictDoUpdate({
                 target: [newsItemTranslations.newsItemId, newsItemTranslations.locale],
-                set: { title: sql`excluded.title`, body: sql`excluded.body` }
+                set: {
+                  title: sql`excluded.title`,
+                  body: sql`excluded.body`,
+                  content: sql`excluded.content`
+                }
               });
           }
           return item;
@@ -1262,5 +1298,6 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
     // inherits the token hook above, which is the whole point of the scope.
     await admin.register(adminTournamentRoutes);
     await admin.register(adminVenueConfigRoutes);
+    await admin.register(adminImageRoutes);
   });
 }

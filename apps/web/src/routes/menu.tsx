@@ -73,6 +73,11 @@ function MenuPage() {
               </ButtonLink>
             </StaggerItem>
             <StaggerItem>
+              <ButtonLink to="/news" variant="outline">
+                {m.menu_news()}
+              </ButtonLink>
+            </StaggerItem>
+            <StaggerItem>
               <ButtonLink to="/contacts" variant="outline">
                 {m.menu_contacts()}
               </ButtonLink>

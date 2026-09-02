@@ -44,6 +44,14 @@ export const newsQuery = (locale: string) =>
     staleTime: 5 * 60_000
   });
 
+/** One news item's own page (/news/:slug). */
+export const newsArticleQuery = (slug: string, locale: string) =>
+  queryOptions({
+    queryKey: ['news', 'article', slug, locale],
+    queryFn: ({ signal }) => api.newsArticle(slug, locale, signal),
+    staleTime: 5 * 60_000
+  });
+
 /** Tournament announcements. Shorter than news: the seat counter moves. */
 export const tournamentsQuery = (locale: string) =>
   queryOptions({

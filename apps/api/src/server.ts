@@ -9,7 +9,10 @@ const app = await buildApp({
   allowedOrigins: config.allowedOrigins,
   adminToken: config.adminToken,
   jwtSecret: config.jwtSecret,
-  cookieSecure: config.cookieSecure
+  cookieSecure: config.cookieSecure,
+  trustedProxies: config.trustedProxies,
+  uploadsDir: config.uploadsDir,
+  oembedToken: config.metaOembedToken
 });
 
 // Graceful shutdown: drain in-flight requests and close the pg pool (onClose hook)

@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
@@ -50,6 +53,7 @@ const MONDAY = nextDate(1);
 const SATURDAY = nextDate(6);
 
 let app: Awaited<ReturnType<typeof buildApp>>;
+let uploadsDir: string;
 
 before(async () => {
   const admin = new pg.Client({ connectionString: ADMIN_URL });
@@ -63,11 +67,13 @@ before(async () => {
   await pool.end();
   await seed(TEST_URL);
 
+  uploadsDir = await mkdtemp(join(tmpdir(), 'piramida-uploads-'));
   app = await buildApp({
     databaseUrl: TEST_URL,
     logger: false,
     adminToken: 'test-admin-token',
     jwtSecret: 'test-jwt-secret',
+    uploadsDir,
     // inject reports one source address for every request, so the global bucket
     // is shared by the whole suite. Route-level limits are still exercised below.
     rateLimitMax: 1000
@@ -77,6 +83,7 @@ before(async () => {
 
 after(async () => {
   await app.close();
+  await rm(uploadsDir, { recursive: true, force: true });
 });
 
 test('health check responds', async () => {
@@ -762,7 +769,12 @@ test('news is localized, published-only, and ordered by sort order', async () =>
   const cards = pl.json();
   assert.equal(cards.length, 2);
   assert.equal(cards[0].title, 'Druga sala otwarta');
-  assert.equal(cards[0].linkUrl, '/book');
+  // The seeded story has an article, so the card opens its own page instead of a link
+  assert.equal(cards[0].slug, 'second-hall-open');
+  assert.equal(cards[0].linkUrl, null);
+  assert.equal(cards[0].hasArticle, true);
+  assert.equal(cards[1].linkUrl, '/prices');
+  assert.equal(cards[1].hasArticle, false);
   // Ascending sortOrder, seeded 1 then 2
   assert.equal(cards[1].title, 'Zniżka na kartę sportową');
 
@@ -815,6 +827,25 @@ test('admin news CRUD: create, hide, reorder, url guard, delete', async () => {
   const staffList = await app.inject({ method: 'GET', url: '/api/admin/news', headers });
   assert.ok(staffList.json().some((n: { id: number }) => n.id === card.id));
 
+  // Polish is the only required copy: a pl-only card is still shown to uk/en
+  // visitors, in Polish, rather than dropped from their carousel
+  const plOnly = await app.inject({
+    method: 'POST',
+    url: '/api/admin/news',
+    headers,
+    payload: { sortOrder: 0, translations: [{ locale: 'pl', title: 'Tylko po polsku' }] }
+  });
+  assert.equal(plOnly.statusCode, 201);
+  for (const locale of ['uk', 'en']) {
+    const feed = await app.inject({ method: 'GET', url: `/api/news?locale=${locale}` });
+    assert.equal(feed.json()[0].title, 'Tylko po polsku', locale);
+  }
+  await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/news/${plOnly.json().id}`,
+    headers
+  });
+
   // A translations-only PATCH touches no news_items column — must still work
   const retitled = await app.inject({
     method: 'PATCH',
@@ -864,6 +895,234 @@ test('admin news CRUD: create, hide, reorder, url guard, delete', async () => {
 
   // The carousel requires a session, the storefront does not
   const unauthorized = await app.inject({ method: 'GET', url: '/api/admin/news' });
+  assert.equal(unauthorized.statusCode, 401);
+});
+
+/** A one-part multipart body, the way a browser posts a single file input. */
+function multipartFile(filename: string, mimetype: string, bytes: Buffer) {
+  const boundary = 'piramidaTestBoundary';
+  const head = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimetype}\r\n\r\n`
+  );
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return {
+    payload: Buffer.concat([head, bytes, tail]),
+    headers: { 'content-type': `multipart/form-data; boundary=${boundary}` }
+  };
+}
+
+/** Smallest valid PNG (1×1 transparent pixel). */
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+test('news pages: slug from the Polish headline, article by slug, hidden items 404', async () => {
+  const headers = { 'x-admin-token': 'test-admin-token' };
+
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/news',
+    headers,
+    payload: {
+      imageUrl: '/news/hall.webp',
+      translations: [
+        {
+          locale: 'pl',
+          title: 'Turniej klubowy w maju',
+          body: 'Zapisy trwają',
+          content:
+            '## Format\n\n- 16 graczy\n\n![Sala](/api/uploads/x.webp)\n\nZapisz się na [stronie](/tournaments).'
+        },
+        { locale: 'uk', title: 'Клубний турнір у травні' }
+      ]
+    }
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  const card = created.json();
+  assert.equal(card.slug, 'turniej-klubowy-w-maju');
+  assert.equal(card.hasArticle, true);
+  assert.equal(
+    card.translations
+      .find((t: { locale: string }) => t.locale === 'pl')
+      .content.startsWith('## Format'),
+    true
+  );
+
+  // Same headline again → suffixed slug, never a 500 on the unique index
+  const twin = await app.inject({
+    method: 'POST',
+    url: '/api/admin/news',
+    headers,
+    payload: { translations: [{ locale: 'pl', title: 'Turniej klubowy w maju' }] }
+  });
+  assert.equal(twin.statusCode, 201);
+  assert.equal(twin.json().slug, 'turniej-klubowy-w-maju-2');
+  // A card without article text has no page to lead to
+  assert.equal(twin.json().hasArticle, false);
+
+  // The public page in Polish; a uk reader whose locale has a headline but no
+  // article text gets the Polish article under the Ukrainian headline
+  const pl = await app.inject({ method: 'GET', url: `/api/news/${card.slug}?locale=pl` });
+  assert.equal(pl.statusCode, 200);
+  assert.equal(pl.json().title, 'Turniej klubowy w maju');
+  assert.match(pl.json().content, /^## Format/);
+  assert.equal(pl.json().hasArticle, true);
+  assert.equal(pl.json().imageUrl, '/news/hall.webp');
+  assert.ok(!Number.isNaN(Date.parse(pl.json().publishedAt)));
+  const uk = await app.inject({ method: 'GET', url: `/api/news/${card.slug}?locale=uk` });
+  assert.equal(uk.json().title, 'Клубний турнір у травні');
+  assert.match(uk.json().content, /^## Format/);
+  assert.equal(uk.json().hasArticle, true);
+
+  // The list carries the same flag, so the carousel knows which cards open a page
+  const list = await app.inject({ method: 'GET', url: '/api/news?locale=pl' });
+  const listed = list.json().find((n: { id: number }) => n.id === card.id);
+  assert.equal(listed.hasArticle, true);
+  assert.equal(listed.slug, card.slug);
+  assert.equal('content' in listed, false);
+
+  // Explicit slug is slugified too
+  const custom = await app.inject({
+    method: 'POST',
+    url: '/api/admin/news',
+    headers,
+    payload: { slug: 'Nowe Stoły!', translations: [{ locale: 'pl', title: 'x' }] }
+  });
+  assert.equal(custom.json().slug, 'nowe-stoly');
+
+  // Unpublishing takes the page down, not just the card
+  await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/news/${card.id}`,
+    headers,
+    payload: { isPublished: false }
+  });
+  const hidden = await app.inject({ method: 'GET', url: `/api/news/${card.slug}?locale=pl` });
+  assert.equal(hidden.statusCode, 404);
+  const unknown = await app.inject({ method: 'GET', url: '/api/news/no-such-story?locale=pl' });
+  assert.equal(unknown.statusCode, 404);
+
+  for (const id of [card.id, twin.json().id, custom.json().id]) {
+    await app.inject({ method: 'DELETE', url: `/api/admin/news/${id}`, headers });
+  }
+});
+
+test('admin image upload: stores by content hash, serves immutable, guards format and size', async () => {
+  const auth = { 'x-admin-token': 'test-admin-token' };
+  const png = multipartFile('cup.png', 'image/png', ONE_PIXEL_PNG);
+
+  const uploaded = await app.inject({
+    method: 'POST',
+    url: '/api/admin/images',
+    headers: { ...auth, ...png.headers },
+    payload: png.payload
+  });
+  assert.equal(uploaded.statusCode, 201, uploaded.body);
+  const { url } = uploaded.json();
+  assert.match(url, /^\/api\/uploads\/[0-9a-f]{32}\.png$/);
+
+  // Served back, public and cacheable forever (the name is the content)
+  const served = await app.inject({ method: 'GET', url });
+  assert.equal(served.statusCode, 200);
+  assert.equal(served.headers['content-type'], 'image/png');
+  assert.match(String(served.headers['cache-control']), /immutable/);
+  assert.equal(served.headers['cross-origin-resource-policy'], 'cross-origin');
+  assert.ok(served.rawPayload.equals(ONE_PIXEL_PNG));
+
+  // Same bytes → same URL, no second file
+  const again = await app.inject({
+    method: 'POST',
+    url: '/api/admin/images',
+    headers: { ...auth, ...png.headers },
+    payload: png.payload
+  });
+  assert.equal(again.json().url, url);
+
+  // The URL passes the news card's own URL guard
+  const card = await app.inject({
+    method: 'POST',
+    url: '/api/admin/news',
+    headers: auth,
+    payload: { imageUrl: url, translations: [{ locale: 'uk', title: 'Фото' }] }
+  });
+  assert.equal(card.statusCode, 201, card.body);
+  assert.equal(card.json().imageUrl, url);
+
+  // Format is sniffed, not read off the filename or declared type
+  const fakePng = multipartFile('evil.png', 'image/png', Buffer.from('<html>hi</html>'));
+  const rejected = await app.inject({
+    method: 'POST',
+    url: '/api/admin/images',
+    headers: { ...auth, ...fakePng.headers },
+    payload: fakePng.payload
+  });
+  assert.equal(rejected.statusCode, 415);
+  assert.equal(rejected.json().error, 'unsupported_image');
+
+  // Over the 5 MB cap → 413, and nothing truncated gets stored
+  const huge = multipartFile(
+    'huge.png',
+    'image/png',
+    Buffer.concat([ONE_PIXEL_PNG, Buffer.alloc(5 * 1024 * 1024)])
+  );
+  const tooLarge = await app.inject({
+    method: 'POST',
+    url: '/api/admin/images',
+    headers: { ...auth, ...huge.headers },
+    payload: huge.payload
+  });
+  assert.equal(tooLarge.statusCode, 413);
+  assert.equal(tooLarge.json().error, 'file_too_large');
+
+  // JSON where multipart is expected
+  const notMultipart = await app.inject({
+    method: 'POST',
+    url: '/api/admin/images',
+    headers: auth,
+    payload: { file: 'nope' }
+  });
+  assert.equal(notMultipart.statusCode, 415);
+  assert.equal(notMultipart.json().error, 'expected_multipart');
+
+  const missing = await app.inject({ method: 'GET', url: '/api/uploads/nope.png' });
+  assert.equal(missing.statusCode, 404);
+
+  const unauthorized = await app.inject({
+    method: 'POST',
+    url: '/api/admin/images',
+    headers: png.headers,
+    payload: png.payload
+  });
+  assert.equal(unauthorized.statusCode, 401);
+});
+
+test('post image import refuses non-public targets before touching the network', async () => {
+  const auth = { 'x-admin-token': 'test-admin-token' };
+  for (const url of [
+    'not a url',
+    'ftp://example.com/pic.jpg',
+    'http://127.0.0.1:3001/health',
+    'http://localhost/admin',
+    'http://169.254.169.254/latest/meta-data',
+    'http://[::1]/',
+    'https://user:pw@example.com/post'
+  ]) {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/images/from-post',
+      headers: auth,
+      payload: { url }
+    });
+    assert.equal(res.statusCode, 422, url);
+    assert.equal(res.json().error, 'invalid_url', url);
+  }
+
+  const unauthorized = await app.inject({
+    method: 'POST',
+    url: '/api/admin/images/from-post',
+    payload: { url: 'https://www.instagram.com/p/abc/' }
+  });
   assert.equal(unauthorized.statusCode, 401);
 });
 

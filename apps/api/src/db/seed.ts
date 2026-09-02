@@ -109,23 +109,39 @@ const FOOD: SeedFood[] = [
 ];
 
 interface SeedNews {
+  slug: string;
   sortOrder: number;
   linkUrl: string | null;
-  uk: [title: string, body: string];
-  pl: [title: string, body: string];
-  en: [title: string, body: string];
+  uk: [title: string, body: string, content?: string];
+  pl: [title: string, body: string, content?: string];
+  en: [title: string, body: string, content?: string];
 }
 
 /** Starter cards for the home carousel — staff replace these from the admin panel. */
 const NEWS: SeedNews[] = [
   {
+    slug: 'second-hall-open',
     sortOrder: 1,
-    linkUrl: '/book',
-    uk: ['Друга зала відкрита', 'Чотири нові столи 12ft — бронюйте онлайн уже сьогодні.'],
-    pl: ['Druga sala otwarta', 'Cztery nowe stoły 12ft — rezerwuj online już dziś.'],
-    en: ['Second hall is open', 'Four new 12ft tables — book yours online today.']
+    // No linkUrl: the card opens its own page, which is where the story lives
+    linkUrl: null,
+    uk: [
+      'Друга зала відкрита',
+      'Чотири нові столи 12ft — бронюйте онлайн уже сьогодні.',
+      "У другій залі стоять чотири столи 12ft для російської піраміди — той самий розмір, що на професійних турнірах.\n\n## Що змінилося\n\n- Столи 6–9 бронюються онлайн так само, як і перші п'ять\n- Ставка за годину для столів 12ft вища — див. розділ «Ціни»\n- Зала має окремий вхід із бару\n\nЗабронювати стіл можна на сторінці [бронювання](/book)."
+    ],
+    pl: [
+      'Druga sala otwarta',
+      'Cztery nowe stoły 12ft — rezerwuj online już dziś.',
+      'W drugiej sali stoją cztery stoły 12ft do piramidy rosyjskiej — ten sam rozmiar, co na turniejach zawodowych.\n\n## Co się zmieniło\n\n- Stoły 6–9 rezerwuje się online tak samo, jak pierwszą piątkę\n- Stawka godzinowa za stoły 12ft jest wyższa — zobacz „Ceny”\n- Sala ma osobne wejście z baru\n\nStolik zarezerwujesz na stronie [rezerwacji](/book).'
+    ],
+    en: [
+      'Second hall is open',
+      'Four new 12ft tables — book yours online today.',
+      'The second hall holds four 12ft tables for Russian pyramid — the same size used at professional tournaments.\n\n## What changed\n\n- Tables 6–9 are booked online just like the first five\n- The hourly rate for 12ft tables is higher — see Prices\n- The hall has its own entrance from the bar\n\nBook a table on the [booking page](/book).'
+    ]
   },
   {
+    slug: 'sport-card-discount',
     sortOrder: 2,
     linkUrl: '/prices',
     uk: [
@@ -258,7 +274,7 @@ export async function seed(url: string) {
         await db.transaction(async tx => {
           const [item] = await tx
             .insert(newsItems)
-            .values({ sortOrder: news.sortOrder, linkUrl: news.linkUrl })
+            .values({ slug: news.slug, sortOrder: news.sortOrder, linkUrl: news.linkUrl })
             .returning({ id: newsItems.id });
           if (!item) return;
 
@@ -267,7 +283,8 @@ export async function seed(url: string) {
               newsItemId: item.id,
               locale,
               title: news[locale][0],
-              body: news[locale][1]
+              body: news[locale][1],
+              content: news[locale][2] ?? null
             }))
           );
         });

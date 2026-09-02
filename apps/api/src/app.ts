@@ -2,6 +2,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import jwt from '@fastify/jwt';
 import { Type } from '@sinclair/typebox';
@@ -11,6 +12,8 @@ import Fastify, { type FastifyError } from 'fastify';
 import { createDb, type Db } from './db/client.ts';
 import { AvailabilityHub } from './lib/availability-hub.ts';
 import { VenueConfigStore } from './services/venue-config.ts';
+import { ImageStore, UPLOADS_URL_PREFIX } from './services/images.ts';
+import { DEFAULT_TRUSTED_PROXIES, DEFAULT_UPLOADS_DIR } from './lib/config.ts';
 import { ERROR_RESPONSE } from './lib/schemas.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
@@ -32,6 +35,10 @@ declare module 'fastify' {
     availabilityHub: AvailabilityHub;
     /** Staff-editable rates and opening hours, cached — see VenueConfigStore */
     venueConfig: VenueConfigStore;
+    /** Staff-uploaded pictures on disk, served under /api/uploads/ */
+    images: ImageStore;
+    /** Meta Graph app token for the Instagram post importer; null = scrape only */
+    oembedToken: string | null;
     /** Secure flag for auth cookies (true in prod/https). */
     cookieSecure: boolean;
     /** Resolves the signed-in user from the JWT (Authorization header or cookie), or null. */
@@ -57,6 +64,16 @@ export interface AppOptions {
    * shares one bucket that a real client never would.
    */
   rateLimitMax?: number | undefined;
+  /**
+   * Peers whose X-Forwarded-* headers are trusted: comma-separated IPs/CIDRs or
+   * @fastify/proxy-addr presets. Default covers nginx on the same host or in a
+   * container on the same private network.
+   */
+  trustedProxies?: string | undefined;
+  /** Directory for staff-uploaded pictures; created if missing. */
+  uploadsDir?: string | undefined;
+  /** Meta Graph app token for Instagram oEmbed; the importer scrapes og:image without it. */
+  oembedToken?: string | undefined;
 }
 
 export async function buildApp({
@@ -66,17 +83,22 @@ export async function buildApp({
   adminToken,
   jwtSecret,
   cookieSecure = false,
-  rateLimitMax = 100
+  rateLimitMax = 100,
+  trustedProxies = DEFAULT_TRUSTED_PROXIES,
+  uploadsDir = DEFAULT_UPLOADS_DIR,
+  oembedToken
 }: AppOptions) {
   const app = Fastify({
     logger:
       typeof logger === 'object'
         ? { ...logger, redact: { paths: ['req.headers.authorization'], remove: true } }
         : logger,
-    // Behind exactly one nginx reverse proxy: trust only the last hop so
-    // request.ip is the address nginx appended, not a client-forged
-    // X-Forwarded-For (which would let anyone rotate IPs past the rate limits).
-    trustProxy: 1
+    // Behind nginx: X-Forwarded-For is honoured only when the connecting peer
+    // is one of these addresses/CIDRs, so request.ip (rate-limit key) is the
+    // address nginx appended, not a client-forged header. Hop counts
+    // (`trustProxy: 1`) fail closed since fastify 5.12 — every request would
+    // key on nginx's own address and share one bucket.
+    trustProxy: trustedProxies
   }).withTypeProvider<TypeBoxTypeProvider>();
 
   const { db, pool } = createDb(databaseUrl);
@@ -88,6 +110,10 @@ export async function buildApp({
   app.decorate('availabilityHub', new AvailabilityHub());
   app.decorate('venueConfig', new VenueConfigStore(db));
   app.decorate('cookieSecure', cookieSecure);
+  const images = new ImageStore(uploadsDir);
+  await images.ensureDir();
+  app.decorate('images', images);
+  app.decorate('oembedToken', oembedToken ?? null);
   app.addHook('onClose', async () => {
     await pool.end();
   });
@@ -120,6 +146,23 @@ export async function buildApp({
     secret: jwtSecret ?? 'auth-disabled-placeholder',
     sign: { expiresIn: '30d' },
     cookie: { cookieName: 'token', signed: false }
+  });
+
+  // Uploaded pictures. Names are content hashes (see ImageStore), so a URL never
+  // changes meaning and browsers may keep it for a year. Helmet's default
+  // Cross-Origin-Resource-Policy is same-origin, which would block <img> from
+  // the web dev server (:3000 → :8080); pictures are public, so relax it here.
+  await app.register(fastifyStatic, {
+    root: images.dir,
+    prefix: UPLOADS_URL_PREFIX,
+    decorateReply: false,
+    index: false,
+    list: false,
+    maxAge: '365d',
+    immutable: true,
+    setHeaders: reply => {
+      reply.header('cross-origin-resource-policy', 'cross-origin');
+    }
   });
 
   app.decorate('authenticatedUser', async (request: FastifyRequest) => {

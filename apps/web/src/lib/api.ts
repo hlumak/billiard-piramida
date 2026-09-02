@@ -4,6 +4,7 @@ import type {
   CreateBookingInput,
   MenuItemDto,
   NewOrderItem,
+  NewsArticleDto,
   NewsItemDto,
   TableDto,
   TournamentDto,
@@ -26,8 +27,10 @@ import type {
  * override for other topologies. In dev (`vite dev`, no --env-file) neither is
  * set, so SSR falls back to the public URL and behaves as before.
  */
+const PUBLIC_API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+
 function resolveApiUrl(): string {
-  const publicUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+  const publicUrl = PUBLIC_API_URL;
   if (!import.meta.env.SSR) return publicUrl;
 
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
@@ -38,6 +41,17 @@ function resolveApiUrl(): string {
 }
 
 const API_URL: string = resolveApiUrl();
+
+/**
+ * Staff-uploaded pictures are stored as `/api/uploads/…` and served by the API.
+ * Same-origin in production, but in dev the web app (:3000) and the API (:8080)
+ * are different origins, so the path needs the API's PUBLIC origin in front —
+ * public even during SSR, because this lands in an `<img src>` the browser
+ * loads, not in a fetch the server makes.
+ */
+export function resolveAssetUrl(url: string): string {
+  return url.startsWith('/api/') ? `${PUBLIC_API_URL}${url}` : url;
+}
 
 /** Non-sensitive flag cookie the server sets alongside the HttpOnly session
  *  cookie, so the client can gate its UI without ever reading the token. */
@@ -66,6 +80,20 @@ interface RequestOptions {
   signal?: AbortSignal | undefined;
 }
 
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let code = 'unknown';
+    try {
+      const errorBody = (await response.json()) as { error?: string; message?: string };
+      code = errorBody.error ?? errorBody.message ?? code;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(response.status, code);
+  }
+  return response.json() as Promise<T>;
+}
+
 export async function request<T>(
   path: string,
   { method, body, headers, signal }: RequestOptions = {}
@@ -82,17 +110,17 @@ export async function request<T>(
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {})
   });
-  if (!response.ok) {
-    let code = 'unknown';
-    try {
-      const errorBody = (await response.json()) as { error?: string; message?: string };
-      code = errorBody.error ?? errorBody.message ?? code;
-    } catch {
-      /* non-JSON error body */
-    }
-    throw new ApiError(response.status, code);
-  }
-  return response.json() as Promise<T>;
+  return parseResponse<T>(response);
+}
+
+/** multipart POST — the browser sets the content-type (with its boundary) itself. */
+export async function upload<T>(path: string, form: FormData): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form
+  });
+  return parseResponse<T>(response);
 }
 
 export const api = {
@@ -104,6 +132,8 @@ export const api = {
     request<MenuItemDto[]>(`/api/menu?locale=${locale}`, { signal }),
   news: (locale: string, signal?: AbortSignal) =>
     request<NewsItemDto[]>(`/api/news?locale=${locale}`, { signal }),
+  newsArticle: (slug: string, locale: string, signal?: AbortSignal) =>
+    request<NewsArticleDto>(`/api/news/${encodeURIComponent(slug)}?locale=${locale}`, { signal }),
   tournaments: (locale: string, signal?: AbortSignal) =>
     request<TournamentDto[]>(`/api/tournaments?locale=${locale}`, { signal }),
   tournament: (slug: string, locale: string, signal?: AbortSignal) =>

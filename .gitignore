@@ -9,5 +9,7 @@ dist/
 !.env.example
 .DS_Store
 coverage/
+# Staff-uploaded pictures (news images) — runtime data, not source
+apps/api/uploads/
 apps/web/src/routeTree.gen.ts
 apps/web/src/paraglide/
