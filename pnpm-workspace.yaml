@@ -7,6 +7,7 @@ allowBuilds:
 # Delay newly-published versions for a day before installing (supply-chain guard)
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
+  - 'srvx@1.0.3'
   - '@oxfmt/binding-android-arm-eabi@0.59.0'
   - '@oxfmt/binding-android-arm64@0.59.0'
   - '@oxfmt/binding-darwin-arm64@0.59.0'
