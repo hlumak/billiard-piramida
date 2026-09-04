@@ -293,6 +293,9 @@ export interface AdminDailyStatDto {
 
 export interface AdminTableUtilizationDto {
   tableId: TableDto['id'];
+  kind: ActivityKind;
+  /** Number within the kind — what the bar is captioned with, never the id */
+  label: TableDto['label'];
   bookedHours: number;
   openHours: number;
 }

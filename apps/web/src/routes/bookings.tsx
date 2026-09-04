@@ -14,6 +14,7 @@ import { QueryError } from '../components/QueryError';
 import { recentBookingIds, rememberBooking } from '../lib/recent-bookings';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
+import { spotName } from '../lib/spots';
 
 export const Route = createFileRoute('/bookings')({
   head: () => ({ meta: noindexMeta(m.seo_title_bookings()) }),
@@ -77,7 +78,7 @@ function MyBookingsPage() {
                       <div className="mt-1 flex items-center justify-between text-sm text-grey-cool">
                         <span>
                           {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)} ·{' '}
-                          {m.table_n({ n: booking.tableId })}
+                          {spotName(booking.kind, booking.tableLabel)}
                         </span>
                         <span className="font-semibold text-creme">
                           {formatPln(booking.totalGrosz, intlTag())}

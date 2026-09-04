@@ -276,6 +276,8 @@ export const ADMIN_ANALYTICS_RESPONSE = Type.Object({
   tables: Type.Array(
     Type.Object({
       tableId: Type.Integer(),
+      kind: ACTIVITY_KIND,
+      label: Type.String(),
       bookedHours: Type.Number(),
       openHours: Type.Number()
     })

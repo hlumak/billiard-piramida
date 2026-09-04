@@ -884,6 +884,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
           daily,
           tables: allTables.map(t => ({
             tableId: t.id,
+            kind: t.kind,
+            label: t.label,
             bookedHours: bookedByTable.get(t.id) ?? 0,
             openHours: openHoursTotal
           })),

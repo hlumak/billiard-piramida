@@ -1,5 +1,5 @@
 import type { AdminTableUtilizationDto } from '@repo/shared';
-import { m } from '../../../paraglide/messages.js';
+import { spotName } from '../../../lib/spots';
 
 /**
  * Horizontal magnitude bars, one per table. Every bar is direct-labeled
@@ -13,7 +13,7 @@ export function UtilizationBars({ tables }: { tables: AdminTableUtilizationDto[]
         return (
           <div key={table.tableId} className="flex items-center gap-3">
             <span className="w-14 shrink-0 text-sm text-creme">
-              {m.table_n({ n: table.tableId })}
+              {spotName(table.kind, table.label)}
             </span>
             <div className="h-4 flex-1 overflow-hidden rounded-[4px] bg-club-green">
               <div
