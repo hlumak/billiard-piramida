@@ -134,6 +134,51 @@ function formReducer(state: FormState, action: FormAction): FormState {
   }
 }
 
+function submitErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.code === 'slot_taken') return m.err_slot_taken();
+    if (err.code === 'invalid_phone') return m.err_phone_invalid();
+    if (err.code === 'outside_operating_hours') return m.err_past_closing();
+  }
+  return m.err_generic();
+}
+
+interface SlotWindow {
+  date: IsoDate;
+  startHour: number;
+  duration: number;
+}
+
+/**
+ * Staff may log games from earlier today, so a table is free for the window
+ * when every hour is a valid slot that isn't already booked — using `booked`
+ * (not `available`, which also hides past hours) is what makes past-today
+ * walk-ins selectable.
+ *
+ * In edit mode the booking's own hours read as `booked` — by itself. Holding
+ * its current slot must not make its own table look unavailable, so those
+ * hours count as free for the form editing it.
+ */
+function isFreeForWindow(
+  table: TableAvailabilityDto,
+  { date, startHour, duration }: SlotWindow,
+  booking: BookingDto | undefined
+): boolean {
+  const held =
+    booking !== undefined &&
+    booking.tableId === table.tableId &&
+    warsawDate(booking.startsAt) === date
+      ? { start: warsawHour(booking.startsAt), end: warsawHour(booking.endsAt) }
+      : null;
+  const slotByHour = new Map(table.slots.map(s => [s.hour, s]));
+  for (let h = startHour; h < startHour + duration; h++) {
+    const slot = slotByHour.get(h);
+    if (!slot) return false;
+    if (slot.booked && !(held !== null && h >= held.start && h < held.end)) return false;
+  }
+  return true;
+}
+
 /** Reception desk: create a booking for a walk-in / phone client. */
 export function AdminNewBooking() {
   const [isOpen, setOpen] = useState(false);
@@ -232,34 +277,10 @@ export function AdminBookingModal({
     }
   });
 
-  // Staff may log games from earlier today, so a table is free for the window
-  // when every hour is a valid slot that isn't already booked — using `booked`
-  // (not `available`, which also hides past hours) is what makes past-today
-  // walk-ins selectable.
   const hours = slotStartsForDate(date, venueHours);
-  // In edit mode the booking's own hours read as `booked` — by itself. Holding
-  // its current slot must not make its own table look unavailable, so those
-  // hours count as free for this form only.
-  const ownDate = booking ? warsawDate(booking.startsAt) : null;
-  const ownStart = booking ? warsawHour(booking.startsAt) : 0;
-  const ownEnd = booking ? warsawHour(booking.endsAt) : 0;
-  const heldByThisBooking = (spotId: number, hour: number) =>
-    booking !== undefined &&
-    spotId === booking.tableId &&
-    date === ownDate &&
-    hour >= ownStart &&
-    hour < ownEnd;
-
-  const freeForWindow = (candidateTable: TableAvailabilityDto) => {
-    if (startHour === null) return false;
-    const slotByHour = new Map(candidateTable.slots.map(s => [s.hour, s]));
-    for (let h = startHour; h < startHour + effectiveDuration; h++) {
-      const slot = slotByHour.get(h);
-      if (!slot) return false;
-      if (slot.booked && !heldByThisBooking(candidateTable.tableId, h)) return false;
-    }
-    return true;
-  };
+  // No spot can be judged free until a start hour is picked
+  const slotWindow: SlotWindow | null =
+    startHour === null ? null : { date, startHour, duration: effectiveDuration };
 
   const canSubmit =
     startHour !== null && tableId !== null && name.trim().length > 0 && isValidPhone(phone);
@@ -323,7 +344,8 @@ export function AdminBookingModal({
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
                       {availability.tables.map(table => {
-                        const free = freeForWindow(table);
+                        const free =
+                          slotWindow !== null && isFreeForWindow(table, slotWindow, booking);
                         return (
                           <button
                             key={table.tableId}
@@ -395,15 +417,7 @@ export function AdminBookingModal({
 
                 {create.error ? (
                   <p className="text-sm text-danger-soft-foreground">
-                    {create.error instanceof ApiError
-                      ? create.error.code === 'slot_taken'
-                        ? m.err_slot_taken()
-                        : create.error.code === 'invalid_phone'
-                          ? m.err_phone_invalid()
-                          : create.error.code === 'outside_operating_hours'
-                            ? m.err_past_closing()
-                            : m.err_generic()
-                      : m.err_generic()}
+                    {submitErrorMessage(create.error)}
                   </p>
                 ) : null}
               </div>
