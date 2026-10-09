@@ -1,5 +1,5 @@
 import multipart from '@fastify/multipart';
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { ERROR_RESPONSE, UPLOADED_IMAGE_RESPONSE } from '../lib/schemas.ts';
 import { MAX_IMAGE_BYTES, UnsupportedImageError } from '../services/images.ts';

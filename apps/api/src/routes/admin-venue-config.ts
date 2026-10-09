@@ -2,7 +2,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { sql } from 'drizzle-orm';
 import { venueHours, venueRates } from '../db/schema.ts';
 import { ERROR_RESPONSE, RATE_TABLE, VENUE_CONFIG_RESPONSE, WEEKLY_HOURS } from '../lib/schemas.ts';
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 
 /**
  * Rates and opening hours, staff side. A whole-config PUT rather than per-field

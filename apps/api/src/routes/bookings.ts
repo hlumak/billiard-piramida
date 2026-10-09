@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import {
   addDays,
   BOOKING_DAYS_AHEAD,

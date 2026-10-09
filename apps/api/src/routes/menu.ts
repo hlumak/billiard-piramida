@@ -1,4 +1,4 @@
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { MenuItemDto } from '@repo/shared';
 import { DEFAULT_LOCALE, isLocale } from '@repo/shared';
 import { eq, inArray } from 'drizzle-orm';

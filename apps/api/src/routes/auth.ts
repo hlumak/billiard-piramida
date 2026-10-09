@@ -1,4 +1,4 @@
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { UserProfileDto } from '@repo/shared';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.ts';

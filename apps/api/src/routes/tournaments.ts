@@ -1,4 +1,4 @@
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import { DEFAULT_LOCALE, isLocale, type Locale, type TournamentDto } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';

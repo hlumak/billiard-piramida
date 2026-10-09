@@ -1,4 +1,4 @@
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { AvailabilityDto, TableAvailabilityDto } from '@repo/shared';
 import { hoursForDate, isIsoDate, MIN_BOOKING_HOURS } from '@repo/shared';
 import { and, eq, gt, lt } from 'drizzle-orm';

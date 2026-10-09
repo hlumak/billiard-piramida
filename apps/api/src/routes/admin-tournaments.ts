@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { MAX_TOURNAMENT_PLAYERS, isIsoDate, isSafeUrl } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';

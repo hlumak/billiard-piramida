@@ -1,4 +1,4 @@
-import { Type, type Static } from '@sinclair/typebox';
+import { Type, type Static } from 'typebox';
 import { MAX_HOURLY_RATE_GROSZ } from '@repo/shared';
 import type {
   AdminAnalyticsDto,

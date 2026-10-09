@@ -49,25 +49,25 @@ importers:
         version: 10.1.5
       '@fastify/type-provider-typebox':
         specifier: 6.1.0
-        version: 6.1.0(typebox@1.3.6)
+        version: 6.1.0(typebox@1.3.36)
       '@fastify/websocket':
         specifier: 11.3.3
         version: 11.3.3
       '@repo/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@sinclair/typebox':
-        specifier: 0.34.52
-        version: 0.34.52
       drizzle-orm:
         specifier: 1.0.0-rc.4
-        version: 1.0.0-rc.4(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(pg@8.23.1)(typebox@1.3.6)(valibot@1.5.0(typescript@7.0.2))(zod@4.6.5)
+        version: 1.0.0-rc.4(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(pg@8.23.1)(typebox@1.3.36)(valibot@1.5.0(typescript@7.0.2))(zod@4.6.5)
       fastify:
         specifier: 5.12.5
         version: 5.12.5
       pg:
         specifier: 8.23.1
         version: 8.23.1
+      typebox:
+        specifier: 1.3.36
+        version: 1.3.36
       undici:
         specifier: 8.11.2
         version: 8.11.2
@@ -3627,8 +3627,8 @@ packages:
   tw-animate-css@1.4.0:
     resolution: {integrity: sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK7WlvmUxpcj6Kgu6EKqjrGFe3QQ==}
 
-  typebox@1.3.6:
-    resolution: {integrity: sha512-Sc8RA0NCMEFmApHNU9ZMzqcpQj46She44J8ffpLM/bdhLNUZKq7DJumcLcsFx1gRmDfQPgCgOmFFJ7rcnfWNyA==}
+  typebox@1.3.36:
+    resolution: {integrity: sha512-bu2Ec2Ti9B4IFSFj1FcZbtLNB/W7igQwxocMGJLAG2NTv1nI+ImtIA34YgHW4CVyGVlJqNXR1GJyLmdWgV3DuA==}
 
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
@@ -4301,9 +4301,9 @@ snapshots:
       fastq: 1.20.3
       glob: 13.0.6
 
-  '@fastify/type-provider-typebox@6.1.0(typebox@1.3.6)':
+  '@fastify/type-provider-typebox@6.1.0(typebox@1.3.36)':
     dependencies:
-      typebox: 1.3.6
+      typebox: 1.3.36
 
   '@fastify/websocket@11.3.3':
     dependencies:
@@ -4967,7 +4967,8 @@ snapshots:
 
   '@sinclair/typebox@0.31.30': {}
 
-  '@sinclair/typebox@0.34.52': {}
+  '@sinclair/typebox@0.34.52':
+    optional: true
 
   '@solid-primitives/event-listener@2.4.6(solid-js@1.9.17)':
     dependencies:
@@ -5853,12 +5854,12 @@ snapshots:
       get-tsconfig: 4.14.3
       jiti: 2.7.0
 
-  drizzle-orm@1.0.0-rc.4(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(pg@8.23.1)(typebox@1.3.6)(valibot@1.5.0(typescript@7.0.2))(zod@4.6.5):
+  drizzle-orm@1.0.0-rc.4(@sinclair/typebox@0.34.52)(@types/pg@8.23.1)(pg@8.23.1)(typebox@1.3.36)(valibot@1.5.0(typescript@7.0.2))(zod@4.6.5):
     optionalDependencies:
       '@sinclair/typebox': 0.34.52
       '@types/pg': 8.23.1
       pg: 8.23.1
-      typebox: 1.3.6
+      typebox: 1.3.36
       valibot: 1.5.0(typescript@7.0.2)
       zod: 4.6.5
 
@@ -6823,7 +6824,7 @@ snapshots:
 
   tw-animate-css@1.4.0: {}
 
-  typebox@1.3.6: {}
+  typebox@1.3.36: {}
 
   typescript@7.0.2:
     optionalDependencies:
