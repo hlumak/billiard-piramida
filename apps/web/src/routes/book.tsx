@@ -104,18 +104,32 @@ function BookingWizard() {
 
   // Each step replaces the last one wholesale, taking the focused control with
   // it: move focus to the new step's heading so keyboard and screen-reader
-  // users land at its start and hear what it asks (not on <body>). The panel
-  // stands in while a lazy step is still loading. Not on the first render.
+  // users land at its start and hear what it asks (not on <body>). While a
+  // step is still loading (lazy chunk, availability) the panel holds focus and
+  // hands it to the heading once that renders. Not on the first render.
   const panelRef = useRef<HTMLDivElement>(null);
   const shownStep = useRef(step);
   useEffect(() => {
-    if (shownStep.current === step) return;
+    const panel = panelRef.current;
+    if (shownStep.current === step || panel === null) return;
     shownStep.current = step;
-    const target = panelRef.current?.querySelector('h2') ?? panelRef.current;
-    if (target instanceof HTMLElement) {
-      target.tabIndex = -1;
-      target.focus();
-    }
+    const focusHeading = () => {
+      const heading = panel.querySelector('h2');
+      if (heading === null) return false;
+      heading.tabIndex = -1;
+      heading.focus();
+      return true;
+    };
+    if (focusHeading()) return;
+    panel.tabIndex = -1;
+    panel.focus();
+    const observer = new MutationObserver(() => {
+      // Only while focus is still parked on the panel: never pull it away
+      // from something the guest has moved to meanwhile
+      if (document.activeElement !== panel || focusHeading()) observer.disconnect();
+    });
+    observer.observe(panel, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [step]);
 
   const handleBack = () => {
