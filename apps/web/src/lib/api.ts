@@ -14,6 +14,7 @@ import type {
   TournamentRegistrationResultDto,
   VenueConfigDto
 } from '@repo/shared';
+import { notFound } from '@tanstack/react-router';
 import { createIsomorphicFn } from '@tanstack/react-start';
 import { getRequestHeader, getRequestIP } from '@tanstack/react-start/server';
 import { manageTokenFor } from './recent-bookings';
@@ -88,6 +89,16 @@ export function resolveAssetUrl(url: string): string {
 export function hasFlagCookie(name: string): boolean {
   if (typeof document === 'undefined') return false;
   return document.cookie.split('; ').some(entry => entry.startsWith(`${name}=`));
+}
+
+/**
+ * A loader's 404 as the router's notFound (a real HTTP 404 with the route's
+ * not-found page), anything else rethrown to the error page. Used where a
+ * missing record used to render a 200 with a spinner — a soft 404.
+ */
+export function notFoundOn404(error: unknown): never {
+  if (error instanceof ApiError && error.status === 404) throw notFound();
+  throw error;
 }
 
 export class ApiError extends Error {
