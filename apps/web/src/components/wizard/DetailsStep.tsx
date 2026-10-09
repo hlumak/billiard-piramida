@@ -27,6 +27,7 @@ import { useVenueConfig } from '../../lib/venue-config';
 import { Link } from '@tanstack/react-router';
 import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { SportCardPicker } from './SportCardPicker';
+import { mutationErrorText } from '../booking/phase';
 import {
   goToStep,
   resetWizard,
@@ -72,17 +73,26 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
   const createBooking = useMutation({
     mutationFn: api.createBooking,
-    onSuccess: (booking, input) => {
+    onSuccess: async (booking, input) => {
       rememberBooking(booking.id);
       // Seed the detail page cache (no refetch on landing) and drop the now-stale slot grid
       queryClient.setQueryData(bookingQuery(booking.id).queryKey, booking);
       queryClient.invalidateQueries({ queryKey: availabilityQuery(input.date).queryKey });
-      resetWizard();
-      navigate({
+      // Navigate first, reset after: resetting renders step 1 synchronously, and
+      // it would sit on screen while the booking page's chunk downloads. The
+      // mutation stays pending meanwhile, so the button keeps saying "Creating…".
+      await navigate({
         to: '/booking/$id',
         params: { id: booking.id },
         search: { new: true }
       });
+      resetWizard();
+    },
+    onError: error => {
+      // The menu moved on under the guest: refresh it so the order shows the truth
+      if (error instanceof ApiError && error.code === 'unknown_food_item') {
+        void queryClient.invalidateQueries({ queryKey: menuQuery(getLocale()).queryKey });
+      }
     }
   });
 
@@ -98,10 +108,10 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
         customerName: value.customerName.trim(),
         customerPhone: value.customerPhone.trim(),
         sportCardCount,
-        items: Object.entries(items).map(([foodItemId, quantity]) => ({
-          foodItemId: Number(foodItemId),
-          quantity
-        }))
+        // Exactly the lines the guest sees and pays for: a dish that has left
+        // the menu since it was picked drops out here just as it does from the
+        // total, instead of failing the whole booking with unknown_food_item
+        items: orderLines.map(line => ({ foodItemId: line.item.id, quantity: line.quantity }))
       });
     }
   });
@@ -113,13 +123,9 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
     (err.code === 'slot_taken' ||
       err.code === 'start_in_past' ||
       err.code === 'outside_operating_hours');
-  const errorMessage = err
-    ? err instanceof ApiError && err.code === 'slot_taken'
-      ? m.err_slot_taken()
-      : isTimeError
-        ? m.err_slot_expired()
-        : m.err_generic()
-    : null;
+  const errorMessage = err ? mutationErrorText(err) : null;
+  // With food in the order the menu must be known, or the lines can't be priced
+  const menuPending = Object.keys(items).length > 0 && menu === undefined;
 
   return (
     <section>
@@ -240,7 +246,11 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
                 isInvalid={field.state.meta.errors.length > 0}
               >
                 <Label>{m.name_label()}</Label>
-                <Input placeholder={m.name_placeholder()} onBlur={field.handleBlur} />
+                <Input
+                  placeholder={m.name_placeholder()}
+                  autoComplete="name"
+                  onBlur={field.handleBlur}
+                />
                 <FieldError>{field.state.meta.errors[0]}</FieldError>
               </TextField>
             )}
@@ -265,7 +275,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
           </form.Field>
 
           {errorMessage ? (
-            <div className="rounded-[10px] bg-danger-soft p-3 text-sm text-creme">
+            <div role="alert" className="rounded-[10px] bg-danger-soft p-3 text-sm text-creme">
               {errorMessage}
               {isTimeError ? (
                 <Button
@@ -285,6 +295,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             size="lg"
             className="h-11.25 w-full text-lg font-bold"
             isPending={createBooking.isPending}
+            isDisabled={menuPending}
           >
             {createBooking.isPending ? m.creating() : m.btn_confirm()}
           </Button>

@@ -140,7 +140,7 @@
   "auth_register_btn": "Create account",
   "auth_err_phone_taken": "This phone number is already registered",
   "auth_err_invalid": "Wrong phone or password",
-  "auth_promo": "Have a sport or club card? Sign in to get your discount",
+  "auth_promo": "Have an account? Sign in and we'll fill in your details",
   "profile_welcome": "Welcome, {name}!",
   "profile_cards_title": "Discounts & cards",
   "sport_card_label": "Sport card",
@@ -316,5 +316,10 @@
   "admin_hours_invalid": "Closing must be later than opening",
   "admin_settings_hint": "Changes take effect at once: new bookings are priced at the new rates, existing ones keep theirs.",
   "admin_invalid_price": "Enter an amount from 0 to 1000 zł",
-  "admin_tournament_min_above_max": "Minimum players can't exceed the maximum"
+  "admin_tournament_min_above_max": "Minimum players can't exceed the maximum",
+  "err_outside_hours": "That time is outside opening hours. Go back and pick another time.",
+  "err_food_unavailable": "A dish in your order is no longer available. Check your order and try again.",
+  "err_booking_changed": "This booking has changed in the meantime. Refresh the page.",
+  "err_rate_limited": "Too many attempts. Wait a minute and try again.",
+  "err_booking_too_long": "A booking can last at most 8 hours."
 }

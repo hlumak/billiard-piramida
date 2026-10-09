@@ -140,7 +140,7 @@
   "auth_register_btn": "Zarejestruj się",
   "auth_err_phone_taken": "Ten numer jest już zarejestrowany",
   "auth_err_invalid": "Nieprawidłowy telefon lub hasło",
-  "auth_promo": "Masz kartę sportową lub klubową? Zaloguj się i odbierz rabat",
+  "auth_promo": "Masz konto? Zaloguj się, a uzupełnimy Twoje dane",
   "profile_welcome": "Witaj, {name}!",
   "profile_cards_title": "Rabaty i karty",
   "sport_card_label": "Karta sportowa",
@@ -316,5 +316,10 @@
   "admin_hours_invalid": "Zamknięcie musi być późniejsze niż otwarcie",
   "admin_settings_hint": "Zmiany działają od razu: nowe rezerwacje liczone są po nowych cenach, a już utworzone zachowują swoją.",
   "admin_invalid_price": "Podaj kwotę od 0 do 1000 zł",
-  "admin_tournament_min_above_max": "Minimum graczy nie może przekraczać maksimum"
+  "admin_tournament_min_above_max": "Minimum graczy nie może przekraczać maksimum",
+  "err_outside_hours": "Ta godzina jest poza godzinami otwarcia. Wróć i wybierz inną.",
+  "err_food_unavailable": "Jedna z pozycji zamówienia jest już niedostępna. Sprawdź zamówienie i spróbuj ponownie.",
+  "err_booking_changed": "Ta rezerwacja w międzyczasie się zmieniła. Odśwież stronę.",
+  "err_rate_limited": "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
+  "err_booking_too_long": "Rezerwacja może trwać najwyżej 8 godzin."
 }

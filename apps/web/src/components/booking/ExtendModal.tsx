@@ -5,7 +5,7 @@ import type { BookingDto } from '@repo/shared';
 import { api } from '../../lib/api';
 import { bookingQuery } from '../../lib/queries';
 import { m } from '../../paraglide/messages.js';
-import { mutationErrorText } from './phase';
+import { isStaleBookingError, mutationErrorText } from './phase';
 
 export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxExtend: number }) {
   const queryClient = useQueryClient();
@@ -21,6 +21,12 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
     onSuccess: updated => {
       queryClient.setQueryData(bookingQuery(booking.id).queryKey, updated);
       setOpen(false);
+    },
+    // The booking moved on (finished, cancelled elsewhere): show its real state
+    onError: error => {
+      if (isStaleBookingError(error)) {
+        void queryClient.invalidateQueries({ queryKey: bookingQuery(booking.id).queryKey });
+      }
     }
   });
 

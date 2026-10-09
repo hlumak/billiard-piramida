@@ -9,7 +9,7 @@ import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { MenuPicker } from '../MenuPicker';
 import { QueryError } from '../QueryError';
-import { mutationErrorText } from './phase';
+import { isStaleBookingError, mutationErrorText } from './phase';
 
 export function AddFoodModal({ booking }: { booking: BookingDto }) {
   const queryClient = useQueryClient();
@@ -33,6 +33,12 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
       queryClient.setQueryData(bookingQuery(booking.id).queryKey, updated);
       setQuantities({});
       setOpen(false);
+    },
+    // The booking moved on (finished, cancelled elsewhere): show its real state
+    onError: error => {
+      if (isStaleBookingError(error)) {
+        void queryClient.invalidateQueries({ queryKey: bookingQuery(booking.id).queryKey });
+      }
     }
   });
 
