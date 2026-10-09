@@ -25,9 +25,9 @@ RUN pnpm install --frozen-lockfile --prod --filter "@repo/api..."
 # to packages/shared, outside node_modules, where stripping is allowed.
 FROM ${NODE_IMAGE} AS api
 ENV NODE_ENV=production \
-    API_HOST=0.0.0.0 \
-    API_PORT=3001 \
-    UPLOADS_DIR=/data/uploads
+  API_HOST=0.0.0.0 \
+  API_PORT=3001 \
+  UPLOADS_DIR=/data/uploads
 WORKDIR /repo
 COPY --from=api-deps /repo/node_modules ./node_modules
 COPY --from=api-deps /repo/apps/api/node_modules ./apps/api/node_modules
@@ -60,21 +60,21 @@ COPY apps/web apps/web
 # the browser calls /api/… on the site's own origin, through nginx.
 ARG VITE_SITE_URL
 ENV RELEASE_BUILD=1 \
-    VITE_SITE_URL=${VITE_SITE_URL} \
-    VITE_API_URL=
+  VITE_SITE_URL=${VITE_SITE_URL} \
+  VITE_API_URL=
 RUN pnpm --filter @repo/web build
 # The production SSR bundle includes its dependencies (ssr.noExternal), so the
 # runtime needs only the build output, the server entry and srvx (which has no
 # dependencies of its own) — not ~340 MB of node_modules.
 RUN mkdir -p /runtime/node_modules \
- && cp -r apps/web/dist apps/web/server.mjs /runtime/ \
- && cp -rL apps/web/node_modules/srvx /runtime/node_modules/srvx \
- && echo '{"type":"module","private":true}' > /runtime/package.json
+  && cp -r apps/web/dist apps/web/server.mjs /runtime/ \
+  && cp -rL apps/web/node_modules/srvx /runtime/node_modules/srvx \
+  && echo '{"type":"module","private":true}' > /runtime/package.json
 
 FROM ${NODE_IMAGE} AS web
 ENV NODE_ENV=production \
-    HOST=0.0.0.0 \
-    PORT=3000
+  HOST=0.0.0.0 \
+  PORT=3000
 WORKDIR /app
 COPY --from=web-build /runtime ./
 USER node
