@@ -57,6 +57,9 @@ const ADMIN_FLAG_COOKIE = 'piramida.admin';
 
 export const adminAuthFlag = createFlagCookieStore(ADMIN_FLAG_COOKIE);
 
+/** The API's ceiling for one bookings page; a full page means there may be more. */
+export const ADMIN_BOOKINGS_LIMIT = 200;
+
 export interface AdminBookingFilters {
   date?: IsoDate | undefined;
   status?: BookingStatus | undefined;
@@ -113,8 +116,8 @@ export const adminApi = {
     if (filters.date) params.set('date', filters.date);
     if (filters.status) params.set('status', filters.status);
     if (filters.phone) params.set('phone', filters.phone);
-    const query = params.size > 0 ? `?${params}` : '';
-    return request<BookingDto[]>(`/api/admin/bookings${query}`, { signal });
+    params.set('limit', String(ADMIN_BOOKINGS_LIMIT));
+    return request<BookingDto[]>(`/api/admin/bookings?${params}`, { signal });
   },
   customers: (params: CustomerListParams = {}, signal?: AbortSignal) => {
     const query = new URLSearchParams();

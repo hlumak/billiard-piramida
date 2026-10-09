@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button, Spinner } from '@heroui/react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { PageHeader } from '../components/AppHeader';
+import { TabList, tabId, tabPanelId } from '../components/TabList';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { AdminBookings } from '../components/admin/AdminBookings';
 import { AdminCustomers } from '../components/admin/AdminCustomers';
@@ -101,6 +102,7 @@ function AdminPage() {
   const signedIn = useFlagCookie(adminAuthFlag);
   const ready = useIsHydrated();
   const [tab, setTab] = useState<TabId>('overview');
+  const idBase = useId();
   const [bookingsPhone, setBookingsPhone] = useState('');
 
   const showCustomerBookings = (phone: string) => {
@@ -126,24 +128,13 @@ function AdminPage() {
         ) : (
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div role="tablist" className="flex flex-wrap gap-2">
-                {TABS.map(entry => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === entry.id}
-                    onClick={() => setTab(entry.id)}
-                    className={`h-10 rounded-[10px] px-4 font-semibold transition-colors ${
-                      tab === entry.id
-                        ? 'bg-golden text-btn-text'
-                        : 'bg-club-green-light text-creme hover:bg-surface-hover'
-                    }`}
-                  >
-                    {entry.label()}
-                  </button>
-                ))}
-              </div>
+              <TabList
+                idBase={idBase}
+                tabs={TABS.map(entry => ({ id: entry.id, label: entry.label() }))}
+                selected={tab}
+                onSelect={setTab}
+                className="flex flex-wrap gap-2"
+              />
               <div className="flex items-center gap-3">
                 <LocaleSwitcher />
                 <Button
@@ -163,7 +154,13 @@ function AdminPage() {
             ) : null}
 
             {/* key remounts the pane so the CSS entrance replays per tab */}
-            <div key={tab} className="anim-stagger-item">
+            <div
+              key={tab}
+              id={tabPanelId(idBase)}
+              role="tabpanel"
+              aria-labelledby={tabId(idBase, tab)}
+              className="anim-stagger-item"
+            >
               {tab === 'overview' ? <AdminOverview /> : null}
               {tab === 'schedule' ? <AdminSchedule onShowBooking={showCustomerBookings} /> : null}
               {tab === 'stats' ? <AdminStats /> : null}

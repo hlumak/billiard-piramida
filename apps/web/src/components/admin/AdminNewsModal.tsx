@@ -9,6 +9,7 @@ import {
   type NewsTranslationDto
 } from '@repo/shared';
 import { adminApi } from '../../lib/admin-api';
+import { isDraftChanged } from './draft';
 import { ApiError } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
 import { AdminImageField } from './AdminImageField';
@@ -71,6 +72,8 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   // one asked for the picture
   const fileInput = useRef<HTMLInputElement>(null);
   const insertTarget = useRef<Locale>('pl');
+
+  const isChanged = isOpen && isDraftChanged(draft, draftFrom(item));
 
   const open = () => {
     setDraft(draftFrom(item));
@@ -154,7 +157,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   const rejectedUrl = save.error instanceof ApiError && save.error.code === 'invalid_url';
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       {item === null ? (
         <Button size="sm" className="font-semibold" onPress={open}>
           {m.admin_add_news()}
@@ -164,7 +167,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
           {m.admin_edit_btn()}
         </Button>
       )}
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop isDismissable={!isChanged} isKeyboardDismissDisabled={isChanged}>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />
@@ -238,7 +241,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
 
                 {LOCALES.map(locale => (
                   <div key={locale} className="rounded-[10px] bg-club-green p-3">
-                    <p className="mb-2 text-xs font-bold uppercase text-golden">{locale}</p>
+                    <p className="mb-2 text-xs font-bold uppercase text-golden-light">{locale}</p>
                     <div className="flex flex-col gap-3">
                       <TextField
                         name={`title-${locale}`}

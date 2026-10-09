@@ -48,7 +48,7 @@ export function TimeStep({ date }: { date: IsoDate }) {
   useLiveAvailability(date);
   const { data: availability, isPending, isError, refetch } = useQuery(availabilityQuery(date));
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !availability) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !availability) {
     return (
       <div className="flex justify-center py-16">

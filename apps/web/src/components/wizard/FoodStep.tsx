@@ -20,7 +20,7 @@ export function FoodStep() {
   // otherwise becomes the containing block for position:fixed) can't shift it.
   const mounted = useIsHydrated();
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !menu) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !menu) {
     return (
       <div className="flex justify-center py-16">

@@ -11,6 +11,7 @@ import {
 import {
   adminApi,
   adminBookingsQuery,
+  ADMIN_BOOKINGS_LIMIT,
   normalizePhoneSearch,
   type AdminBookingFilters
 } from '../../lib/admin-api';
@@ -164,7 +165,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
         </div>
       </div>
 
-      {isError ? (
+      {isError && !bookings ? (
         <QueryError onRetry={() => refetch()} />
       ) : isPending || !bookings ? (
         <div className="flex justify-center py-16">
@@ -174,6 +175,11 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
         <p className="py-10 text-center text-grey-cool">{m.admin_no_results()}</p>
       ) : (
         <StaggerGroup>
+          {bookings.length >= ADMIN_BOOKINGS_LIMIT ? (
+            <p role="status" className="mb-2 text-sm text-grey-cool">
+              {m.admin_bookings_capped({ n: ADMIN_BOOKINGS_LIMIT })}
+            </p>
+          ) : null}
           <ul className="flex flex-col gap-2">
             {bookings.map(booking => (
               <StaggerItem
@@ -201,7 +207,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
                       {PHASE_LABELS[booking.phase]()}
                     </span>
                   </div>
-                  <span className="font-bold text-golden">
+                  <span className="font-bold text-golden-light">
                     {formatPln(booking.totalGrosz, intlTag())}
                     {booking.discountGrosz > 0 ? (
                       <span className="ml-1 text-xs font-medium text-grey-cool">
@@ -215,7 +221,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
                     {booking.customerName} ·{' '}
                     <a
                       href={`tel:${booking.customerPhone.replaceAll(' ', '')}`}
-                      className="text-golden hover:underline"
+                      className="text-golden-light hover:underline"
                     >
                       {formatPhone(booking.customerPhone)}
                     </a>

@@ -26,11 +26,11 @@ export function CancelModal({ booking }: { booking: BookingDto }) {
   });
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       <Button variant="danger-soft" className="w-full" onPress={() => setOpen(true)}>
         {m.cancel_booking()}
       </Button>
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop>
         <Modal.Container>
           <Modal.Dialog className="sm:max-w-90">
             <Modal.CloseTrigger />

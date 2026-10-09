@@ -26,7 +26,7 @@ export function TableStep({
   const { data: availability, isPending, isError, refetch } = useQuery(availabilityQuery(date));
   const [kind, setKind] = useState<ActivityKind>('billiard');
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !availability) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !availability) {
     return (
       <div className="flex justify-center py-16">

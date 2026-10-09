@@ -78,7 +78,7 @@ export function AdminImageField({ value, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-3 rounded-[10px] bg-club-green p-3">
-      <p className="text-xs font-bold uppercase text-golden">{m.admin_image_label()}</p>
+      <p className="text-xs font-bold uppercase text-golden-light">{m.admin_image_label()}</p>
 
       {preview ? (
         // Decorative: the fields around it say what it is

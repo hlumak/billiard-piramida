@@ -333,5 +333,6 @@
   "nav_profile": "Profil",
   "nav_home": "Strona główna",
   "skip_to_content": "Przejdź do treści",
-  "seo_title_profile": "Profil — piramida"
+  "seo_title_profile": "Profil — piramida",
+  "admin_bookings_capped": "Pokazano pierwsze {n} rezerwacji. Zawęź wyszukiwanie datą lub telefonem, aby zobaczyć resztę."
 }

@@ -89,7 +89,7 @@ function TournamentRow({ item }: { item: AdminTournamentDto }) {
 export function AdminTournaments() {
   const { data: items, isPending, isError, refetch } = useQuery(adminTournamentsQuery());
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !items) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !items) {
     return (
       <div className="flex justify-center py-16">

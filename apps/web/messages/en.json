@@ -333,5 +333,6 @@
   "nav_profile": "Profile",
   "nav_home": "Home",
   "skip_to_content": "Skip to content",
-  "seo_title_profile": "Profile — piramida"
+  "seo_title_profile": "Profile — piramida",
+  "admin_bookings_capped": "Showing the first {n} bookings. Narrow the search by date or phone to see the rest."
 }

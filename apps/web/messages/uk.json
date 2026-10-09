@@ -333,5 +333,6 @@
   "nav_profile": "Профіль",
   "nav_home": "Головна",
   "skip_to_content": "Перейти до вмісту",
-  "seo_title_profile": "Профіль — piramida"
+  "seo_title_profile": "Профіль — piramida",
+  "admin_bookings_capped": "Показано перші {n} бронювань. Звузьте пошук за датою чи телефоном, щоб побачити решту."
 }

@@ -46,7 +46,7 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
               href={`/news/${item.slug}`}
               target="_blank"
               rel="noreferrer"
-              className="truncate text-xs text-golden hover:text-golden-hover"
+              className="truncate text-xs text-golden-light hover:underline"
             >
               /news/{item.slug}
             </a>
@@ -100,6 +100,11 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
           </Button>
         </div>
       </div>
+      {update.isError || remove.isError ? (
+        <p role="alert" className="mt-2 text-sm text-danger-soft-foreground">
+          {m.err_generic()}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -125,13 +130,15 @@ export function AdminNews() {
         )
       );
     },
-    onSuccess: () => {
+    // Settled, not success: a move that failed halfway has still renumbered
+    // some rows, and the list must show the order the server now has.
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'news'] });
       queryClient.invalidateQueries({ queryKey: ['news'] });
     }
   });
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !items) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !items) {
     return (
       <div className="flex justify-center py-16">
@@ -145,6 +152,11 @@ export function AdminNews() {
       <div className="flex justify-end">
         <AdminNewsModal item={null} />
       </div>
+      {reorder.isError ? (
+        <p role="alert" className="text-sm text-danger-soft-foreground">
+          {m.err_generic()}
+        </p>
+      ) : null}
       {items.length === 0 ? (
         <p className="py-8 text-center text-grey-cool">{m.admin_no_news()}</p>
       ) : (

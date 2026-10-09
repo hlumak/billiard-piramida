@@ -286,8 +286,8 @@ export function AdminBookingModal({
     startHour !== null && tableId !== null && name.trim().length > 0 && isValidPhone(phone);
 
   return (
-    <Modal>
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Backdrop>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />

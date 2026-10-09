@@ -22,7 +22,7 @@ export function AdminOverview() {
   const { data: stats, isPending, isError, refetch } = useQuery(adminStatsQuery());
   const { data: menu } = useQuery(menuQuery(getLocale()));
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !stats) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !stats) {
     return (
       <div className="flex justify-center py-16">
@@ -50,7 +50,7 @@ export function AdminOverview() {
       </StaggerGroup>
 
       <Reveal delay={0.2} className="rounded-[10px] bg-club-green-light p-4">
-        <h3 className="mb-2 font-semibold text-golden">{m.admin_top_items()}</h3>
+        <h3 className="mb-2 font-semibold text-golden-light">{m.admin_top_items()}</h3>
         {stats.topItems.length === 0 ? (
           <p className="text-sm text-grey-cool">{m.admin_no_results()}</p>
         ) : (
@@ -58,7 +58,7 @@ export function AdminOverview() {
             {stats.topItems.map(item => (
               <li key={item.foodItemId} className="flex justify-between">
                 <span>{nameBySlug.get(item.slug) ?? item.slug}</span>
-                <span className="font-semibold text-golden">× {item.totalQuantity}</span>
+                <span className="font-semibold text-golden-light">× {item.totalQuantity}</span>
               </li>
             ))}
           </ul>

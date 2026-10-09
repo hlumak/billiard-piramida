@@ -43,7 +43,7 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
   });
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       <Button
         size="lg"
         variant="outline"
@@ -52,7 +52,7 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
       >
         {m.add_food()}
       </Button>
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-md">
             <Modal.CloseTrigger />

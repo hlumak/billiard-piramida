@@ -4,6 +4,7 @@ import { parseZloty } from '../../lib/money';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AdminMenuItemDto, Locale, MenuTranslationDto } from '@repo/shared';
 import { adminApi } from '../../lib/admin-api';
+import { isDraftChanged } from './draft';
 import { categoryLabel } from '../../lib/menu';
 import { m } from '../../paraglide/messages.js';
 
@@ -37,6 +38,8 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
   const [draft, setDraft] = useState<DishDraft>(() => draftFrom(item));
+
+  const isChanged = isOpen && isDraftChanged(draft, draftFrom(item));
 
   const open = () => {
     setDraft(draftFrom(item));
@@ -77,7 +80,7 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
   });
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       {item === null ? (
         <Button size="sm" className="font-semibold" onPress={open}>
           {m.admin_add_dish()}
@@ -87,7 +90,7 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
           {m.admin_edit_btn()}
         </Button>
       )}
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop isDismissable={!isChanged} isKeyboardDismissDisabled={isChanged}>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />
@@ -134,7 +137,7 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
 
                 {LOCALES.map(locale => (
                   <div key={locale} className="rounded-[10px] bg-club-green p-3">
-                    <p className="mb-2 text-xs font-bold uppercase text-golden">{locale}</p>
+                    <p className="mb-2 text-xs font-bold uppercase text-golden-light">{locale}</p>
                     <div className="flex flex-col gap-3">
                       <TextField
                         name={`name-${locale}`}

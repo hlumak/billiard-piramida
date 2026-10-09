@@ -79,7 +79,7 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
                 <span className="flex items-center gap-2">
                   <a
                     href={`tel:${customer.phone.replaceAll(' ', '')}`}
-                    className="text-sm text-golden hover:underline"
+                    className="text-sm text-golden-light hover:underline"
                   >
                     {formatPhone(customer.phone)}
                   </a>
@@ -105,7 +105,7 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
                 </span>
                 <span>
                   {m.admin_total_spent()}:{' '}
-                  <span className="font-semibold text-golden">
+                  <span className="font-semibold text-golden-light">
                     {formatPln(customer.totalSpentGrosz, intlTag())}
                   </span>
                 </span>

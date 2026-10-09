@@ -31,7 +31,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
   });
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       <Button
         size="lg"
         className="h-11.25 w-full text-lg font-bold"
@@ -43,7 +43,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
       >
         {m.extend()}
       </Button>
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop>
         <Modal.Container>
           <Modal.Dialog className="sm:max-w-90">
             <Modal.CloseTrigger />

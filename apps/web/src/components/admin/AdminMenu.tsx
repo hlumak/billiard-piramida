@@ -92,7 +92,13 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
         </div>
       </div>
       {deleteBlocked ? (
-        <p className="mt-2 text-xs text-danger-soft-foreground">{m.admin_has_orders()}</p>
+        <p role="alert" className="mt-2 text-sm text-danger-soft-foreground">
+          {m.admin_has_orders()}
+        </p>
+      ) : update.isError || remove.isError ? (
+        <p role="alert" className="mt-2 text-sm text-danger-soft-foreground">
+          {m.err_generic()}
+        </p>
       ) : null}
     </div>
   );
@@ -101,7 +107,7 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
 export function AdminMenu() {
   const { data: items, isPending, isError, refetch } = useQuery(adminMenuQuery());
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !items) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !items) {
     return (
       <div className="flex justify-center py-16">

@@ -159,7 +159,7 @@ export function AdminTournamentRoster({ tournamentId }: { tournamentId: number }
         ? m.err_generic()
         : null;
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !roster) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !roster) {
     return (
       <div className="flex justify-center py-6">
@@ -170,7 +170,7 @@ export function AdminTournamentRoster({ tournamentId }: { tournamentId: number }
 
   return (
     <div className="mt-3 flex flex-col gap-3 border-t border-deep-cream/20 pt-3">
-      <p className="text-sm font-semibold text-golden">{m.admin_roster()}</p>
+      <p className="text-sm font-semibold text-golden-light">{m.admin_roster()}</p>
 
       {roster.length === 0 ? (
         <p className="text-sm text-grey-cool">{m.admin_roster_empty()}</p>
@@ -192,6 +192,11 @@ export function AdminTournamentRoster({ tournamentId }: { tournamentId: number }
           ))}
         </ul>
       )}
+      {setStatus.isError || rename.isError || remove.isError ? (
+        <p role="alert" className="text-sm text-danger-soft-foreground">
+          {m.err_generic()}
+        </p>
+      ) : null}
 
       {/* Walk-ins: staff take the fee at the desk and add the player themselves,
           so this bypasses the deadline and the cap the public form respects. */}
@@ -220,7 +225,11 @@ export function AdminTournamentRoster({ tournamentId }: { tournamentId: number }
           {m.admin_roster_add()}
         </Button>
       </div>
-      {addError ? <p className="text-sm text-danger-soft-foreground">{addError}</p> : null}
+      {addError ? (
+        <p role="alert" className="text-sm text-danger-soft-foreground">
+          {addError}
+        </p>
+      ) : null}
     </div>
   );
 }

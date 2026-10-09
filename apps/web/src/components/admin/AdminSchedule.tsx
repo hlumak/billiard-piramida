@@ -198,7 +198,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
         </span>
       </div>
 
-      {isError ? (
+      {isError && !bookings ? (
         <QueryError onRetry={() => refetch()} />
       ) : isPending || !bookings ? (
         <div className="flex justify-center py-16">
@@ -215,7 +215,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
               <div
                 key={hour}
                 className={`pb-1 text-center text-sm font-semibold ${
-                  hour === nowHour ? 'text-golden' : 'text-grey-cool'
+                  hour === nowHour ? 'text-golden-light' : 'text-grey-cool'
                 }`}
               >
                 {formatHour(hour)}

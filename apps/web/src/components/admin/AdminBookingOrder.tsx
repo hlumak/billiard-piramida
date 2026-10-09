@@ -64,7 +64,7 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
   const failed = addItems.isError || setQuantity.isError || removeItem.isError;
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       <Button
         size="sm"
         variant="outline"
@@ -73,7 +73,7 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
       >
         {m.admin_order_btn()}
       </Button>
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />
@@ -141,13 +141,13 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
                   </ul>
                 )}
 
-                <div className="flex justify-between border-t border-deep-cream/20 pt-3 font-bold text-golden">
+                <div className="flex justify-between border-t border-deep-cream/20 pt-3 font-bold text-golden-light">
                   <span>{m.total()}</span>
                   <span>{formatPln(booking.totalGrosz, intlTag())}</span>
                 </div>
 
-                <p className="text-sm font-semibold text-golden">{m.admin_order_add()}</p>
-                {isError ? (
+                <p className="text-sm font-semibold text-golden-light">{m.admin_order_add()}</p>
+                {isError && !menu ? (
                   <QueryError onRetry={() => refetch()} />
                 ) : !menu ? (
                   <div className="flex justify-center py-6">
