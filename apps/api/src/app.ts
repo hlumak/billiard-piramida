@@ -13,7 +13,7 @@ import { createDb, type Db } from './db/client.ts';
 import { AvailabilityHub } from './lib/availability-hub.ts';
 import { VenueConfigStore } from './services/venue-config.ts';
 import { ImageStore, UPLOADS_URL_PREFIX } from './services/images.ts';
-import { DEFAULT_TRUSTED_PROXIES, DEFAULT_UPLOADS_DIR } from './lib/config.ts';
+import { DEFAULT_TRUSTED_PROXIES, DEFAULT_UPLOADS_DIR, type AllowedOrigin } from './lib/config.ts';
 import { ERROR_RESPONSE } from './lib/schemas.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
@@ -61,8 +61,8 @@ const FRAMEWORK_ERROR_CODES: Record<number, string> = {
 export interface AppOptions {
   databaseUrl: string;
   logger?: boolean | { level: string };
-  /** Explicit CORS allowlist; undefined reflects any origin (dev). */
-  allowedOrigins?: string[] | undefined;
+  /** CORS allowlist; undefined = same-origin only (no cross-origin access). */
+  allowedOrigins?: AllowedOrigin[] | undefined;
   /** Shared secret for /api/admin; admin routes 503 when unset. */
   adminToken?: string | undefined;
   /** JWT signing secret; auth routes 503 when unset (accounts stay optional). */
@@ -140,7 +140,9 @@ export async function buildApp({
   // hooks only apply to routes registered after them.
   await app.register(helmet);
   await app.register(cors, {
-    origin: allowedOrigins ?? true,
+    // Never "reflect any origin": with credentials that would let any site
+    // read authenticated responses
+    origin: allowedOrigins ?? false,
     // PATCH is used by profile and admin menu updates
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
     // Auth rides in cookies now, so cross-origin requests must send credentials
