@@ -14,6 +14,7 @@ import {
 } from '@repo/shared';
 import { adminApi, type AdminTournamentInput } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
+import { parseZloty } from '../../lib/money';
 import { adminStatusLabel } from '../../lib/tournaments';
 import { m } from '../../paraglide/messages.js';
 
@@ -89,8 +90,9 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
   const startHour = parseCount(draft.startHour, 0, 23);
   const maxPlayers = parseCount(draft.maxPlayers, 2, MAX_TOURNAMENT_PLAYERS);
   const minPlayers = parseCount(draft.minPlayers, 0, MAX_TOURNAMENT_PLAYERS) ?? undefined;
-  const feeInput = draft.entryFee.trim().replace(',', '.');
-  const entryFeeGrosz = feeInput === '' ? null : Math.round(Number(feeInput) * 100);
+  // Blank means "not priced yet" (null); anything typed must be a valid amount
+  const feeBlank = draft.entryFee.trim() === '';
+  const entryFeeGrosz = feeBlank ? null : parseZloty(draft.entryFee);
   const imageUrl = draft.imageUrl.trim() || null;
 
   const translations: TournamentTranslationDto[] = LOCALES.flatMap(locale => {
@@ -108,7 +110,8 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
 
   // The server re-checks all of it; catching it here spares a round trip
   const urlOk = imageUrl === null || isSafeUrl(imageUrl);
-  const feeOk = entryFeeGrosz === null || (Number.isFinite(entryFeeGrosz) && entryFeeGrosz >= 0);
+  const feeOk = feeBlank || entryFeeGrosz !== null;
+  const playersOk = minPlayers === undefined || maxPlayers == null || minPlayers <= maxPlayers;
   const datesOk =
     startsOn !== undefined &&
     registrationDeadline !== undefined &&
@@ -119,7 +122,8 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
   // `datesOk` that reports it — this check only owns the ordering.
   const orderOk =
     startsOn == null || registrationDeadline == null || registrationDeadline <= startsOn;
-  const canSubmit = urlOk && feeOk && datesOk && orderOk && translations.length === LOCALES.length;
+  const canSubmit =
+    urlOk && feeOk && datesOk && orderOk && playersOk && translations.length === LOCALES.length;
 
   const save = useMutation({
     mutationFn: () => {
@@ -154,9 +158,13 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
       ? m.admin_invalid_url()
       : !orderOk || rejected === 'deadline_after_start'
         ? m.admin_tournament_deadline_after_start()
-        : save.isError
-          ? m.err_generic()
-          : null;
+        : !playersOk || rejected === 'min_above_max'
+          ? m.admin_tournament_min_above_max()
+          : !feeOk
+            ? m.admin_invalid_price()
+            : save.isError
+              ? m.err_generic()
+              : null;
 
   return (
     <Modal>

@@ -11,6 +11,7 @@ import {
 } from '@repo/shared';
 import { adminApi, adminVenueConfigQuery } from '../../lib/admin-api';
 import { formatHour, weekdayName } from '../../lib/format';
+import { parseZloty } from '../../lib/money';
 import { WEEKDAY_DISPLAY_ORDER } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
@@ -35,11 +36,9 @@ function ratesToDraft(config: VenueConfigDto): RateDraft {
   };
 }
 
+/** Blank is invalid, not a free hour — see parseZloty. */
 function parseRate(value: string): number | null {
-  const parsed = Number(value.trim().replace(',', '.'));
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  const grosz = Math.round(parsed * 100);
-  return grosz <= MAX_HOURLY_RATE_GROSZ ? grosz : null;
+  return parseZloty(value, MAX_HOURLY_RATE_GROSZ);
 }
 
 function HourSelect({

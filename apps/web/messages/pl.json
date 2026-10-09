@@ -314,5 +314,7 @@
   "admin_hours_close": "Zamknięcie",
   "admin_day_closed": "Zamknięte",
   "admin_hours_invalid": "Zamknięcie musi być późniejsze niż otwarcie",
-  "admin_settings_hint": "Zmiany działają od razu: nowe rezerwacje liczone są po nowych cenach, a już utworzone zachowują swoją."
+  "admin_settings_hint": "Zmiany działają od razu: nowe rezerwacje liczone są po nowych cenach, a już utworzone zachowują swoją.",
+  "admin_invalid_price": "Podaj kwotę od 0 do 1000 zł",
+  "admin_tournament_min_above_max": "Minimum graczy nie może przekraczać maksimum"
 }
