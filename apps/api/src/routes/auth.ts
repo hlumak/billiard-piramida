@@ -135,10 +135,17 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
       const normalized = normalizePhone(request.body.phone) ?? request.body.phone.trim();
       const [user] = await app.db.select().from(users).where(eq(users.phone, normalized));
       // Verify against a dummy hash when the user is missing — uniform timing
-      const valid = user
+      const check = user
         ? await verifyPassword(request.body.password, user.passwordHash)
-        : (await hashPassword(request.body.password), false);
-      if (!user || !valid) return reply.code(401).send({ error: 'invalid_credentials' });
+        : (await hashPassword(request.body.password), { valid: false, needsRehash: false });
+      if (!user || !check.valid) return reply.code(401).send({ error: 'invalid_credentials' });
+      // The only moment the plain password is at hand: bring an old hash up to today's cost
+      if (check.needsRehash) {
+        await app.db
+          .update(users)
+          .set({ passwordHash: await hashPassword(request.body.password) })
+          .where(eq(users.id, user.id));
+      }
 
       const token = await reply.jwtSign({ sub: user.id });
       setUserCookies(reply, token, app.cookieSecure);
