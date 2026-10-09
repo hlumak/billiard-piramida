@@ -5,6 +5,7 @@ import { ImagePlus } from 'lucide-react';
 import {
   isSafeUrl,
   type AdminNewsItemDto,
+  SUPPORTED_LOCALES,
   type Locale,
   type NewsTranslationDto
 } from '@repo/shared';
@@ -14,7 +15,6 @@ import { ApiError } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
 import { AdminImageField } from './AdminImageField';
 
-const LOCALES: Locale[] = ['uk', 'pl', 'en'];
 const REQUIRED_LOCALE: Locale = 'pl';
 /** Mirrors the API's cap on a single picture. */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -85,7 +85,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   const linkUrl = draft.linkUrl.trim() || null;
   const slug = draft.slug.trim();
   const sortOrder = Number(draft.sortOrder);
-  const translations: NewsTranslationDto[] = LOCALES.flatMap(locale => {
+  const translations: NewsTranslationDto[] = SUPPORTED_LOCALES.flatMap(locale => {
     const title = draft.titles[locale].trim();
     return title === ''
       ? []
@@ -239,7 +239,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
                   }}
                 />
 
-                {LOCALES.map(locale => (
+                {SUPPORTED_LOCALES.map(locale => (
                   <div key={locale} className="rounded-[10px] bg-club-green p-3">
                     <p className="mb-2 text-xs font-bold uppercase text-golden-light">{locale}</p>
                     <div className="flex flex-col gap-3">

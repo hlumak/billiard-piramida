@@ -2,14 +2,18 @@ import { useState } from 'react';
 import { Button, FieldError, Input, Label, Modal, TextField } from '@heroui/react';
 import { parseZloty } from '../../lib/money';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { AdminMenuItemDto, Locale, MenuTranslationDto } from '@repo/shared';
+import {
+  SUPPORTED_LOCALES,
+  type AdminMenuItemDto,
+  type Locale,
+  type MenuTranslationDto
+} from '@repo/shared';
 import { adminApi } from '../../lib/admin-api';
 import { isDraftChanged } from './draft';
 import { categoryLabel } from '../../lib/menu';
 import { m } from '../../paraglide/messages.js';
 
 const CATEGORIES = ['snack', 'main', 'drink', 'dessert'] as const;
-const LOCALES: Locale[] = ['uk', 'pl', 'en'];
 
 interface DishDraft {
   category: string;
@@ -49,7 +53,7 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
   const priceGrosz = parseZloty(draft.price);
   // One pass: a locale with a blank name is left out entirely
   const translations: MenuTranslationDto[] = [];
-  for (const locale of LOCALES) {
+  for (const locale of SUPPORTED_LOCALES) {
     const name = draft.names[locale].trim();
     if (name === '') continue;
     translations.push({
@@ -58,7 +62,7 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
       description: draft.descriptions[locale].trim() || null
     });
   }
-  const canSubmit = priceGrosz !== null && translations.length === LOCALES.length;
+  const canSubmit = priceGrosz !== null && translations.length === SUPPORTED_LOCALES.length;
 
   const save = useMutation({
     mutationFn: () => {
@@ -135,7 +139,7 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
                   <FieldError>{m.admin_invalid_price()}</FieldError>
                 </TextField>
 
-                {LOCALES.map(locale => (
+                {SUPPORTED_LOCALES.map(locale => (
                   <div key={locale} className="rounded-[10px] bg-club-green p-3">
                     <p className="mb-2 text-xs font-bold uppercase text-golden-light">{locale}</p>
                     <div className="flex flex-col gap-3">

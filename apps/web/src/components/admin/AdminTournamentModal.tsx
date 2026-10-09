@@ -8,6 +8,7 @@ import {
   isSafeUrl,
   type AdminTournamentDto,
   type IsoDate,
+  SUPPORTED_LOCALES,
   type Locale,
   type TournamentStatus,
   type TournamentTranslationDto
@@ -18,8 +19,6 @@ import { parseZloty } from '../../lib/money';
 import { adminStatusLabel } from '../../lib/tournaments';
 import { isDraftChanged } from './draft';
 import { m } from '../../paraglide/messages.js';
-
-const LOCALES: Locale[] = ['uk', 'pl', 'en'];
 
 interface TournamentDraft {
   status: TournamentStatus;
@@ -98,7 +97,7 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
   const entryFeeGrosz = feeBlank ? null : parseZloty(draft.entryFee);
   const imageUrl = draft.imageUrl.trim() || null;
 
-  const translations: TournamentTranslationDto[] = LOCALES.flatMap(locale => {
+  const translations: TournamentTranslationDto[] = SUPPORTED_LOCALES.flatMap(locale => {
     const title = draft.titles[locale].trim();
     if (title === '') return [];
     return [
@@ -126,7 +125,12 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
   const orderOk =
     startsOn == null || registrationDeadline == null || registrationDeadline <= startsOn;
   const canSubmit =
-    urlOk && feeOk && datesOk && orderOk && playersOk && translations.length === LOCALES.length;
+    urlOk &&
+    feeOk &&
+    datesOk &&
+    orderOk &&
+    playersOk &&
+    translations.length === SUPPORTED_LOCALES.length;
 
   const save = useMutation({
     mutationFn: () => {
@@ -272,7 +276,7 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
                   <Input inputMode="url" placeholder="/news/tournament.webp" />
                 </TextField>
 
-                {LOCALES.map(locale => (
+                {SUPPORTED_LOCALES.map(locale => (
                   <div key={locale} className="rounded-[10px] bg-club-green p-3">
                     <p className="mb-2 text-xs font-bold uppercase text-golden-light">{locale}</p>
                     <div className="flex flex-col gap-3">
