@@ -10,6 +10,19 @@ interface ClientMessage {
   date?: unknown;
 }
 
+/** Any JSON value parses — `null`, numbers, arrays — so only a plain object counts. */
+function parseClientMessage(raw: string): ClientMessage | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+    ? (parsed as ClientMessage)
+    : null;
+}
+
 export function liveRoutes(app: AppInstance) {
   app.get('/api/ws', { websocket: true }, (socket, request) => {
     const subscribed = new Set<IsoDate>();
@@ -31,21 +44,25 @@ export function liveRoutes(app: AppInstance) {
     }, PING_INTERVAL_MS);
 
     socket.on('message', (raw: unknown) => {
-      let message: ClientMessage;
+      // ws emits 'message' outside any try/catch of ours: a throw here is an
+      // uncaughtException that takes the whole process down, so nothing a
+      // client sends may escape this handler.
       try {
-        message = JSON.parse(String(raw)) as ClientMessage;
-      } catch {
-        return;
-      }
-      const { type, date } = message;
-      if (typeof date !== 'string' || !isIsoDate(date)) return;
+        const message = parseClientMessage(String(raw));
+        if (message === null) return;
+        const { type, date } = message;
+        if (typeof date !== 'string' || !isIsoDate(date)) return;
 
-      if (type === 'subscribe' && subscribed.size < MAX_SUBSCRIPTIONS) {
-        subscribed.add(date);
-        app.availabilityHub.subscribe(date, socket);
-      } else if (type === 'unsubscribe') {
-        subscribed.delete(date);
-        app.availabilityHub.unsubscribe(date, socket);
+        if (type === 'subscribe' && subscribed.size < MAX_SUBSCRIPTIONS) {
+          subscribed.add(date);
+          app.availabilityHub.subscribe(date, socket);
+        } else if (type === 'unsubscribe') {
+          subscribed.delete(date);
+          app.availabilityHub.unsubscribe(date, socket);
+        }
+      } catch (err) {
+        request.log.warn({ err }, 'dropping websocket client after a bad message');
+        socket.terminate();
       }
     });
 

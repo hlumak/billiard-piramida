@@ -424,6 +424,28 @@ test('websocket subscribers hear availability changes', async () => {
   assert.deepEqual(messages[0], { type: 'availability_changed', date: SATURDAY });
 });
 
+test('malformed websocket messages never take the process down', async () => {
+  if (!app.server.listening) await app.listen({ port: 0, host: '127.0.0.1' });
+  const address = app.server.address();
+  assert.ok(address && typeof address === 'object');
+
+  // `null` used to parse fine and then throw on destructuring — an
+  // uncaughtException that killed the whole API from one anonymous frame.
+  for (const frame of ['null', '1', '"x"', '[]', '{', 'true']) {
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/ws`);
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener('open', () => resolve());
+      ws.addEventListener('error', () => reject(new Error('ws connect failed')));
+    });
+    ws.send(frame);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    ws.close();
+  }
+
+  const health = await fetch(`http://127.0.0.1:${address.port}/health`);
+  assert.equal(health.status, 200);
+});
+
 test('auth: register, login, profile update', async () => {
   const registered = await app.inject({
     method: 'POST',
