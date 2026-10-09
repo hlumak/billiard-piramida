@@ -7,12 +7,12 @@
   },
   "scripts": {
     "dev": "vite dev --port 3000",
-    "generate-routes": "tsr generate",
+    "generate": "tsr generate && paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy cookie preferredLanguage baseLocale --silent",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node --env-file-if-exists=../../.env server.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "typecheck": "pnpm run generate && tsc --noEmit",
+    "test": "pnpm run generate && vitest run --passWithNoTests"
   },
   "dependencies": {
     "@heroui/react": "3.2.6",
