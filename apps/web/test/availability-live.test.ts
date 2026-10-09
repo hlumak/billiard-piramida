@@ -10,7 +10,10 @@ class FakeSocket {
   closed = false;
   private handlers = new Map<string, ((event: { data?: unknown }) => void)[]>();
 
-  constructor(readonly url: string) {
+  readonly url: string;
+
+  constructor(url: string) {
+    this.url = url;
     FakeSocket.instances.push(this);
   }
   addEventListener(type: string, handler: (event: { data?: unknown }) => void) {
