@@ -1625,6 +1625,56 @@ test('admin session cookie authenticates admin requests; bad token is rejected',
     cookies: { admin_token: adminCookie.value }
   });
   assert.equal(stats.statusCode, 200);
+
+  // The cookie is a signed, expiring session scoped to the admin API — not
+  // the master secret, and not sent along with every page request
+  assert.notEqual(adminCookie.value, 'test-admin-token');
+  assert.equal(adminCookie.path, '/api/admin');
+
+  // A forged or expired session is refused
+  const [, signature] = adminCookie.value.split('.');
+  const expired = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: ip,
+    cookies: { admin_token: `${Date.now() - 1000}.${signature}` }
+  });
+  assert.equal(expired.statusCode, 401);
+});
+
+test('guessing the admin secret is throttled on every admin route', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.44' };
+  let throttled = false;
+  for (let i = 0; i < 12; i++) {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/stats',
+      headers: { ...ip, 'x-admin-token': `guess-${i}` }
+    });
+    if (res.statusCode === 429) {
+      throttled = true;
+      assert.equal(res.json().error, 'rate_limited');
+      break;
+    }
+    assert.equal(res.statusCode, 401);
+  }
+  assert.ok(throttled, 'expected a 429 after repeated wrong admin tokens');
+
+  // Blocked even with the right secret until the window passes…
+  const right = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: { ...ip, 'x-admin-token': 'test-admin-token' }
+  });
+  assert.equal(right.statusCode, 429);
+
+  // …while other addresses are unaffected
+  const other = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: staff('198.51.100.45')
+  });
+  assert.equal(other.statusCode, 200);
 });
 
 /** The next EU fall-back Sunday (last Sunday of October) at least a day out. */

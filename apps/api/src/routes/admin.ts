@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { Type } from '@sinclair/typebox';
 import {
   discountGroszFor,
@@ -59,6 +58,8 @@ import {
   UUID
 } from '../lib/schemas.ts';
 import { ADMIN_TOKEN_COOKIE, clearAdminCookies, setAdminCookies } from '../lib/cookies.ts';
+import { issueAdminSession, secretsMatch, verifyAdminSession } from '../lib/admin-session.ts';
+import { FailureLimiter } from '../lib/failure-limiter.ts';
 import { EXCLUSION_VIOLATION, FOREIGN_KEY_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { adminImageRoutes } from './admin-images.ts';
 import { hasArticleText } from './news.ts';
@@ -79,12 +80,9 @@ import type { AppInstance } from '../app.ts';
 
 const DAY_MS = 24 * HOUR_MS;
 
-/** Constant-time comparison — hash first so lengths always match. */
-function tokenMatches(provided: string, expected: string): boolean {
-  const a = createHash('sha256').update(provided).digest();
-  const b = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(a, b);
-}
+/** Wrong admin credentials per IP before /api/admin answers 429 for a while. */
+const ADMIN_FAILURES_PER_WINDOW = 10;
+const ADMIN_FAILURE_WINDOW_MS = 15 * 60_000;
 
 /**
  * Rental revenue, from the rate each booking was written at. This used to be a
@@ -185,6 +183,11 @@ function cleanUrl(value: string | null | undefined): string | null | undefined {
 }
 
 export async function adminRoutes(app: AppInstance, adminToken: string | undefined) {
+  // Shared by the login and the guard: guessing through the x-admin-token
+  // header on any admin route used to run at the global 100/min instead of the
+  // login's 10/min. Every wrong secret or session now counts against the IP.
+  const failures = new FailureLimiter(ADMIN_FAILURES_PER_WINDOW, ADMIN_FAILURE_WINDOW_MS);
+
   // Session endpoints live OUTSIDE the guarded scope so they manage their own auth:
   // login validates the token and sets the HttpOnly cookie; logout just clears it.
   app.post(
@@ -202,10 +205,12 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
     },
     async (request, reply) => {
       if (!adminToken) return reply.code(503).send({ error: 'admin_disabled' });
-      if (!tokenMatches(request.body.token, adminToken)) {
+      if (failures.isBlocked(request.ip)) return reply.code(429).send({ error: 'rate_limited' });
+      if (!secretsMatch(request.body.token, adminToken)) {
+        failures.fail(request.ip);
         return reply.code(401).send({ error: 'unauthorized' });
       }
-      setAdminCookies(reply, request.body.token, app.cookieSecure);
+      setAdminCookies(reply, issueAdminSession(adminToken), app.cookieSecure);
       return { ok: true };
     }
   );
@@ -227,11 +232,18 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       if (!adminToken) {
         return reply.code(503).send({ error: 'admin_disabled' });
       }
-      // Accept the token from the HttpOnly cookie (browser) or the x-admin-token
-      // header (API clients / tests).
+      if (failures.isBlocked(request.ip)) return reply.code(429).send({ error: 'rate_limited' });
+      // Browsers carry a signed, expiring session cookie; API clients (and the
+      // tests) may send the secret itself in the x-admin-token header.
       const header = request.headers['x-admin-token'];
-      const provided = typeof header === 'string' ? header : request.cookies[ADMIN_TOKEN_COOKIE];
-      if (typeof provided !== 'string' || !tokenMatches(provided, adminToken)) {
+      const session = request.cookies[ADMIN_TOKEN_COOKIE];
+      const authorized =
+        typeof header === 'string'
+          ? secretsMatch(header, adminToken)
+          : typeof session === 'string' && verifyAdminSession(adminToken, session);
+      if (!authorized) {
+        // An absent credential is a visitor, not a guess
+        if (typeof header === 'string' || typeof session === 'string') failures.fail(request.ip);
         return reply.code(401).send({ error: 'unauthorized' });
       }
     });
