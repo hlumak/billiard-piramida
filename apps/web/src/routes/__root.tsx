@@ -6,6 +6,7 @@ import { getLocale } from '../paraglide/runtime.js';
 import { SITE_URL } from '../lib/seo';
 import { venueConfigQuery } from '../lib/queries';
 import { DevTools } from '../integrations/devtools';
+import { NavigationProgress } from '../components/NavigationProgress';
 
 import appCss from '../styles.css?url';
 
@@ -88,6 +89,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         >
           {m.skip_to_content()}
         </a>
+        <NavigationProgress />
         {children}
         {import.meta.env.DEV ? (
           <Suspense fallback={null}>
