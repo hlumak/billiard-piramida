@@ -1779,6 +1779,42 @@ test('drafts stay private and a passed deadline shuts sign-ups', async () => {
   assert.equal(backwards.json().error, 'deadline_after_start');
 });
 
+test('a refused tournament edit leaves the row untouched', async () => {
+  const headers = staff('198.51.100.23');
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers,
+    payload: {
+      slug: 'rollback-cup',
+      startsOn: '2027-03-10',
+      registrationDeadline: '2027-03-01',
+      translations: [{ locale: 'en', title: 'Rollback cup' }]
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id;
+
+  // Moving only the deadline past the (unchanged) start is judged against the
+  // merged row — and the refusal must not have been saved anyway
+  const patched = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${id}`,
+    headers,
+    payload: {
+      registrationDeadline: '2027-03-20',
+      translations: [{ locale: 'en', title: 'Renamed cup' }]
+    }
+  });
+  assert.equal(patched.statusCode, 422);
+  assert.equal(patched.json().error, 'deadline_after_start');
+
+  const list = await app.inject({ method: 'GET', url: '/api/admin/tournaments', headers });
+  const stored = list.json().find((t: { id: number }) => t.id === id);
+  assert.equal(stored.registrationDeadline, '2027-03-01');
+  assert.equal(stored.title, 'Rollback cup');
+});
+
 test('admin roster: walk-ins, the delete guard, and cancelling frees a seat', async () => {
   const created = await createTournament('198.51.100.24', {
     slug: 'walk-in-cup',

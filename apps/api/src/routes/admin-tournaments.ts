@@ -58,6 +58,9 @@ const REGISTRATION_PARAMS = Type.Object({
   })
 });
 
+/** Thrown inside the PATCH transaction so an invalid date pair rolls back. */
+class DeadlineAfterStartError extends Error {}
+
 /** Blank input clears the column; anything left is trimmed. */
 function cleanText(value: string | null | undefined): string | null | undefined {
   if (value === undefined) return undefined;
@@ -238,55 +241,63 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
         ...(imageUrl !== undefined ? { imageUrl } : {})
       };
 
-      const updated = await admin.db.transaction(async tx => {
-        // A translations-only PATCH touches no tournaments column; Drizzle refuses
-        // an empty `set`, so read the row instead of updating it (as with news).
-        const [row] =
-          Object.keys(patch).length > 0
-            ? await tx
-                .update(tournaments)
-                .set(patch)
-                .where(eq(tournaments.id, request.params.id))
-                .returning()
-            : await tx.select().from(tournaments).where(eq(tournaments.id, request.params.id));
-        if (!row) return null;
+      let updated: typeof tournaments.$inferSelect | null;
+      try {
+        updated = await admin.db.transaction(async tx => {
+          // A translations-only PATCH touches no tournaments column; Drizzle refuses
+          // an empty `set`, so read the row instead of updating it (as with news).
+          const [row] =
+            Object.keys(patch).length > 0
+              ? await tx
+                  .update(tournaments)
+                  .set(patch)
+                  .where(eq(tournaments.id, request.params.id))
+                  .returning()
+              : await tx.select().from(tournaments).where(eq(tournaments.id, request.params.id));
+          if (!row) return null;
 
-        if (translations !== undefined && translations.length > 0) {
-          // One statement for all three locales: `excluded` is the row Postgres
-          // was about to insert, so the update reads each locale's own copy.
-          await tx
-            .insert(tournamentTranslations)
-            .values(
-              translations.map(t => ({
-                tournamentId: row.id,
-                locale: t.locale,
-                title: t.title.trim(),
-                summary: cleanText(t.summary) ?? null,
-                details: cleanText(t.details) ?? null
-              }))
-            )
-            .onConflictDoUpdate({
-              target: [tournamentTranslations.tournamentId, tournamentTranslations.locale],
-              set: {
-                title: sql`excluded.title`,
-                summary: sql`excluded.summary`,
-                details: sql`excluded.details`
-              }
-            });
+          if (translations !== undefined && translations.length > 0) {
+            // One statement for all three locales: `excluded` is the row Postgres
+            // was about to insert, so the update reads each locale's own copy.
+            await tx
+              .insert(tournamentTranslations)
+              .values(
+                translations.map(t => ({
+                  tournamentId: row.id,
+                  locale: t.locale,
+                  title: t.title.trim(),
+                  summary: cleanText(t.summary) ?? null,
+                  details: cleanText(t.details) ?? null
+                }))
+              )
+              .onConflictDoUpdate({
+                target: [tournamentTranslations.tournamentId, tournamentTranslations.locale],
+                set: {
+                  title: sql`excluded.title`,
+                  summary: sql`excluded.summary`,
+                  details: sql`excluded.details`
+                }
+              });
+          }
+          // Checked against the merged row, inside the transaction: a PATCH that
+          // moves only one of the two dates must still be judged against the
+          // other one as it now stands — and a refusal must roll the edit back.
+          if (
+            row.startsOn !== null &&
+            row.registrationDeadline !== null &&
+            row.registrationDeadline > row.startsOn
+          ) {
+            throw new DeadlineAfterStartError();
+          }
+          return row;
+        });
+      } catch (err) {
+        if (err instanceof DeadlineAfterStartError) {
+          return reply.code(422).send({ error: 'deadline_after_start' });
         }
-        return row;
-      });
-      if (!updated) return reply.code(404).send({ error: 'not_found' });
-
-      // Checked against the merged row: a PATCH that moves only one of the two
-      // dates must still be judged against the other one as it now stands.
-      if (
-        updated.startsOn !== null &&
-        updated.registrationDeadline !== null &&
-        updated.registrationDeadline > updated.startsOn
-      ) {
-        return reply.code(422).send({ error: 'deadline_after_start' });
+        throw err;
       }
+      if (!updated) return reply.code(404).send({ error: 'not_found' });
 
       const dto = await loadAdminDto(updated.id);
       assert(dto, 'tournament vanished after update');
