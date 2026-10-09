@@ -55,7 +55,7 @@ test('the request carries the picks, trimmed contact details and the priced line
 
 test('a dartboard booking sends no game key at all', () => {
   const request = bookingRequestFrom(
-    { ...billiard, tableId: 10, kind: 'darts', game: null },
+    { ...billiard, tableId: 6, kind: 'darts', tableLabel: '1', game: null },
     { customerName: 'Ola', customerPhone: '+48601234567' },
     0,
     []
