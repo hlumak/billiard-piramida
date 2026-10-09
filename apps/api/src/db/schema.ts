@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   date,
   index,
   integer,
@@ -99,7 +101,14 @@ export const bookings = pgTable(
     // the user-id FK used by history/discount queries.
     index('bookings_status_starts_at_idx').on(t.status, t.startsAt),
     index('bookings_customer_phone_idx').on(t.customerPhone),
-    index('bookings_user_id_idx').on(t.userId)
+    index('bookings_user_id_idx').on(t.userId),
+    // Every writer validates these, but the database is the last word: a
+    // zero-length booking would slip past the overlap guard (an empty range
+    // overlaps nothing), and negative money would corrupt every total
+    check('bookings_ends_after_start', sql`${t.endsAt} > ${t.startsAt}`),
+    check('bookings_sport_card_count_non_negative', sql`${t.sportCardCount} >= 0`),
+    check('bookings_hourly_rate_non_negative', sql`${t.hourlyRateGrosz} >= 0`),
+    check('bookings_discount_non_negative', sql`${t.discountGrosz} >= 0`)
   ]
 );
 
@@ -108,28 +117,44 @@ export const bookings = pgTable(
  * `RateTier` ('9ft' | '12ft' | 'darts') — a text key rather than an enum so a
  * new cloth size is a seed row, not a migration plus a deploy.
  */
-export const venueRates = pgTable('venue_rates', {
-  tier: text('tier').primaryKey(),
-  hourlyGrosz: integer('hourly_grosz').notNull()
-});
+export const venueRates = pgTable(
+  'venue_rates',
+  {
+    tier: text('tier').primaryKey(),
+    hourlyGrosz: integer('hourly_grosz').notNull()
+  },
+  t => [check('venue_rates_hourly_non_negative', sql`${t.hourlyGrosz} >= 0`)]
+);
 
 /**
  * Opening hours, one row per weekday (0 = Sunday … 6 = Saturday). A day with
  * `opens >= closes` is shut: no slot survives the window arithmetic.
  */
-export const venueHours = pgTable('venue_hours', {
-  weekday: integer('weekday').primaryKey(),
-  opens: integer('opens').notNull(),
-  closes: integer('closes').notNull()
-});
+export const venueHours = pgTable(
+  'venue_hours',
+  {
+    weekday: integer('weekday').primaryKey(),
+    opens: integer('opens').notNull(),
+    closes: integer('closes').notNull()
+  },
+  t => [
+    check('venue_hours_weekday_range', sql`${t.weekday} between 0 and 6`),
+    check('venue_hours_opens_range', sql`${t.opens} between 0 and 24`),
+    check('venue_hours_closes_range', sql`${t.closes} between 0 and 24`)
+  ]
+);
 
-export const foodItems = pgTable('food_items', {
-  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-  slug: text('slug').notNull().unique(),
-  category: text('category').notNull(),
-  priceGrosz: integer('price_grosz').notNull(),
-  isAvailable: boolean('is_available').notNull().default(true)
-});
+export const foodItems = pgTable(
+  'food_items',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    slug: text('slug').notNull().unique(),
+    category: text('category').notNull(),
+    priceGrosz: integer('price_grosz').notNull(),
+    isAvailable: boolean('is_available').notNull().default(true)
+  },
+  t => [check('food_items_price_non_negative', sql`${t.priceGrosz} >= 0`)]
+);
 
 export const foodItemTranslations = pgTable(
   'food_item_translations',
@@ -213,7 +238,12 @@ export const tournaments = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   // The public list reads exactly this slice: everything but drafts, soonest first
-  t => [index('tournaments_status_starts_on_idx').on(t.status, t.startsOn)]
+  t => [
+    index('tournaments_status_starts_on_idx').on(t.status, t.startsOn),
+    check('tournaments_min_players_non_negative', sql`${t.minPlayers} >= 0`),
+    check('tournaments_start_hour_range', sql`${t.startHour} between 0 and 23`),
+    check('tournaments_entry_fee_non_negative', sql`${t.entryFeeGrosz} >= 0`)
+  ]
 );
 
 export const tournamentTranslations = pgTable(
@@ -273,5 +303,9 @@ export const orderItems = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   // Every DTO load fetches order items by booking_id — avoid the seq scan.
-  t => [index('order_items_booking_id_idx').on(t.bookingId)]
+  t => [
+    index('order_items_booking_id_idx').on(t.bookingId),
+    check('order_items_quantity_positive', sql`${t.quantity} > 0`),
+    check('order_items_unit_price_non_negative', sql`${t.unitPriceGrosz} >= 0`)
+  ]
 );
