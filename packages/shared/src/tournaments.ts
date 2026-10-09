@@ -39,6 +39,15 @@ export type TournamentRegistrationState =
  */
 export const MAX_TOURNAMENT_PLAYERS = 256;
 
+/**
+ * How long an unpaid online sign-up holds its seat. Sign-ups are anonymous
+ * and unverified, so without this anyone could fill a capped roster (or
+ * squat someone else's number) with pending seats nobody will pay for.
+ * A lapsed pending seat stays on the staff roster, but no longer counts
+ * toward "full" — and the same phone may sign up again over it.
+ */
+export const PENDING_SEAT_HOLD_MS = 72 * 3_600_000;
+
 /** Everything `registrationStateOf` needs — the DTO and the DB row both satisfy it. */
 export interface RegistrationWindow {
   status: TournamentStatus;

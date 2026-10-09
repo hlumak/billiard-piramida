@@ -19,6 +19,12 @@ const app = await buildApp({
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {
     app.log.info({ signal }, 'shutting down');
+    // A request stuck on a hung upstream must not keep the process (and a
+    // deploy) waiting forever
+    setTimeout(() => {
+      app.log.error('shutdown deadline passed; exiting');
+      process.exit(1);
+    }, 10_000).unref();
     app
       .close()
       .then(() => process.exit(0))

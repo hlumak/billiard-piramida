@@ -6,10 +6,24 @@ import { getLocale } from '../paraglide/runtime.js';
 import { SITE_URL } from '../lib/seo';
 import { venueConfigQuery } from '../lib/queries';
 import { DevTools } from '../integrations/devtools';
+import { NavigationProgress } from '../components/NavigationProgress';
 
 import appCss from '../styles.css?url';
 
 import type { QueryClient } from '@tanstack/react-query';
+import type { Locale } from '@repo/shared';
+
+/**
+ * Body text (Montserrat 400) in the subsets this locale's copy needs, fetched
+ * alongside the stylesheet rather than after it is parsed — the difference
+ * between the first paint in the fallback face and in the real one. Weights
+ * and faces used less widely still load on demand.
+ */
+const FONT_PRELOADS: Record<Locale, string[]> = {
+  pl: ['montserrat-400-latin', 'montserrat-400-latin-ext'],
+  uk: ['montserrat-400-latin', 'montserrat-400-cyrillic'],
+  en: ['montserrat-400-latin']
+};
 
 interface MyRouterContext {
   queryClient: QueryClient;
@@ -30,6 +44,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { property: 'og:site_name', content: 'piramida' },
       { property: 'og:type', content: 'website' },
       { property: 'og:image', content: `${SITE_URL}/og-image.jpg` },
+      { property: 'og:image:width', content: '1200' },
+      { property: 'og:image:height', content: '630' },
       // X reads og:* as a fallback, but only when a card is already recognised —
       // validators (and the devtools SEO panel) report an empty preview without
       // the explicit twitter:* set, so the card carries its own image/title/desc.
@@ -41,12 +57,19 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     // render-blocking requests on the critical path.
     links: [
       { rel: 'stylesheet', href: appCss },
+      ...FONT_PRELOADS[getLocale()].map(font => ({
+        rel: 'preload',
+        href: `/fonts/${font}.woff2`,
+        as: 'font',
+        type: 'font/woff2',
+        crossOrigin: 'anonymous' as const
+      })),
       { rel: 'icon', href: '/favicon.ico', sizes: '48x48' },
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
       { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16.png' },
       { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' },
       { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
-      { rel: 'manifest', href: '/manifest.webmanifest' }
+      { rel: 'manifest', href: `/manifest.webmanifest?locale=${getLocale()}` }
     ]
   }),
   shellComponent: RootDocument
@@ -59,6 +82,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        {/* First stop for keyboard users: jump past the header to the page */}
+        <a
+          href="#main"
+          className="sr-only z-50 rounded-lg bg-golden px-4 py-2 font-semibold text-btn-text focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        >
+          {m.skip_to_content()}
+        </a>
+        <NavigationProgress />
         {children}
         {import.meta.env.DEV ? (
           <Suspense fallback={null}>

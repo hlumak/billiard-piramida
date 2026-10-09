@@ -9,18 +9,28 @@ import { adminBookingsQuery } from '../../lib/admin-api';
 import { tablesQuery } from '../../lib/queries';
 import { spotName } from '../../lib/spots';
 import { availabilityLive } from '../../lib/availability-live';
-import { addDays, formatDayLong, formatHour, warsawHour, warsawToday } from '../../lib/format';
+import {
+  addDays,
+  bookingHours,
+  formatDayLong,
+  formatHour,
+  warsawHour,
+  warsawToday
+} from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
+import { PHASE_LABELS } from '../booking/phase';
 import { AdminDatePicker } from './AdminDatePicker';
+import { useNowMinute } from '../../lib/use-now';
 import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
 
 /** (tableId, hour) → the confirmed booking covering that hour. Bookings are
- *  hour-aligned and never cross midnight (close is 23 at the latest). */
+ *  hour-aligned and never cross midnight; one may end at 24 (see bookingHours). */
 function occupancyOf(bookings: BookingDto[]): Map<string, BookingDto> {
   const map = new Map<string, BookingDto>();
   for (const booking of bookings) {
-    for (let h = warsawHour(booking.startsAt); h < warsawHour(booking.endsAt); h++) {
+    const { start, end } = bookingHours(booking);
+    for (let h = start; h < end; h++) {
       map.set(`${booking.tableId}:${h}`, booking);
     }
   }
@@ -57,9 +67,13 @@ function TableRow({
   for (let hour = open; hour < close;) {
     const booking = occupancy.get(`${tableId}:${hour}`);
     if (booking) {
-      const endHour = warsawHour(booking.endsAt);
-      const span = endHour - hour;
+      const endHour = bookingHours(booking).end;
+      // A booking can outlast the grid when staff have since moved closing time
+      // earlier: clamp, or it would push every following row out of place
+      const span = Math.min(endHour, close) - hour;
       const time = `${formatHour(hour)}–${formatHour(endHour)}`;
+      // Being played right now (the grid re-renders every minute)
+      const active = nowHour !== null && hour <= nowHour && nowHour < endHour;
       cells.push(
         <button
           key={hour}
@@ -67,14 +81,22 @@ function TableRow({
           style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
           onClick={() => onShowBooking(booking.customerPhone)}
           title={`${booking.customerName} · ${formatPhone(booking.customerPhone)} · ${time}`}
-          className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] bg-club-green-light px-2 text-left transition-colors hover:bg-surface-hover ${
-            isPastHour(endHour - 1) ? 'opacity-50' : ''
-          }`}
+          // Figma: a game in progress is solid golden, any other booking a
+          // #ffb732 fill at half strength. Figma also fades that label to half,
+          // which leaves creme at ~3.8:1; black at full strength keeps it
+          // readable (5.3:1). Hover only brightens the fill a step.
+          className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] px-2 text-left text-btn-text-hover transition-colors ${
+            active
+              ? 'bg-golden hover:bg-golden-hover'
+              : 'bg-golden-hover/50 hover:bg-golden-hover/70'
+          } ${isPastHour(endHour - 1) ? 'opacity-50' : ''}`}
         >
-          <span className="w-full truncate text-sm font-semibold text-creme">
+          <span className="w-full truncate text-sm font-semibold">
             {booking.customerName}
+            {/* The colour alone says "playing now" only to those who see it */}
+            {active ? <span className="sr-only">, {PHASE_LABELS.active()}</span> : null}
           </span>
-          <span className="text-xs text-grey-cool">{time}</span>
+          <span className="text-xs">{time}</span>
         </button>
       );
       hour = endHour;
@@ -90,7 +112,7 @@ function TableRow({
           aria-label={`${name}, ${formatHour(slotHour)} — ${m.admin_free()}`}
           onClick={() => onPickSlot(slotHour)}
           className={`h-12 rounded-[10px] border transition-colors hover:bg-surface-hover ${
-            isPastHour(slotHour) ? 'border-grey-warm opacity-40' : 'border-golden/60'
+            isPastHour(slotHour) ? 'border-black opacity-40' : 'border-golden/60'
           }`}
         />
       );
@@ -138,8 +160,9 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
     [date, queryClient]
   );
 
-  const today = warsawToday();
-  const nowHour = date === today ? warsawHour(new Date()) : null;
+  const now = useNowMinute();
+  const today = warsawToday(now);
+  const nowHour = date === today ? warsawHour(now) : null;
   const { open, close } = hoursForDate(date, useVenueConfig().hours);
   const hours = Array.from({ length: close - open }, (_, i) => open + i);
   const occupancy = occupancyOf(bookings ?? []);
@@ -186,7 +209,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
         </span>
       </div>
 
-      {isError ? (
+      {isError && !bookings ? (
         <QueryError onRetry={() => refetch()} />
       ) : isPending || !bookings ? (
         <div className="flex justify-center py-16">
@@ -232,8 +255,12 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
           {m.admin_free()}
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-3 rounded bg-club-green-light" />
+          <span aria-hidden className="size-3 rounded bg-golden-hover/50" />
           {m.admin_booked()}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="size-3 rounded bg-golden" />
+          {PHASE_LABELS.active()}
         </span>
       </div>
 

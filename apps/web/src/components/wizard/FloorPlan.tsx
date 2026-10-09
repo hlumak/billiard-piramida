@@ -358,12 +358,12 @@ function RoomLabel({
 }) {
   const lineHeight = size * 1.15;
   // dy stacks each word under the last, so only the first line takes the anchor
-  let dy = 0;
-  const lines = label.split(' ').map(word => {
-    const line = { word, dy };
-    dy = lineHeight;
-    return line;
-  });
+  const lines = label.split(' ').map((word, index) => ({
+    word,
+    dy: index === 0 ? 0 : lineHeight,
+    // A label may repeat a word, so the position is part of the identity
+    key: `${index}:${word}`
+  }));
 
   return (
     <text
@@ -375,7 +375,7 @@ function RoomLabel({
       style={{ fontSize: size }}
     >
       {lines.map(line => (
-        <tspan key={line.word} x={tx} dy={line.dy}>
+        <tspan key={line.key} x={tx} dy={line.dy}>
           {line.word}
         </tspan>
       ))}

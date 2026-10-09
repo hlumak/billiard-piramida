@@ -5,15 +5,18 @@ import { ImagePlus } from 'lucide-react';
 import {
   isSafeUrl,
   type AdminNewsItemDto,
+  SUPPORTED_LOCALES,
   type Locale,
   type NewsTranslationDto
 } from '@repo/shared';
 import { adminApi } from '../../lib/admin-api';
+import { isDraftChanged } from './draft';
 import { ApiError } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
+import { localizeHref } from '../../paraglide/runtime.js';
 import { AdminImageField } from './AdminImageField';
+import { uploadErrorMessage } from './upload-errors';
 
-const LOCALES: Locale[] = ['uk', 'pl', 'en'];
 const REQUIRED_LOCALE: Locale = 'pl';
 /** Mirrors the API's cap on a single picture. */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -48,14 +51,6 @@ function draftFrom(item: AdminNewsItemDto | null): NewsDraft {
   };
 }
 
-function uploadErrorMessage(err: unknown): string {
-  if (err instanceof ApiError) {
-    if (err.code === 'file_too_large') return m.admin_image_too_large();
-    if (err.code === 'unsupported_image') return m.admin_unsupported_image();
-  }
-  return m.admin_upload_failed();
-}
-
 /**
  * Create (item === null) or edit a news card: cover, link, order, and per
  * locale a headline, a teaser and an optional article that gives the card its
@@ -72,6 +67,8 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const insertTarget = useRef<Locale>('pl');
 
+  const isChanged = isOpen && isDraftChanged(draft, draftFrom(item));
+
   const open = () => {
     setDraft(draftFrom(item));
     setInsertError(null);
@@ -82,7 +79,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   const linkUrl = draft.linkUrl.trim() || null;
   const slug = draft.slug.trim();
   const sortOrder = Number(draft.sortOrder);
-  const translations: NewsTranslationDto[] = LOCALES.flatMap(locale => {
+  const translations: NewsTranslationDto[] = SUPPORTED_LOCALES.flatMap(locale => {
     const title = draft.titles[locale].trim();
     return title === ''
       ? []
@@ -154,7 +151,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   const rejectedUrl = save.error instanceof ApiError && save.error.code === 'invalid_url';
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       {item === null ? (
         <Button size="sm" className="font-semibold" onPress={open}>
           {m.admin_add_news()}
@@ -164,7 +161,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
           {m.admin_edit_btn()}
         </Button>
       )}
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop isDismissable={!isChanged} isKeyboardDismissDisabled={isChanged}>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />
@@ -214,7 +211,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
                   <p className="text-sm text-grey-cool">
                     {m.admin_page_address()}:{' '}
                     <a
-                      href={`/news/${item.slug}`}
+                      href={localizeHref(`/news/${item.slug}`)}
                       target="_blank"
                       rel="noreferrer"
                       className="text-golden hover:text-golden-hover"
@@ -236,9 +233,9 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
                   }}
                 />
 
-                {LOCALES.map(locale => (
+                {SUPPORTED_LOCALES.map(locale => (
                   <div key={locale} className="rounded-[10px] bg-club-green p-3">
-                    <p className="mb-2 text-xs font-bold uppercase text-golden">{locale}</p>
+                    <p className="mb-2 text-xs font-bold uppercase text-golden-light">{locale}</p>
                     <div className="flex flex-col gap-3">
                       <TextField
                         name={`title-${locale}`}

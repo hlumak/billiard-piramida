@@ -1,5 +1,7 @@
+import { lookup as dnsLookup } from 'node:dns';
 import { lookup } from 'node:dns/promises';
-import { BlockList, isIP } from 'node:net';
+import { BlockList, isIP, type LookupFunction } from 'node:net';
+import { Agent, fetch as undiciFetch } from 'undici';
 import { ImageStore, MAX_IMAGE_BYTES, UnsupportedImageError } from './images.ts';
 
 /**
@@ -17,6 +19,9 @@ import { ImageStore, MAX_IMAGE_BYTES, UnsupportedImageError } from './images.ts'
  * server: every hop is restricted to http(s) on a public address (no loopback,
  * RFC 1918, link-local, metadata endpoints), redirects are followed by hand so
  * each target is re-checked, and bodies are capped before being buffered.
+ * The address is checked again at connect time, on the very address the
+ * socket uses — a host that resolves to a public IP for the pre-check and
+ * to 127.0.0.1 a moment later (DNS rebinding) is refused there.
  */
 
 export type PostImageFailure =
@@ -70,10 +75,18 @@ for (const [net, prefix] of [
   PRIVATE_RANGES.addSubnet(net, prefix, 'ipv4');
 }
 for (const [net, prefix] of [
-  ['::', 128],
-  ['::1', 128],
+  // ::/96 also covers the unspecified address, loopback and IPv4-compatible
+  // addresses (::a.b.c.d); IPv4-mapped (::ffff:a.b.c.d) is matched against
+  // the v4 list by BlockList itself
+  ['::', 96],
+  ['64:ff9b::', 96], // NAT64: reaches the embedded IPv4 address
+  ['64:ff9b:1::', 48], // local-use NAT64
+  ['100::', 64], // discard-only
+  ['2001:db8::', 32], // documentation
+  ['2002::', 16], // 6to4: embeds an IPv4 address
   ['fc00::', 7],
   ['fe80::', 10],
+  ['fec0::', 10], // deprecated site-local
   ['ff00::', 8]
 ] as const) {
   PRIVATE_RANGES.addSubnet(net, prefix, 'ipv6');
@@ -89,6 +102,39 @@ async function defaultResolve(hostname: string): Promise<string[]> {
   const records = await lookup(hostname, { all: true });
   return records.map(r => r.address);
 }
+
+/**
+ * The resolver the socket itself uses: refuses to connect anywhere private,
+ * whatever the earlier pre-check saw. This is what closes the DNS-rebinding
+ * window between "check the name" and "connect to the name".
+ */
+const publicOnlyLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookup(hostname, { ...options, all: true }, (err, addresses) => {
+    if (err) {
+      callback(err, '', 0);
+      return;
+    }
+    const first = addresses[0];
+    if (!first || !addresses.every(entry => isPublicAddress(entry.address))) {
+      callback(new PostImageError('invalid_url', `${hostname} is not a public host`), '', 0);
+      return;
+    }
+    if (options.all) {
+      (callback as unknown as (err: null, list: typeof addresses) => void)(null, addresses);
+    } else {
+      callback(null, first.address, first.family);
+    }
+  });
+};
+
+const publicOnlyAgent = new Agent({ connect: { lookup: publicOnlyLookup } });
+
+/** fetch through the connect-time guard (tests swap in their own fetch). */
+const guardedFetch: typeof globalThis.fetch = (input, init) =>
+  undiciFetch(input as Parameters<typeof undiciFetch>[0], {
+    ...(init as Parameters<typeof undiciFetch>[1]),
+    dispatcher: publicOnlyAgent
+  }) as unknown as Promise<Response>;
 
 /** http(s), no embedded credentials, and a host that resolves only to public addresses. */
 async function assertFetchable(url: URL, resolve: NonNullable<PostImageDeps['resolve']>) {
@@ -186,20 +232,38 @@ const ENTITIES: Record<string, string> = {
 function decodeEntities(value: string): string {
   return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, entity: string) => {
     const lower = entity.toLowerCase();
-    if (lower.startsWith('#x')) return String.fromCodePoint(parseInt(lower.slice(2), 16));
-    if (lower.startsWith('#')) return String.fromCodePoint(parseInt(lower.slice(1), 10));
+    if (lower.startsWith('#')) {
+      const code = lower.startsWith('#x')
+        ? parseInt(lower.slice(2), 16)
+        : parseInt(lower.slice(1), 10);
+      // fromCodePoint throws past U+10FFFF: a junk entity is text, not a 500
+      return Number.isInteger(code) && code >= 0 && code <= 0x10ffff
+        ? String.fromCodePoint(code)
+        : whole;
+    }
     return ENTITIES[lower] ?? whole;
   });
 }
 
 function attributesOf(tag: string): Record<string, string> {
   const attrs: Record<string, string> = {};
-  for (const match of tag.matchAll(/([a-zA-Z:_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) {
+  for (const match of tag.matchAll(ATTRIBUTE)) {
     const name = match[1]?.toLowerCase();
     if (name) attrs[name] = match[2] ?? match[3] ?? match[4] ?? '';
   }
   return attrs;
 }
+
+/**
+ * The preview tags live in <head>, which is a few KB; the rest of a 2 MB page
+ * is only a place to hide hostile input. Scanning is cut at </head> or 256 KB.
+ */
+const MAX_SCANNED_HTML = 256 * 1024;
+
+/** Bounded patterns: no tag longer than 2 KB, no attribute name over 64 chars —
+ *  the unbounded versions went quadratic on a long run without '=' or '>'. */
+const META_TAG = /<meta\b[^<>]{0,2048}>/gi;
+const ATTRIBUTE = /([a-zA-Z:_-]{1,64})\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
 
 /** Preferred first; the first tag of the best kind wins (og:image lists lead with the main picture). */
 const IMAGE_META_KEYS = [
@@ -213,7 +277,9 @@ const IMAGE_META_KEYS = [
 /** The picture a link preview of this page would show, or null. Exported for tests. */
 export function extractPreviewImage(html: string): string | null {
   let best: { rank: number; url: string } | null = null;
-  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+  const headEnd = html.search(/<\/head\s*>/i);
+  const scanned = html.slice(0, Math.min(headEnd === -1 ? html.length : headEnd, MAX_SCANNED_HTML));
+  for (const tag of scanned.match(META_TAG) ?? []) {
     const attrs = attributesOf(tag);
     const key = (attrs.property ?? attrs.name)?.toLowerCase();
     const content = attrs.content?.trim();
@@ -239,7 +305,8 @@ async function instagramThumbnail(
   token: string,
   deps: Required<Pick<PostImageDeps, 'fetch' | 'resolve'>>
 ): Promise<URL | null> {
-  const endpoint = new URL('https://graph.facebook.com/v21.0/instagram_oembed');
+  // v21.0 is retired on 2027-01-21; Meta keeps a version ~2 years after release
+  const endpoint = new URL('https://graph.facebook.com/v26.0/instagram_oembed');
   endpoint.searchParams.set('url', post.href);
   endpoint.searchParams.set('fields', 'thumbnail_url');
   endpoint.searchParams.set('access_token', token);
@@ -270,7 +337,7 @@ export async function importPostImage(
   options: PostImageDeps = {}
 ): Promise<string> {
   const deps = {
-    fetch: options.fetch ?? globalThis.fetch,
+    fetch: options.fetch ?? guardedFetch,
     resolve: options.resolve ?? defaultResolve
   };
   let postUrl: URL;

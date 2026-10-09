@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { hoursForDate } from '@repo/shared';
+import { hoursForDate, isClosedAllDay } from '@repo/shared';
 import { HomeHeader } from '../components/AppHeader';
 import { NewsCarousel } from '../components/NewsCarousel';
 import { Reveal } from '../components/motion';
@@ -34,7 +34,7 @@ export const Route = createFileRoute('/')({
 });
 
 function Home() {
-  const { open, close } = hoursForDate(warsawToday(), useVenueConfig().hours);
+  const today = hoursForDate(warsawToday(), useVenueConfig().hours);
 
   return (
     <div className="relative min-h-dvh overflow-hidden">
@@ -62,16 +62,20 @@ function Home() {
             middle of the hero, the CTA stays pinned near the bottom. The
             carousel styles itself (rather than sitting in a wrapper) so that
             with no news it renders nothing at all and the CTA drops back down. */}
-        <NewsCarousel className="anim-reveal mt-auto w-full self-center pt-8 [animation-delay:100ms] md:max-w-md" />
+        <main id="main" className="flex flex-1 flex-col">
+          <NewsCarousel className="anim-reveal mt-auto w-full self-center pt-8 [animation-delay:100ms] md:max-w-md" />
 
-        <Reveal delay={0.15} className="mt-auto flex flex-col items-center gap-3">
-          <div className="w-full max-w-74">
-            <ButtonLink to="/book">{m.book_now()}</ButtonLink>
-          </div>
-          <p className="text-sm text-creme/80">
-            {m.open_today({ open: formatHour(open), close: formatHour(close) })}
-          </p>
-        </Reveal>
+          <Reveal delay={0.15} className="mt-auto flex flex-col items-center gap-3">
+            <div className="w-full max-w-74">
+              <ButtonLink to="/book">{m.book_now()}</ButtonLink>
+            </div>
+            <p className="text-sm text-creme/80">
+              {isClosedAllDay(today)
+                ? m.closed_today()
+                : m.open_today({ open: formatHour(today.open), close: formatHour(today.close) })}
+            </p>
+          </Reveal>
+        </main>
       </div>
     </div>
   );

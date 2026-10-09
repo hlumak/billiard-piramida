@@ -9,10 +9,7 @@ import {
   gamesFor,
   MAX_SPORT_CARDS_PER_BOOKING,
   sizeOf,
-  spotPriceGrosz,
-  type ActivityKind,
-  type BilliardGame,
-  type IsoDate
+  spotPriceGrosz
 } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
 import { m } from '../../paraglide/messages.js';
@@ -27,6 +24,13 @@ import { useVenueConfig } from '../../lib/venue-config';
 import { Link } from '@tanstack/react-router';
 import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { SportCardPicker } from './SportCardPicker';
+import { mutationErrorText } from '../booking/phase';
+import {
+  bookingRequestFrom,
+  needsNewTime,
+  orderLinesFrom,
+  type BookingDraft
+} from './booking-request';
 import {
   goToStep,
   resetWizard,
@@ -34,18 +38,6 @@ import {
   setSportCardCount,
   wizardStore
 } from '../../store/booking-wizard';
-
-/** All picks made in earlier steps — non-null by construction (see book.tsx). */
-export interface BookingDraft {
-  date: IsoDate;
-  startHour: number;
-  durationHours: number;
-  tableId: number;
-  kind: ActivityKind;
-  tableLabel: string;
-  /** Null on a dartboard — nothing to rack, nothing to ask */
-  game: BilliardGame | null;
-}
 
 export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const navigate = useNavigate();
@@ -55,12 +47,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const { data: menu } = useQuery(menuQuery(getLocale()));
   const { data: profile } = useQuery(profileQuery());
 
-  const orderLines = Object.entries(items)
-    .map(([foodItemId, quantity]) => {
-      const item = menu?.find(entry => entry.id === Number(foodItemId));
-      return item ? { item, quantity } : null;
-    })
-    .filter(line => line != null);
+  const orderLines = orderLinesFrom(items, menu);
 
   const spot = { id: draft.tableId, kind: draft.kind };
   const tableSize = sizeOf(draft.tableId);
@@ -72,54 +59,44 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
   const createBooking = useMutation({
     mutationFn: api.createBooking,
-    onSuccess: (booking, input) => {
-      rememberBooking(booking.id);
+    onSuccess: async ({ manageToken, ...booking }, input) => {
+      // The secret comes back this once: keep it, and put it in the page's
+      // link (fragment, never sent to a server) so a bookmark manages it too
+      rememberBooking(booking.id, manageToken);
       // Seed the detail page cache (no refetch on landing) and drop the now-stale slot grid
       queryClient.setQueryData(bookingQuery(booking.id).queryKey, booking);
       queryClient.invalidateQueries({ queryKey: availabilityQuery(input.date).queryKey });
-      resetWizard();
-      navigate({
+      // Navigate first, reset after: resetting renders step 1 synchronously, and
+      // it would sit on screen while the booking page's chunk downloads. The
+      // mutation stays pending meanwhile, so the button keeps saying "Creating…".
+      await navigate({
         to: '/booking/$id',
         params: { id: booking.id },
-        search: { new: true }
+        search: { new: true },
+        hash: `key=${manageToken}`
       });
+      resetWizard();
+    },
+    onError: error => {
+      // The menu moved on under the guest: refresh it so the order shows the truth
+      if (error instanceof ApiError && error.code === 'unknown_food_item') {
+        void queryClient.invalidateQueries({ queryKey: menuQuery(getLocale()).queryKey });
+      }
     }
   });
 
   const form = useForm({
     defaultValues: { customerName: profile?.name ?? '', customerPhone: profile?.phone ?? '' },
     onSubmit: ({ value }) => {
-      const { game, ...picks } = draft;
-      createBooking.mutate({
-        ...picks,
-        // Omitted rather than sent as null: on a dartboard the API refuses the
-        // key outright, and omitting it is also what "no preference" means
-        ...(game === null ? {} : { game }),
-        customerName: value.customerName.trim(),
-        customerPhone: value.customerPhone.trim(),
-        sportCardCount,
-        items: Object.entries(items).map(([foodItemId, quantity]) => ({
-          foodItemId: Number(foodItemId),
-          quantity
-        }))
-      });
+      createBooking.mutate(bookingRequestFrom(draft, value, sportCardCount, orderLines));
     }
   });
 
-  // Errors the user can only fix by returning to the time step and re-picking
   const err = createBooking.error;
-  const isTimeError =
-    err instanceof ApiError &&
-    (err.code === 'slot_taken' ||
-      err.code === 'start_in_past' ||
-      err.code === 'outside_operating_hours');
-  const errorMessage = err
-    ? err instanceof ApiError && err.code === 'slot_taken'
-      ? m.err_slot_taken()
-      : isTimeError
-        ? m.err_slot_expired()
-        : m.err_generic()
-    : null;
+  const isTimeError = needsNewTime(err);
+  const errorMessage = err ? mutationErrorText(err) : null;
+  // With food in the order the menu must be known, or the lines can't be priced
+  const menuPending = Object.keys(items).length > 0 && menu === undefined;
 
   return (
     <section>
@@ -132,7 +109,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-6">
         <div className="mb-6 rounded-[10px] bg-club-green-light p-4 md:mb-0">
-          <h3 className="mb-2 font-semibold text-golden">{m.summary_title()}</h3>
+          <h3 className="mb-2 font-semibold text-golden-light">{m.summary_title()}</h3>
           <dl className="flex flex-col gap-1 text-sm text-creme">
             <div className="flex justify-between">
               <dt className="text-grey-cool">{m.summary_date()}</dt>
@@ -202,10 +179,10 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             {discount > 0 ? (
               <div className="flex justify-between text-creme">
                 <span className="text-grey-cool">{m.sport_cards_count({ n: sportCardCount })}</span>
-                <span className="text-golden">−{formatPln(discount, intlTag())}</span>
+                <span className="text-golden-light">−{formatPln(discount, intlTag())}</span>
               </div>
             ) : null}
-            <div className="mt-2 flex justify-between text-base font-bold text-golden">
+            <div className="mt-2 flex justify-between text-base font-bold text-golden-light">
               <span>{m.total()}</span>
               <span>{formatPln(tableTotal + foodTotal - discount, intlTag())}</span>
             </div>
@@ -240,7 +217,11 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
                 isInvalid={field.state.meta.errors.length > 0}
               >
                 <Label>{m.name_label()}</Label>
-                <Input placeholder={m.name_placeholder()} onBlur={field.handleBlur} />
+                <Input
+                  placeholder={m.name_placeholder()}
+                  autoComplete="name"
+                  onBlur={field.handleBlur}
+                />
                 <FieldError>{field.state.meta.errors[0]}</FieldError>
               </TextField>
             )}
@@ -265,7 +246,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
           </form.Field>
 
           {errorMessage ? (
-            <div className="rounded-[10px] bg-danger-soft p-3 text-sm text-creme">
+            <div role="alert" className="rounded-[10px] bg-danger-soft p-3 text-sm text-creme">
               {errorMessage}
               {isTimeError ? (
                 <Button
@@ -285,6 +266,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             size="lg"
             className="h-11.25 w-full text-lg font-bold"
             isPending={createBooking.isPending}
+            isDisabled={menuPending}
           >
             {createBooking.isPending ? m.creating() : m.btn_confirm()}
           </Button>

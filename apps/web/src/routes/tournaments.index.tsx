@@ -13,7 +13,8 @@ import { getLocale } from '../paraglide/runtime.js';
 export const Route = createFileRoute('/tournaments/')({
   // SSR + hover-preload: the list is server data and the page is indexable
   loader: ({ context }) => context.queryClient.ensureQueryData(tournamentsQuery(getLocale())),
-  head: ({ match }) => pageHead(m.seo_title_tournaments(), m.seo_desc_tournaments(), match.pathname),
+  head: ({ match }) =>
+    pageHead(m.seo_title_tournaments(), m.seo_desc_tournaments(), match.pathname),
   component: TournamentsPage
 });
 
@@ -28,7 +29,7 @@ function TournamentsPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="tournaments" />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         {isError ? (
           <QueryError onRetry={() => refetch()} />
         ) : isPending || !tournaments ? (
@@ -41,7 +42,7 @@ function TournamentsPage() {
           <StaggerGroup>
             <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {tournaments.map(tournament => (
-                <StaggerItem key={tournament.id}>
+                <StaggerItem key={tournament.id} as="li">
                   <Link
                     to="/tournaments/$slug"
                     params={{ slug: tournament.slug }}

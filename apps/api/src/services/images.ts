@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { stripImageMetadata } from './image-metadata.ts';
 
 /**
  * Staff-uploaded pictures (news cards, later tournaments) live on local disk
@@ -69,9 +70,12 @@ export class ImageStore {
   }
 
   /** Writes the picture (validating the format) and returns its app-relative URL. */
-  async save(bytes: Uint8Array): Promise<string> {
-    const ext = sniffImage(bytes);
+  async save(upload: Uint8Array): Promise<string> {
+    const ext = sniffImage(upload);
     if (ext === null) throw new UnsupportedImageError();
+    // Published as-is, so the GPS position and device in a phone photo's EXIF
+    // would be too: strip metadata first (the hash then names the clean file)
+    const bytes = stripImageMetadata(ext, upload);
     const name = `${createHash('sha256').update(bytes).digest('hex').slice(0, 32)}.${ext}`;
     try {
       // 'wx' fails if the file exists — same hash, same bytes, nothing to redo

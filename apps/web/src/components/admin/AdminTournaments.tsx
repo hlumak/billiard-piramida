@@ -34,7 +34,7 @@ function TournamentRow({ item }: { item: AdminTournamentDto }) {
         : null;
 
   return (
-    <li
+    <div
       className={`rounded-[10px] bg-club-green-light p-3 ${
         item.status === 'draft' ? 'opacity-60' : ''
       }`}
@@ -82,14 +82,14 @@ function TournamentRow({ item }: { item: AdminTournamentDto }) {
       ) : null}
       {/* Mounted only when open: one registrations query per expanded roster */}
       {showRoster ? <AdminTournamentRoster tournamentId={item.id} /> : null}
-    </li>
+    </div>
   );
 }
 
 export function AdminTournaments() {
   const { data: items, isPending, isError, refetch } = useQuery(adminTournamentsQuery());
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !items) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !items) {
     return (
       <div className="flex justify-center py-16">
@@ -109,7 +109,7 @@ export function AdminTournaments() {
         <StaggerGroup>
           <ul className="flex flex-col gap-2">
             {items.map(item => (
-              <StaggerItem key={item.id}>
+              <StaggerItem key={item.id} as="li">
                 <TournamentRow item={item} />
               </StaggerItem>
             ))}

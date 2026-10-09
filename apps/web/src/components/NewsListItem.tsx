@@ -27,10 +27,12 @@ export function NewsListItem({ item }: { item: NewsItemDto }) {
         <time dateTime={item.publishedAt} className="text-xs text-grey-cool">
           {formatPublished(item.publishedAt)}
         </time>
-        <p className="font-semibold text-golden">{item.title}</p>
+        <p className="font-semibold text-golden-light">{item.title}</p>
         {item.body ? <p className="text-sm text-creme/85">{item.body}</p> : null}
         {item.hasArticle ? (
-          <span className="mt-1 text-sm font-semibold text-golden">{m.news_read_more()} →</span>
+          <span className="mt-1 text-sm font-semibold text-golden-light">
+            {m.news_read_more()} →
+          </span>
         ) : null}
       </div>
     </>

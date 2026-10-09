@@ -2,7 +2,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { sql } from 'drizzle-orm';
 import { venueHours, venueRates } from '../db/schema.ts';
 import { ERROR_RESPONSE, RATE_TABLE, VENUE_CONFIG_RESPONSE, WEEKLY_HOURS } from '../lib/schemas.ts';
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 
 /**
  * Rates and opening hours, staff side. A whole-config PUT rather than per-field
@@ -30,9 +30,10 @@ export const adminVenueConfigRoutes: FastifyPluginAsyncTypebox = async admin => 
     async (request, reply) => {
       const { rates, hours } = request.body;
 
-      // A day that opens after it closes is shut, which is legitimate; one that
-      // runs past midnight is not — this app's whole clock is a single day.
-      if (hours.some(day => day.open > 24 || day.close > 24)) {
+      // A shut day is open === close (what the settings form sends). Opening
+      // after closing is a typo the analytics would count as negative hours,
+      // and running past midnight is not a thing: the app's clock is one day.
+      if (hours.some(day => day.open > day.close || day.close > 24)) {
         return reply.code(422).send({ error: 'invalid_hours' });
       }
 

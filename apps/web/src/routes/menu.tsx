@@ -57,38 +57,41 @@ function MenuPage() {
             and the language row ended up sitting on the last button. */}
         <div aria-hidden className="h-[26dvh] shrink" />
 
-        <StaggerGroup className="shrink-0">
-          <nav className="flex flex-col gap-5">
-            <StaggerItem>
-              <ButtonLink to="/book">{m.menu_booking()}</ButtonLink>
-            </StaggerItem>
-            <StaggerItem>
-              <ButtonLink to="/bookings" variant="outline">
-                {m.nav_my_bookings()}
-              </ButtonLink>
-            </StaggerItem>
-            <StaggerItem>
-              <ButtonLink to="/tournaments" variant="outline">
-                {m.menu_tournaments()}
-              </ButtonLink>
-            </StaggerItem>
-            <StaggerItem>
-              <ButtonLink to="/news" variant="outline">
-                {m.menu_news()}
-              </ButtonLink>
-            </StaggerItem>
-            <StaggerItem>
-              <ButtonLink to="/contacts" variant="outline">
-                {m.menu_contacts()}
-              </ButtonLink>
-            </StaggerItem>
-            <StaggerItem>
-              <ButtonLink to="/prices" variant="outline">
-                {m.menu_prices()}
-              </ButtonLink>
-            </StaggerItem>
-          </nav>
-        </StaggerGroup>
+        <main id="main" className="shrink-0">
+          <h1 className="sr-only">{m.nav_menu()}</h1>
+          <StaggerGroup>
+            <nav className="flex flex-col gap-5">
+              <StaggerItem>
+                <ButtonLink to="/book">{m.menu_booking()}</ButtonLink>
+              </StaggerItem>
+              <StaggerItem>
+                <ButtonLink to="/bookings" variant="outline">
+                  {m.nav_my_bookings()}
+                </ButtonLink>
+              </StaggerItem>
+              <StaggerItem>
+                <ButtonLink to="/tournaments" variant="outline">
+                  {m.menu_tournaments()}
+                </ButtonLink>
+              </StaggerItem>
+              <StaggerItem>
+                <ButtonLink to="/news" variant="outline">
+                  {m.menu_news()}
+                </ButtonLink>
+              </StaggerItem>
+              <StaggerItem>
+                <ButtonLink to="/contacts" variant="outline">
+                  {m.menu_contacts()}
+                </ButtonLink>
+              </StaggerItem>
+              <StaggerItem>
+                <ButtonLink to="/prices" variant="outline">
+                  {m.menu_prices()}
+                </ButtonLink>
+              </StaggerItem>
+            </nav>
+          </StaggerGroup>
+        </main>
 
         {/* pt-8 is the floor: mt-auto contributes nothing once the screen is
             full, and the row must still clear the button above it. */}

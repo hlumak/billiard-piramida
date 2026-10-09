@@ -1,19 +1,22 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isValidPhone } from '@repo/shared/phone';
 import { CardFields, type CardsState } from './CardFields';
 import { PhoneField } from '../PhoneField';
+import { TabList } from '../TabList';
+import { tabId, tabPanelId } from '../tab-ids';
 import { Reveal } from '../motion';
 import { ApiError } from '../../lib/api';
 import { authApi, storeSession, type RegisterInput } from '../../lib/auth';
 import { m } from '../../paraglide/messages.js';
 
 const EMPTY_CARDS: CardsState = { sportCardType: null, sportCardNumber: '' };
+type AuthTab = 'login' | 'register';
 
 export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [tab, setTab] = useState<AuthTab>('login');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -37,43 +40,46 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
     }
   });
 
-  const errorText = submit.error
-    ? submit.error instanceof ApiError && submit.error.code === 'phone_taken'
+  // A phone problem belongs on the phone field, where it is read with the field
+  const error = submit.error instanceof ApiError ? submit.error : null;
+  const phoneError =
+    error?.code === 'phone_taken'
       ? m.auth_err_phone_taken()
-      : submit.error instanceof ApiError && submit.error.code === 'invalid_phone'
+      : error?.code === 'invalid_phone'
         ? m.err_phone_invalid()
-        : submit.error instanceof ApiError && submit.error.status === 401
-          ? m.auth_err_invalid()
-          : m.err_generic()
-    : null;
+        : null;
+  const errorText =
+    submit.error === null || phoneError !== null
+      ? null
+      : error?.status === 401
+        ? m.auth_err_invalid()
+        : m.err_generic();
+
+  const idBase = useId();
+  const selectTab = (entry: AuthTab) => {
+    setTab(entry);
+    submit.reset();
+  };
 
   return (
     <Reveal className="mx-auto w-full max-w-sm md:max-w-md">
       <p className="mb-5 text-sm text-grey-cool">{m.auth_promo()}</p>
 
-      <div role="tablist" className="mb-6 flex gap-2">
-        {(['login', 'register'] as const).map(entry => (
-          <button
-            key={entry}
-            type="button"
-            role="tab"
-            aria-selected={tab === entry}
-            onClick={() => {
-              setTab(entry);
-              submit.reset();
-            }}
-            className={`h-10 rounded-[10px] px-4 font-semibold transition-colors ${
-              tab === entry
-                ? 'bg-golden text-btn-text'
-                : 'bg-club-green-light text-creme hover:bg-surface-hover'
-            }`}
-          >
-            {entry === 'login' ? m.auth_tab_login() : m.auth_tab_register()}
-          </button>
-        ))}
-      </div>
+      <TabList
+        idBase={idBase}
+        tabs={[
+          { id: 'login', label: m.auth_tab_login() },
+          { id: 'register', label: m.auth_tab_register() }
+        ]}
+        selected={tab}
+        onSelect={selectTab}
+        className="mb-6 flex gap-2"
+      />
 
       <form
+        id={tabPanelId(idBase)}
+        role="tabpanel"
+        aria-labelledby={tabId(idBase, tab)}
         className="flex flex-col gap-4"
         onSubmit={event => {
           event.preventDefault();
@@ -96,6 +102,8 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
             submit.reset();
           }}
           isRequired
+          isInvalid={phoneError !== null}
+          errorMessage={phoneError ?? undefined}
         />
 
         <TextField

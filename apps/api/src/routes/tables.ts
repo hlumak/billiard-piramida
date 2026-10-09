@@ -1,4 +1,4 @@
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { TableDto } from '@repo/shared';
 import { tables } from '../db/schema.ts';
 import { TABLE_RESPONSE } from '../lib/schemas.ts';

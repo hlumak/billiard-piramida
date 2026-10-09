@@ -6,9 +6,13 @@
  * row written before this guard existed must not become an XSS vector.
  *
  * Backslashes are normalized to slashes by URL parsers, so `/\evil.tld` is a
- * protocol-relative URL in disguise and is rejected with `//`.
+ * protocol-relative URL in disguise and is rejected with `//`. Browsers also
+ * strip tab/CR/LF anywhere in a URL, so `/<TAB>/evil.tld` would become
+ * `//evil.tld`: control characters and whitespace are refused outright.
  */
 export function isSafeUrl(value: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u0020\u007f]/.test(value)) return false;
   if (value.startsWith('/')) return !/^\/[/\\]/.test(value);
   try {
     const { protocol } = new URL(value);

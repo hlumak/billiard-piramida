@@ -1,7 +1,7 @@
 import assert from 'node:assert';
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { MAX_TOURNAMENT_PLAYERS, isSafeUrl } from '@repo/shared';
+import { MAX_TOURNAMENT_PLAYERS, isIsoDate, isSafeUrl } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { tournamentRegistrations, tournaments, tournamentTranslations } from '../db/schema.ts';
@@ -9,12 +9,14 @@ import {
   ADMIN_TOURNAMENT_REGISTRATION_RESPONSE,
   ADMIN_TOURNAMENT_RESPONSE,
   ERROR_RESPONSE,
+  INT_ID,
   LOCALE_SCHEMA,
   TOURNAMENT_REGISTRATION_STATUS,
-  TOURNAMENT_STATUS
+  TOURNAMENT_STATUS,
+  UUID
 } from '../lib/schemas.ts';
 import { UNIQUE_VIOLATION, pgErrorCode } from '../lib/errors.ts';
-import { slugify } from '../lib/slug.ts';
+import { insertWithFreeSlug, slugify } from '../lib/slug.ts';
 import { seatCountsFor, toAdminTournamentDto } from '../services/tournaments.ts';
 
 const TRANSLATIONS_BODY = Type.Array(
@@ -48,15 +50,38 @@ const OPTIONAL_MIN_PLAYERS = Type.Optional(
 );
 const OPTIONAL_URL = Type.Optional(Type.Union([Type.String({ maxLength: 500 }), Type.Null()]));
 
-const ID_PARAMS = Type.Object({ id: Type.Integer({ minimum: 1 }) });
-// Strict UUID shape, as in bookings: a loose pattern lets malformed ids reach
-// Postgres as a uuid cast and surface as a logged 500 instead of a clean 404.
-const REGISTRATION_PARAMS = Type.Object({
-  id: Type.Integer({ minimum: 1 }),
-  registrationId: Type.String({
-    pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-  })
-});
+const ID_PARAMS = Type.Object({ id: INT_ID });
+const REGISTRATION_PARAMS = Type.Object({ id: INT_ID, registrationId: UUID });
+
+/** Thrown inside the PATCH transaction so a refused merged row rolls back. */
+class RefusedEdit extends Error {
+  readonly code: string;
+  constructor(code: string) {
+    super(code);
+    this.code = code;
+  }
+}
+
+/** The pattern only checks the shape; '2027-02-31' would reach Postgres as a 500. */
+function hasImpossibleDate(...values: (string | null | undefined)[]): boolean {
+  return values.some(value => typeof value === 'string' && !isIsoDate(value));
+}
+
+/** Cross-field rules every stored tournament must satisfy; null when it does. */
+function rowProblem(row: {
+  startsOn: string | null;
+  registrationDeadline: string | null;
+  minPlayers: number;
+  maxPlayers: number | null;
+}): string | null {
+  // A dated tournament that shuts sign-ups after it starts is a data entry
+  // slip, not something to discover once nobody can register.
+  if (row.startsOn !== null && row.registrationDeadline !== null) {
+    if (row.registrationDeadline > row.startsOn) return 'deadline_after_start';
+  }
+  if (row.maxPlayers !== null && row.minPlayers > row.maxPlayers) return 'min_above_max';
+  return null;
+}
 
 /** Blank input clears the column; anything left is trimmed. */
 function cleanText(value: string | null | undefined): string | null | undefined {
@@ -138,11 +163,16 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
       if (imageUrl !== null && !isSafeUrl(imageUrl)) {
         return reply.code(422).send({ error: 'invalid_url' });
       }
-      // A dated tournament that shuts sign-ups after it starts is a data entry
-      // slip, not something to discover once nobody can register.
-      if (startsOn != null && registrationDeadline != null && registrationDeadline > startsOn) {
-        return reply.code(422).send({ error: 'deadline_after_start' });
+      if (hasImpossibleDate(startsOn, registrationDeadline)) {
+        return reply.code(422).send({ error: 'invalid_date' });
       }
+      const problem = rowProblem({
+        startsOn: startsOn ?? null,
+        registrationDeadline: registrationDeadline ?? null,
+        minPlayers: minPlayers ?? 0,
+        maxPlayers: maxPlayers ?? null
+      });
+      if (problem !== null) return reply.code(422).send({ error: problem });
 
       // An all-Cyrillic title slugifies to nothing; `slugify`'s fallback owns that
       const en = translations.find(t => t.locale === 'en');
@@ -150,31 +180,25 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
       const base = slugify(request.body.slug ?? titleForSlug, 'tournament');
 
       const created = await admin.db.transaction(async tx => {
-        // Unique slug: append a counter on collision, same as menu items
-        let slug = base;
-        for (let attempt = 2; attempt < 20; attempt++) {
-          const [existing] = await tx
-            .select({ id: tournaments.id })
-            .from(tournaments)
-            .where(eq(tournaments.slug, slug));
-          if (!existing) break;
-          slug = `${base}-${attempt}`;
-        }
-
-        const [row] = await tx
-          .insert(tournaments)
-          .values({
-            slug,
-            imageUrl,
-            ...(status !== undefined ? { status } : {}),
-            ...(startsOn !== undefined ? { startsOn } : {}),
-            ...(startHour !== undefined ? { startHour } : {}),
-            ...(registrationDeadline !== undefined ? { registrationDeadline } : {}),
-            ...(entryFeeGrosz !== undefined ? { entryFeeGrosz } : {}),
-            ...(minPlayers !== undefined ? { minPlayers } : {}),
-            ...(maxPlayers !== undefined ? { maxPlayers } : {})
-          })
-          .returning();
+        // Unique slug: base, then base-2, base-3… (atomic, see insertWithFreeSlug)
+        const row = await insertWithFreeSlug(base, async slug => {
+          const [inserted] = await tx
+            .insert(tournaments)
+            .values({
+              slug,
+              imageUrl,
+              ...(status !== undefined ? { status } : {}),
+              ...(startsOn !== undefined ? { startsOn } : {}),
+              ...(startHour !== undefined ? { startHour } : {}),
+              ...(registrationDeadline !== undefined ? { registrationDeadline } : {}),
+              ...(entryFeeGrosz !== undefined ? { entryFeeGrosz } : {}),
+              ...(minPlayers !== undefined ? { minPlayers } : {}),
+              ...(maxPlayers !== undefined ? { maxPlayers } : {})
+            })
+            .onConflictDoNothing({ target: tournaments.slug })
+            .returning();
+          return inserted;
+        });
         assert(row, 'insert returned no row');
 
         await tx.insert(tournamentTranslations).values(
@@ -221,6 +245,10 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
       const { status, startsOn, startHour, registrationDeadline, translations } = request.body;
       const { entryFeeGrosz, minPlayers, maxPlayers } = request.body;
 
+      if (hasImpossibleDate(startsOn, registrationDeadline)) {
+        return reply.code(422).send({ error: 'invalid_date' });
+      }
+
       // undefined = leave the column alone, null = clear it
       const imageUrl = cleanText(request.body.imageUrl);
       if (typeof imageUrl === 'string' && !isSafeUrl(imageUrl)) {
@@ -238,55 +266,56 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
         ...(imageUrl !== undefined ? { imageUrl } : {})
       };
 
-      const updated = await admin.db.transaction(async tx => {
-        // A translations-only PATCH touches no tournaments column; Drizzle refuses
-        // an empty `set`, so read the row instead of updating it (as with news).
-        const [row] =
-          Object.keys(patch).length > 0
-            ? await tx
-                .update(tournaments)
-                .set(patch)
-                .where(eq(tournaments.id, request.params.id))
-                .returning()
-            : await tx.select().from(tournaments).where(eq(tournaments.id, request.params.id));
-        if (!row) return null;
+      let updated: typeof tournaments.$inferSelect | null;
+      try {
+        updated = await admin.db.transaction(async tx => {
+          // A translations-only PATCH touches no tournaments column; Drizzle refuses
+          // an empty `set`, so read the row instead of updating it (as with news).
+          const [row] =
+            Object.keys(patch).length > 0
+              ? await tx
+                  .update(tournaments)
+                  .set(patch)
+                  .where(eq(tournaments.id, request.params.id))
+                  .returning()
+              : await tx.select().from(tournaments).where(eq(tournaments.id, request.params.id));
+          if (!row) return null;
 
-        if (translations !== undefined && translations.length > 0) {
-          // One statement for all three locales: `excluded` is the row Postgres
-          // was about to insert, so the update reads each locale's own copy.
-          await tx
-            .insert(tournamentTranslations)
-            .values(
-              translations.map(t => ({
-                tournamentId: row.id,
-                locale: t.locale,
-                title: t.title.trim(),
-                summary: cleanText(t.summary) ?? null,
-                details: cleanText(t.details) ?? null
-              }))
-            )
-            .onConflictDoUpdate({
-              target: [tournamentTranslations.tournamentId, tournamentTranslations.locale],
-              set: {
-                title: sql`excluded.title`,
-                summary: sql`excluded.summary`,
-                details: sql`excluded.details`
-              }
-            });
-        }
-        return row;
-      });
-      if (!updated) return reply.code(404).send({ error: 'not_found' });
-
-      // Checked against the merged row: a PATCH that moves only one of the two
-      // dates must still be judged against the other one as it now stands.
-      if (
-        updated.startsOn !== null &&
-        updated.registrationDeadline !== null &&
-        updated.registrationDeadline > updated.startsOn
-      ) {
-        return reply.code(422).send({ error: 'deadline_after_start' });
+          if (translations !== undefined && translations.length > 0) {
+            // One statement for all three locales: `excluded` is the row Postgres
+            // was about to insert, so the update reads each locale's own copy.
+            await tx
+              .insert(tournamentTranslations)
+              .values(
+                translations.map(t => ({
+                  tournamentId: row.id,
+                  locale: t.locale,
+                  title: t.title.trim(),
+                  summary: cleanText(t.summary) ?? null,
+                  details: cleanText(t.details) ?? null
+                }))
+              )
+              .onConflictDoUpdate({
+                target: [tournamentTranslations.tournamentId, tournamentTranslations.locale],
+                set: {
+                  title: sql`excluded.title`,
+                  summary: sql`excluded.summary`,
+                  details: sql`excluded.details`
+                }
+              });
+          }
+          // Checked against the merged row, inside the transaction: a PATCH that
+          // moves only one of two related fields must still be judged against
+          // the other as it now stands — and a refusal must roll the edit back.
+          const problem = rowProblem(row);
+          if (problem !== null) throw new RefusedEdit(problem);
+          return row;
+        });
+      } catch (err) {
+        if (err instanceof RefusedEdit) return reply.code(422).send({ error: err.code });
+        throw err;
       }
+      if (!updated) return reply.code(404).send({ error: 'not_found' });
 
       const dto = await loadAdminDto(updated.id);
       assert(dto, 'tournament vanished after update');
@@ -391,11 +420,21 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
       // standing at the desk with the fee in hand outranks both.
       const status = request.body.status ?? 'confirmed';
       try {
+        // A player whose seat was cancelled is signed up again on that same
+        // row (one row per phone, by the unique index) — the public flow already
+        // works this way; staff used to get already_registered instead
         const [row] = await admin.db
           .insert(tournamentRegistrations)
           .values({ tournamentId: tournament.id, name, phone, status })
+          .onConflictDoUpdate({
+            target: [tournamentRegistrations.tournamentId, tournamentRegistrations.phone],
+            set: { name, status, createdAt: new Date() },
+            setWhere: eq(tournamentRegistrations.status, 'cancelled')
+          })
           .returning();
-        assert(row, 'insert returned no row');
+        // The conflict update only applies over a cancelled seat; a live one
+        // comes back empty and is the duplicate it always was
+        if (!row) return reply.code(409).send({ error: 'already_registered' });
         return reply.code(201).send({
           id: row.id,
           tournamentId: row.tournamentId,

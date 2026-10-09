@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { CalendarDays, CircleDollarSign, Clock } from 'lucide-react';
 import { formatPln, type TournamentDto } from '@repo/shared';
@@ -7,6 +8,19 @@ import { Reveal } from '../motion';
 import { formatDayLong, intlTag } from '../../lib/format';
 import { stateLabel, whenLabel } from '../../lib/tournaments';
 import { m } from '../../paraglide/messages.js';
+
+/**
+ * Staff-authored plain text, split on blank lines. A paragraph's text is its
+ * identity; a repeated one (a "—" divider) also gets its occurrence number.
+ */
+function keyedParagraphs(details: string): { key: string; text: string }[] {
+  const seen = new Map<string, number>();
+  return details.split(/\n{2,}/).map(text => {
+    const occurrence = (seen.get(text) ?? 0) + 1;
+    seen.set(text, occurrence);
+    return { key: `${occurrence}:${text}`, text };
+  });
+}
 
 /** One labelled line of the fact block: when, sign-up deadline, entry fee. */
 function Fact({
@@ -33,6 +47,7 @@ function Fact({
 export function TournamentView({ tournament }: { tournament: TournamentDto }) {
   const when = whenLabel(tournament);
   const { entryFeeGrosz, registrationDeadline, registrationState, minPlayers } = tournament;
+  const [registered, setRegistered] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -84,16 +99,21 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
           <h3 className="mb-2 text-lg font-semibold text-golden">{m.tournament_details()}</h3>
           {/* Staff-authored plain text: blank lines are the paragraph breaks */}
           <div className="flex flex-col gap-3 text-creme/85">
-            {tournament.details.split(/\n{2,}/).map(paragraph => (
-              <p key={paragraph}>{paragraph}</p>
+            {keyedParagraphs(tournament.details).map(({ key, text }) => (
+              <p key={key}>{text}</p>
             ))}
           </div>
         </Reveal>
       ) : null}
 
       <Reveal delay={0.15}>
-        {registrationState === 'open' ? (
-          <TournamentRegisterForm tournament={tournament} />
+        {/* Stays up after a sign-up even if that seat filled the roster, so
+            the success panel isn't swapped for "full" under the new player */}
+        {registrationState === 'open' || registered ? (
+          <TournamentRegisterForm
+            tournament={tournament}
+            onRegistered={() => setRegistered(true)}
+          />
         ) : (
           <p className="rounded-[10px] bg-club-green-light p-4 text-center text-grey-cool">
             {stateLabel(registrationState)}

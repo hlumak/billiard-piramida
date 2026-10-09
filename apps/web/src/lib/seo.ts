@@ -1,6 +1,6 @@
-import type { VenueConfigDto } from '@repo/shared';
+import { SUPPORTED_LOCALES, type Locale, type VenueConfigDto } from '@repo/shared';
 import { m } from '../paraglide/messages.js';
-import { getLocale } from '../paraglide/runtime.js';
+import { baseLocale, getLocale, localizeHref } from '../paraglide/runtime.js';
 import { VENUE } from './venue';
 import { FALLBACK_VENUE_CONFIG, groupWeeklyHours } from './venue-config';
 
@@ -10,14 +10,24 @@ export const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'http://localho
 const OG_LOCALES = { uk: 'uk_UA', pl: 'pl_PL', en: 'en_GB' } as const;
 
 /**
- * Standard `head` for an indexable page. `pathname` is the route match's, so
- * the canonical and the og:url agree with each other and with the sitemap
- * (locale is a cookie, not a URL segment, so one canonical serves all three).
+ * Absolute address of a page in one language. `pathname` is the route's,
+ * without a language prefix (the router strips it); index routes match with a
+ * trailing slash ("/tournaments/") while links and the sitemap use the bare
+ * form, and a canonical must pick one.
+ */
+export function localizedPageUrl(pathname: string, locale: Locale): string {
+  const bare = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  return `${SITE_URL}${localizeHref(bare, { locale })}`;
+}
+
+/**
+ * Standard `head` for an indexable page: the canonical and og:url name this
+ * language's address, and hreflang alternates point search engines at the
+ * same page in the other two (x-default: Polish, the club's own language).
  */
 export function pageHead(title: string, description: string, pathname: string, image?: string) {
-  // Index routes match with a trailing slash ("/tournaments/"); the sitemap and
-  // every internal link use the bare form, and a canonical must pick one.
-  const url = `${SITE_URL}${pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname}`;
+  const locale = getLocale();
+  const url = localizedPageUrl(pathname, locale);
   // Unfurlers need an absolute image URL; app-relative covers (uploads included)
   // are same-origin with the site in production.
   const imageUrl =
@@ -29,7 +39,7 @@ export function pageHead(title: string, description: string, pathname: string, i
       { property: 'og:title', content: title },
       { property: 'og:description', content: description },
       { property: 'og:url', content: url },
-      { property: 'og:locale', content: OG_LOCALES[getLocale()] },
+      { property: 'og:locale', content: OG_LOCALES[locale] },
       // Per-page twins of the og:* set; the card type is global (__root), and so
       // is the image unless the page brings its own
       { name: 'twitter:title', content: title },
@@ -42,7 +52,15 @@ export function pageHead(title: string, description: string, pathname: string, i
             { name: 'twitter:image', content: imageUrl }
           ])
     ],
-    links: [{ rel: 'canonical', href: url }]
+    links: [
+      { rel: 'canonical', href: url },
+      ...SUPPORTED_LOCALES.map(other => ({
+        rel: 'alternate',
+        hrefLang: other,
+        href: localizedPageUrl(pathname, other)
+      })),
+      { rel: 'alternate', hrefLang: 'x-default', href: localizedPageUrl(pathname, baseLocale) }
+    ]
   };
 }
 

@@ -1,4 +1,4 @@
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { UserProfileDto } from '@repo/shared';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.ts';
@@ -118,7 +118,9 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
 
       const token = await reply.jwtSign({ sub: created.id });
       setUserCookies(reply, token, app.cookieSecure);
-      return reply.code(201).send({ token, profile: toProfile(created) });
+      // The token goes out only as the HttpOnly cookie: returning it in the
+      // body too would hand any script running at login a 30-day credential
+      return reply.code(201).send({ profile: toProfile(created) });
     }
   );
 
@@ -135,14 +137,21 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
       const normalized = normalizePhone(request.body.phone) ?? request.body.phone.trim();
       const [user] = await app.db.select().from(users).where(eq(users.phone, normalized));
       // Verify against a dummy hash when the user is missing — uniform timing
-      const valid = user
+      const check = user
         ? await verifyPassword(request.body.password, user.passwordHash)
-        : (await hashPassword(request.body.password), false);
-      if (!user || !valid) return reply.code(401).send({ error: 'invalid_credentials' });
+        : (await hashPassword(request.body.password), { valid: false, needsRehash: false });
+      if (!user || !check.valid) return reply.code(401).send({ error: 'invalid_credentials' });
+      // The only moment the plain password is at hand: bring an old hash up to today's cost
+      if (check.needsRehash) {
+        await app.db
+          .update(users)
+          .set({ passwordHash: await hashPassword(request.body.password) })
+          .where(eq(users.id, user.id));
+      }
 
       const token = await reply.jwtSign({ sub: user.id });
       setUserCookies(reply, token, app.cookieSecure);
-      return { token, profile: toProfile(user) };
+      return { profile: toProfile(user) };
     }
   );
 
@@ -181,15 +190,19 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
       if (!user) return reply.code(401).send({ error: 'unauthorized' });
 
       const { name, sportCardType, sportCardNumber } = request.body;
+      if (name !== undefined && name.trim() === '') {
+        return reply.code(422).send({ error: 'invalid_name' });
+      }
+      const patch = {
+        ...(name !== undefined ? { name: name.trim() } : {}),
+        ...(sportCardType !== undefined ? { sportCardType } : {}),
+        ...(sportCardNumber !== undefined ? { sportCardNumber: blankToNull(sportCardNumber) } : {})
+      };
+      // Nothing to change is not an error — and Drizzle refuses an empty `set`
+      if (Object.keys(patch).length === 0) return toProfile(user);
       const [updated] = await app.db
         .update(users)
-        .set({
-          ...(name !== undefined ? { name: name.trim() } : {}),
-          ...(sportCardType !== undefined ? { sportCardType } : {}),
-          ...(sportCardNumber !== undefined
-            ? { sportCardNumber: blankToNull(sportCardNumber) }
-            : {})
-        })
+        .set(patch)
         .where(eq(users.id, user.id))
         .returning();
       if (!updated) return reply.code(404).send({ error: 'not_found' });

@@ -1,144 +1,40 @@
 import { useState } from 'react';
 import { Button, Input, Label, Modal, TextField } from '@heroui/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  MAX_TOURNAMENT_PLAYERS,
-  TOURNAMENT_STATUSES,
-  isIsoDate,
-  isSafeUrl,
-  type AdminTournamentDto,
-  type IsoDate,
-  type Locale,
-  type TournamentStatus,
-  type TournamentTranslationDto
-} from '@repo/shared';
-import { adminApi, type AdminTournamentInput } from '../../lib/admin-api';
+import { SUPPORTED_LOCALES, TOURNAMENT_STATUSES, type AdminTournamentDto } from '@repo/shared';
+import { adminApi } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { adminStatusLabel } from '../../lib/tournaments';
+import { isDraftChanged } from './draft';
+import {
+  checkTournamentDraft,
+  tournamentDraftFrom,
+  type TournamentDraft
+} from './tournament-draft';
 import { m } from '../../paraglide/messages.js';
-
-const LOCALES: Locale[] = ['uk', 'pl', 'en'];
-
-interface TournamentDraft {
-  status: TournamentStatus;
-  startsOn: string;
-  startHour: string;
-  registrationDeadline: string;
-  /** Entered in złoty; converted to grosze on submit */
-  entryFee: string;
-  minPlayers: string;
-  maxPlayers: string;
-  imageUrl: string;
-  titles: Record<Locale, string>;
-  summaries: Record<Locale, string>;
-  details: Record<Locale, string>;
-}
-
-function draftFrom(item: AdminTournamentDto | null): TournamentDraft {
-  const titles = { uk: '', pl: '', en: '' };
-  const summaries = { uk: '', pl: '', en: '' };
-  const details = { uk: '', pl: '', en: '' };
-  for (const t of item?.translations ?? []) {
-    titles[t.locale] = t.title;
-    summaries[t.locale] = t.summary ?? '';
-    details[t.locale] = t.details ?? '';
-  }
-  return {
-    status: item?.status ?? 'draft',
-    startsOn: item?.startsOn ?? '',
-    startHour: item?.startHour === null || item === null ? '' : String(item.startHour),
-    registrationDeadline: item?.registrationDeadline ?? '',
-    entryFee: item?.entryFeeGrosz != null ? String(item.entryFeeGrosz / 100) : '',
-    minPlayers: String(item?.minPlayers ?? 0),
-    maxPlayers: item?.maxPlayers != null ? String(item.maxPlayers) : '',
-    imageUrl: item?.imageUrl ?? '',
-    titles,
-    summaries,
-    details
-  };
-}
-
-/** "" clears the column; anything else must parse as a calendar date. */
-function parseDate(value: string): IsoDate | null | undefined {
-  const trimmed = value.trim();
-  if (trimmed === '') return null;
-  return isIsoDate(trimmed) ? trimmed : undefined;
-}
-
-/** "" clears; otherwise an integer within [min, max], or undefined when unusable. */
-function parseCount(value: string, min: number, max: number): number | null | undefined {
-  const trimmed = value.trim();
-  if (trimmed === '') return null;
-  const parsed = Number(trimmed);
-  return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : undefined;
-}
 
 /** Create (item === null) or edit a tournament: schedule, roster limits, copy. */
 export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null }) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
-  const [draft, setDraft] = useState<TournamentDraft>(() => draftFrom(item));
+  const [draft, setDraft] = useState<TournamentDraft>(() => tournamentDraftFrom(item));
+
+  const isChanged = isOpen && isDraftChanged(draft, tournamentDraftFrom(item));
 
   const open = () => {
-    setDraft(draftFrom(item));
+    setDraft(tournamentDraftFrom(item));
     setOpen(true);
   };
 
-  const startsOn = parseDate(draft.startsOn);
-  const registrationDeadline = parseDate(draft.registrationDeadline);
-  const startHour = parseCount(draft.startHour, 0, 23);
-  const maxPlayers = parseCount(draft.maxPlayers, 2, MAX_TOURNAMENT_PLAYERS);
-  const minPlayers = parseCount(draft.minPlayers, 0, MAX_TOURNAMENT_PLAYERS) ?? undefined;
-  const feeInput = draft.entryFee.trim().replace(',', '.');
-  const entryFeeGrosz = feeInput === '' ? null : Math.round(Number(feeInput) * 100);
-  const imageUrl = draft.imageUrl.trim() || null;
-
-  const translations: TournamentTranslationDto[] = LOCALES.flatMap(locale => {
-    const title = draft.titles[locale].trim();
-    if (title === '') return [];
-    return [
-      {
-        locale,
-        title,
-        summary: draft.summaries[locale].trim() || null,
-        details: draft.details[locale].trim() || null
-      }
-    ];
-  });
-
-  // The server re-checks all of it; catching it here spares a round trip
-  const urlOk = imageUrl === null || isSafeUrl(imageUrl);
-  const feeOk = entryFeeGrosz === null || (Number.isFinite(entryFeeGrosz) && entryFeeGrosz >= 0);
-  const datesOk =
-    startsOn !== undefined &&
-    registrationDeadline !== undefined &&
-    startHour !== undefined &&
-    maxPlayers !== undefined &&
-    minPlayers !== undefined;
-  // `== null` on purpose: an unparseable date is undefined here, and it is
-  // `datesOk` that reports it — this check only owns the ordering.
-  const orderOk =
-    startsOn == null || registrationDeadline == null || registrationDeadline <= startsOn;
-  const canSubmit = urlOk && feeOk && datesOk && orderOk && translations.length === LOCALES.length;
+  const check = checkTournamentDraft(draft);
 
   const save = useMutation({
     mutationFn: () => {
-      // Guarded by canSubmit; narrowing here keeps the input type honest
-      if (!datesOk || minPlayers === undefined) throw new Error('invalid draft');
-      const input: AdminTournamentInput = {
-        status: draft.status,
-        startsOn,
-        startHour,
-        registrationDeadline,
-        entryFeeGrosz,
-        minPlayers,
-        maxPlayers,
-        imageUrl,
-        translations
-      };
+      // Save is disabled until the check passes; this keeps the input type honest
+      if (!check.ok) throw new Error('invalid draft');
       return item === null
-        ? adminApi.createTournament(input)
-        : adminApi.updateTournament(item.id, input);
+        ? adminApi.createTournament(check.input)
+        : adminApi.updateTournament(item.id, check.input);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tournaments'] });
@@ -149,17 +45,22 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
   });
 
   const rejected = save.error instanceof ApiError ? save.error.code : null;
+  const problem = check.ok ? null : check.problem;
   const errorText =
-    !urlOk || rejected === 'invalid_url'
+    problem === 'invalid_url' || rejected === 'invalid_url'
       ? m.admin_invalid_url()
-      : !orderOk || rejected === 'deadline_after_start'
+      : problem === 'deadline_after_start' || rejected === 'deadline_after_start'
         ? m.admin_tournament_deadline_after_start()
-        : save.isError
-          ? m.err_generic()
-          : null;
+        : problem === 'min_above_max' || rejected === 'min_above_max'
+          ? m.admin_tournament_min_above_max()
+          : problem === 'invalid_fee'
+            ? m.admin_invalid_price()
+            : save.isError
+              ? m.err_generic()
+              : null;
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       {item === null ? (
         <Button size="sm" className="font-semibold" onPress={open}>
           {m.admin_add_tournament()}
@@ -169,7 +70,7 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
           {m.admin_edit_btn()}
         </Button>
       )}
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop isDismissable={!isChanged} isKeyboardDismissDisabled={isChanged}>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />
@@ -261,9 +162,9 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
                   <Input inputMode="url" placeholder="/news/tournament.webp" />
                 </TextField>
 
-                {LOCALES.map(locale => (
+                {SUPPORTED_LOCALES.map(locale => (
                   <div key={locale} className="rounded-[10px] bg-club-green p-3">
-                    <p className="mb-2 text-xs font-bold uppercase text-golden">{locale}</p>
+                    <p className="mb-2 text-xs font-bold uppercase text-golden-light">{locale}</p>
                     <div className="flex flex-col gap-3">
                       <TextField
                         name={`title-${locale}`}
@@ -320,7 +221,7 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
             <Modal.Footer>
               <Button
                 className="w-full font-bold"
-                isDisabled={!canSubmit}
+                isDisabled={!check.ok}
                 isPending={save.isPending}
                 onPress={() => save.mutate()}
               >

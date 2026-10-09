@@ -36,13 +36,30 @@ export function clearUserCookies(reply: FastifyReply, secure: boolean): void {
   reply.clearCookie(USER_FLAG_COOKIE, { ...base(secure), httpOnly: false });
 }
 
-/** Admin cookies are session-scoped (no maxAge) to mirror the old sessionStorage. */
-export function setAdminCookies(reply: FastifyReply, token: string, secure: boolean): void {
-  reply.setCookie(ADMIN_TOKEN_COOKIE, token, { ...base(secure), httpOnly: true });
+/** Only the admin API ever reads the session, so only it is ever sent it —
+ *  not every page request to the web server. */
+const ADMIN_COOKIE_PATH = '/api/admin';
+
+/**
+ * Admin cookies are browser-session scoped (no maxAge) to mirror the old
+ * sessionStorage; the session value itself also expires (see admin-session.ts).
+ */
+export function setAdminCookies(reply: FastifyReply, session: string, secure: boolean): void {
+  reply.setCookie(ADMIN_TOKEN_COOKIE, session, {
+    ...base(secure),
+    path: ADMIN_COOKIE_PATH,
+    httpOnly: true
+  });
   reply.setCookie(ADMIN_FLAG_COOKIE, '1', { ...base(secure), httpOnly: false });
 }
 
 export function clearAdminCookies(reply: FastifyReply, secure: boolean): void {
+  reply.clearCookie(ADMIN_TOKEN_COOKIE, {
+    ...base(secure),
+    path: ADMIN_COOKIE_PATH,
+    httpOnly: true
+  });
+  // Sessions from before the cookie was scoped sat on "/" — clear that one too
   reply.clearCookie(ADMIN_TOKEN_COOKIE, { ...base(secure), httpOnly: true });
   reply.clearCookie(ADMIN_FLAG_COOKIE, { ...base(secure), httpOnly: false });
 }

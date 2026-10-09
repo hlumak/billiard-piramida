@@ -19,7 +19,7 @@ import type {
   UploadedImageDto,
   VenueConfigDto
 } from '@repo/shared';
-import { queryOptions } from '@tanstack/react-query';
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { request, upload } from './api';
 import { createFlagCookieStore } from './hydration';
 
@@ -57,6 +57,9 @@ const ADMIN_FLAG_COOKIE = 'piramida.admin';
 
 export const adminAuthFlag = createFlagCookieStore(ADMIN_FLAG_COOKIE);
 
+/** The API's ceiling for one bookings page; a full page means there may be more. */
+export const ADMIN_BOOKINGS_LIMIT = 200;
+
 export interface AdminBookingFilters {
   date?: IsoDate | undefined;
   status?: BookingStatus | undefined;
@@ -86,6 +89,14 @@ export interface AdminTournamentInput {
   translations: TournamentTranslationDto[];
 }
 
+/**
+ * Phones are stored as E.164 ("+48601234567") while staff type what they see
+ * ("601 234 567"): drop everything but digits and "+" before the substring search.
+ */
+export function normalizePhoneSearch(input: string): string {
+  return input.replace(/[^d+]/g, '');
+}
+
 export interface CustomerListParams {
   limit?: number | undefined;
   offset?: number | undefined;
@@ -105,8 +116,8 @@ export const adminApi = {
     if (filters.date) params.set('date', filters.date);
     if (filters.status) params.set('status', filters.status);
     if (filters.phone) params.set('phone', filters.phone);
-    const query = params.size > 0 ? `?${params}` : '';
-    return request<BookingDto[]>(`/api/admin/bookings${query}`, { signal });
+    params.set('limit', String(ADMIN_BOOKINGS_LIMIT));
+    return request<BookingDto[]>(`/api/admin/bookings?${params}`, { signal });
   },
   customers: (params: CustomerListParams = {}, signal?: AbortSignal) => {
     const query = new URLSearchParams();
@@ -269,14 +280,25 @@ export const adminBookingsQuery = (filters: AdminBookingFilters) =>
     refetchInterval: 60_000
   });
 
-export const adminCustomersQuery = (params: CustomerListParams = {}) =>
-  queryOptions({
-    queryKey: [
-      'admin',
-      'customers',
-      params.limit ?? null,
-      params.offset ?? null,
-      params.phone ?? null
-    ],
-    queryFn: ({ signal }) => adminApi.customers(params, signal)
+/** One page of the customer list; the API caps `limit` at 200. */
+export const CUSTOMERS_PAGE_SIZE = 50;
+
+/**
+ * Offset paging: "load more" fetches only the next page. Growing `limit`
+ * instead re-downloaded every row each time and, past 200 customers, asked for
+ * more than the API allows — a 400 that left the tab stuck on an error.
+ */
+export const adminCustomersQuery = (phone: string) =>
+  infiniteQueryOptions({
+    queryKey: ['admin', 'customers', phone],
+    queryFn: ({ pageParam, signal }) =>
+      adminApi.customers(
+        { limit: CUSTOMERS_PAGE_SIZE, offset: pageParam, ...(phone ? { phone } : {}) },
+        signal
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.length === CUSTOMERS_PAGE_SIZE ? pages.length * CUSTOMERS_PAGE_SIZE : undefined,
+    // Typing in the search keeps the old list on screen instead of a spinner
+    placeholderData: keepPreviousData
   });

@@ -8,6 +8,7 @@ import {
   BILLIARD_TABLES_COUNT,
   DARTBOARDS_COUNT,
   DEFAULT_HOURLY_RATE_GROSZ,
+  PENDING_SEAT_HOLD_MS,
   SPORT_CARD_DISCOUNT_GROSZ,
   SPOTS_COUNT
 } from '@repo/shared';
@@ -17,7 +18,7 @@ import pg from 'pg';
 import { buildApp } from '../src/app.ts';
 import { LOCAL_DATABASE_URL } from '../src/lib/config.ts';
 import { createDb } from '../src/db/client.ts';
-import { bookings, users } from '../src/db/schema.ts';
+import { bookings, tournamentRegistrations, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
 
 /** Derived from the shared constants — a rate change must not silently rot these. */
@@ -30,6 +31,20 @@ const TABLE_12FT_ID = 8;
 
 const ADMIN_URL = process.env.DATABASE_URL ?? LOCAL_DATABASE_URL;
 const TEST_URL = ADMIN_URL.replace(/\/[^/]+$/, '/piramida_test');
+
+// The suite DROPs and re-creates a database on whatever server DATABASE_URL
+// names. Only ever a local one, unless explicitly overridden.
+{
+  const host = new URL(ADMIN_URL).hostname;
+  if (
+    !['localhost', '127.0.0.1', '::1', 'postgres'].includes(host) &&
+    !process.env.ALLOW_REMOTE_TEST_DB
+  ) {
+    throw new Error(
+      `Refusing to run the API tests against ${host}: set ALLOW_REMOTE_TEST_DB=1 to override`
+    );
+  }
+}
 
 /**
  * Next date (≥ 7 days out, so always in the future) falling on `weekday`.
@@ -76,7 +91,9 @@ before(async () => {
     uploadsDir,
     // inject reports one source address for every request, so the global bucket
     // is shared by the whole suite. Route-level limits are still exercised below.
-    rateLimitMax: 1000
+    rateLimitMax: 1000,
+    // Same reasoning for the per-IP booking limit; its own test builds an app with the default
+    bookingCreateLimit: 1000
   });
   await app.ready();
 });
@@ -166,6 +183,26 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   assert.equal(booking.foodTotalGrosz, 2 * fries.priceGrosz);
   assert.equal(booking.totalGrosz, 2 * BILLIARD_HOUR + 2 * fries.priceGrosz);
   assert.equal(booking.phase, 'upcoming');
+  // The secret that manages this booking comes back once, with the booking
+  assert.equal(typeof booking.manageToken, 'string');
+  const manage = { 'x-booking-token': booking.manageToken };
+
+  // The id alone is not enough any more — not to read it, not to change it
+  const withoutToken = await app.inject({ method: 'GET', url: `/api/bookings/${booking.id}` });
+  assert.equal(withoutToken.statusCode, 404);
+  const wrongToken = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${booking.id}/cancel`,
+    headers: { 'x-booking-token': 'not-the-token' }
+  });
+  assert.equal(wrongToken.statusCode, 404);
+  const withToken = await app.inject({
+    method: 'GET',
+    url: `/api/bookings/${booking.id}`,
+    headers: manage
+  });
+  assert.equal(withToken.statusCode, 200);
+  assert.equal('manageToken' in withToken.json(), false);
 
   // overlapping booking on the same table → 409 via EXCLUDE constraint
   const conflict = await app.inject({
@@ -210,6 +247,7 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const extend = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/extend`,
+    headers: manage,
     payload: { additionalHours: 1 }
   });
   assert.equal(extend.statusCode, 200);
@@ -219,6 +257,7 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const tooLong = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/extend`,
+    headers: manage,
     payload: { additionalHours: 5 }
   });
   assert.equal(tooLong.statusCode, 422);
@@ -228,6 +267,7 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const addFood = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/items`,
+    headers: manage,
     payload: { items: [{ foodItemId: beer.id, quantity: 3 }] }
   });
   assert.equal(addFood.statusCode, 200);
@@ -237,12 +277,17 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const badFood = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/items`,
+    headers: manage,
     payload: { items: [{ foodItemId: 99999, quantity: 1 }] }
   });
   assert.equal(badFood.statusCode, 422);
 
   // cancel frees the slot
-  const cancel = await app.inject({ method: 'POST', url: `/api/bookings/${booking.id}/cancel` });
+  const cancel = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${booking.id}/cancel`,
+    headers: manage
+  });
   assert.equal(cancel.statusCode, 200);
   assert.equal(cancel.json().phase, 'cancelled');
 
@@ -424,6 +469,28 @@ test('websocket subscribers hear availability changes', async () => {
   assert.deepEqual(messages[0], { type: 'availability_changed', date: SATURDAY });
 });
 
+test('malformed websocket messages never take the process down', async () => {
+  if (!app.server.listening) await app.listen({ port: 0, host: '127.0.0.1' });
+  const address = app.server.address();
+  assert.ok(address && typeof address === 'object');
+
+  // `null` used to parse fine and then throw on destructuring — an
+  // uncaughtException that killed the whole API from one anonymous frame.
+  for (const frame of ['null', '1', '"x"', '[]', '{', 'true']) {
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/ws`);
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener('open', () => resolve());
+      ws.addEventListener('error', () => reject(new Error('ws connect failed')));
+    });
+    ws.send(frame);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    ws.close();
+  }
+
+  const health = await fetch(`http://127.0.0.1:${address.port}/health`);
+  assert.equal(health.status, 200);
+});
+
 test('auth: register, login, profile update', async () => {
   const registered = await app.inject({
     method: 'POST',
@@ -431,8 +498,9 @@ test('auth: register, login, profile update', async () => {
     payload: { phone: '+48 600 700 800', name: 'Auth Test', password: 'secret-pass-1' }
   });
   assert.equal(registered.statusCode, 201);
-  const { token, profile } = registered.json();
-  assert.ok(token.length > 20);
+  const { profile } = registered.json();
+  assert.equal('token' in registered.json(), false);
+  assert.ok(registered.cookies.find(c => c.name === 'token' && c.httpOnly));
   assert.equal(profile.sportCardType, null);
 
   const dupe = await app.inject({
@@ -456,7 +524,11 @@ test('auth: register, login, profile update', async () => {
   });
   assert.equal(login.statusCode, 200);
 
-  const auth = { authorization: `Bearer ${login.json().token}` };
+  // The session is the HttpOnly cookie only — nothing in the body to steal
+  assert.equal('token' in login.json(), false);
+  const sessionCookie = login.cookies.find(c => c.name === 'token');
+  assert.ok(sessionCookie);
+  const auth = { cookie: `token=${sessionCookie.value}` };
   const updated = await app.inject({
     method: 'PATCH',
     url: '/api/auth/me',
@@ -562,6 +634,7 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
   const extended = await app.inject({
     method: 'POST',
     url: `/api/bookings/${dartsDto.id}/extend`,
+    headers: { 'x-booking-token': dartsDto.manageToken },
     payload: { additionalHours: 1 }
   });
   assert.equal(extended.statusCode, 200);
@@ -857,6 +930,11 @@ test('admin news CRUD: create, hide, reorder, url guard, delete', async () => {
   const plRow = retitled.json().translations.find((t: { locale: string }) => t.locale === 'pl');
   assert.equal(plRow.title, 'Turniej klubowy');
   assert.equal(retitled.json().isPublished, false); // untouched by the patch
+  // The translations sent replace the set: uk and en were cleared in the editor
+  assert.deepEqual(
+    retitled.json().translations.map((t: { locale: string }) => t.locale),
+    ['pl']
+  );
 
   // Blank clears a URL column
   const cleared = await app.inject({
@@ -1212,7 +1290,7 @@ test('guest phone lookup returns only active bookings and normalizes the query',
     }
   });
   assert.equal(created.statusCode, 201);
-  const id = created.json().id;
+  const { id, startsAt, manageToken } = created.json();
 
   // National-format query must match the E.164-stored number
   const found = await app.inject({
@@ -1221,10 +1299,19 @@ test('guest phone lookup returns only active bookings and normalizes the query',
     headers: ip
   });
   assert.equal(found.statusCode, 200);
-  assert.ok(found.json().some((b: { id: string }) => b.id === id));
+  const summary = found.json().find((b: { startsAt: string }) => b.startsAt === startsAt);
+  assert.ok(summary);
+  // Knowing a number tells you when — never who, nor how to manage it
+  for (const secret of ['id', 'customerName', 'customerPhone', 'manageToken']) {
+    assert.equal(secret in summary, false, `lookup must not expose ${secret}`);
+  }
 
   // Cancelled bookings drop out of the recovery list
-  await app.inject({ method: 'POST', url: `/api/bookings/${id}/cancel`, headers: ip });
+  await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${id}/cancel`,
+    headers: { ...ip, 'x-booking-token': manageToken }
+  });
   const afterCancel = await app.inject({
     method: 'GET',
     url: '/api/bookings/lookup?phone=512100100',
@@ -1251,9 +1338,78 @@ test('lookup is rate limited to 10 requests per minute', async () => {
       url: '/api/bookings/lookup?phone=500500500',
       headers: ip
     });
-    if (res.statusCode === 429) limited = true;
+    if (res.statusCode === 429) {
+      limited = true;
+      // Distinguishable from bad input, so the client can say "slow down"
+      assert.equal(res.json().error, 'rate_limited');
+    }
   }
   assert.ok(limited, 'expected a 429 within 11 rapid lookups');
+});
+
+test('out-of-range input is a clean 4xx, never a 500', async () => {
+  const headers = staff('198.51.100.31');
+
+  // Beyond Postgres `integer` on a public endpoint: rejected by the schema
+  const overflow = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 1,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Overflow',
+      customerPhone: '+48 601 000 111',
+      items: [{ foodItemId: 3_000_000_000, quantity: 1 }]
+    }
+  });
+  assert.equal(overflow.statusCode, 400);
+
+  // Right shape, impossible calendar date
+  const feb31 = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers,
+    payload: { startsOn: '2027-02-31', translations: [{ locale: 'en', title: 'Feb cup' }] }
+  });
+  assert.equal(feb31.statusCode, 422);
+  assert.equal(feb31.json().error, 'invalid_date');
+
+  const minAboveMax = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers,
+    payload: { minPlayers: 20, maxPlayers: 8, translations: [{ locale: 'en', title: 'Odd cup' }] }
+  });
+  assert.equal(minAboveMax.statusCode, 422);
+  assert.equal(minAboveMax.json().error, 'min_above_max');
+
+  // A translations-only menu edit touches no food_items column
+  const renamed = await app.inject({
+    method: 'PATCH',
+    url: '/api/admin/menu/1',
+    headers,
+    payload: { translations: [{ locale: 'en', name: 'Fries, renamed' }] }
+  });
+  assert.equal(renamed.statusCode, 200);
+  assert.ok(renamed.json().translations.some((t: { name: string }) => t.name === 'Fries, renamed'));
+
+  // Whitespace is not a name
+  const blank = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 2,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: '   ',
+      customerPhone: '+48 601 000 112'
+    }
+  });
+  assert.equal(blank.statusCode, 422);
+  assert.equal(blank.json().error, 'invalid_name');
 });
 
 test('failed create with an unknown food item leaves no phantom booking', async () => {
@@ -1301,6 +1457,7 @@ test('extend colliding with a later booking on the same table returns 409', asyn
   });
   assert.equal(first.statusCode, 201);
   const firstId = first.json().id;
+  const firstManage = { 'x-booking-token': first.json().manageToken };
 
   // A later booking leaves a 19–20 gap after the first (18–19)
   const later = await app.inject({
@@ -1322,7 +1479,7 @@ test('extend colliding with a later booking on the same table returns 409', asyn
   const collide = await app.inject({
     method: 'POST',
     url: `/api/bookings/${firstId}/extend`,
-    headers: ip,
+    headers: { ...ip, ...firstManage },
     payload: { additionalHours: 2 }
   });
   assert.equal(collide.statusCode, 409);
@@ -1332,7 +1489,7 @@ test('extend colliding with a later booking on the same table returns 409', asyn
   const ok = await app.inject({
     method: 'POST',
     url: `/api/bookings/${firstId}/extend`,
-    headers: ip,
+    headers: { ...ip, ...firstManage },
     payload: { additionalHours: 1 }
   });
   assert.equal(ok.statusCode, 200);
@@ -1531,23 +1688,87 @@ test('admin session cookie authenticates admin requests; bad token is rejected',
     cookies: { admin_token: adminCookie.value }
   });
   assert.equal(stats.statusCode, 200);
+
+  // The cookie is a signed, expiring session scoped to the admin API — not
+  // the master secret, and not sent along with every page request
+  assert.notEqual(adminCookie.value, 'test-admin-token');
+  assert.equal(adminCookie.path, '/api/admin');
+
+  // A forged or expired session is refused
+  const [, signature] = adminCookie.value.split('.');
+  const expired = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: ip,
+    cookies: { admin_token: `${Date.now() - 1000}.${signature}` }
+  });
+  assert.equal(expired.statusCode, 401);
 });
 
+test('guessing the admin secret is throttled on every admin route', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.44' };
+  let throttled = false;
+  for (let i = 0; i < 12; i++) {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/stats',
+      headers: { ...ip, 'x-admin-token': `guess-${i}` }
+    });
+    if (res.statusCode === 429) {
+      throttled = true;
+      assert.equal(res.json().error, 'rate_limited');
+      break;
+    }
+    assert.equal(res.statusCode, 401);
+  }
+  assert.ok(throttled, 'expected a 429 after repeated wrong admin tokens');
+
+  // Blocked even with the right secret until the window passes…
+  const right = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: { ...ip, 'x-admin-token': 'test-admin-token' }
+  });
+  assert.equal(right.statusCode, 429);
+
+  // …while other addresses are unaffected
+  const other = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: staff('198.51.100.45')
+  });
+  assert.equal(other.statusCode, 200);
+});
+
+/** The next EU fall-back Sunday (last Sunday of October) at least a day out. */
+function nextFallBackSunday(): string {
+  const now = new Date();
+  for (const year of [now.getUTCFullYear(), now.getUTCFullYear() + 1]) {
+    const day = new Date(Date.UTC(year, 9, 31));
+    day.setUTCDate(31 - day.getUTCDay());
+    if (day.getTime() > now.getTime() + 86_400_000) return day.toISOString().slice(0, 10);
+  }
+  throw new Error('unreachable');
+}
+
 test('booking on a DST fall-back date computes correct Warsaw instants', async () => {
-  // 2026-10-25 is the EU fall-back Sunday (25-hour day); 15:00 Warsaw is CET
-  // (UTC+1) that afternoon, so the stored instant must be 14:00Z — not 13:00Z.
-  const avail = await app.inject({ method: 'GET', url: '/api/availability?date=2026-10-25' });
+  // The fall-back Sunday is a 25-hour day; 15:00 Warsaw is CET (UTC+1) that
+  // afternoon, so the stored instant must be 14:00Z — not 13:00Z. Computed,
+  // not hardcoded (a fixed date silently turns into "start in the past"), and
+  // booked from the desk, which isn't bound by the guests' 14-day horizon.
+  const date = nextFallBackSunday();
+  const avail = await app.inject({ method: 'GET', url: `/api/availability?date=${date}` });
   assert.equal(avail.statusCode, 200);
   assert.equal(avail.json().open, 15);
   assert.equal(avail.json().close, 23);
 
   const res = await app.inject({
     method: 'POST',
-    url: '/api/bookings',
-    headers: { 'x-forwarded-for': '198.51.100.8' },
+    url: '/api/admin/bookings',
+    headers: { 'x-admin-token': 'test-admin-token', 'x-forwarded-for': '198.51.100.8' },
     payload: {
       tableId: 1,
-      date: '2026-10-25',
+      date,
       startHour: 15,
       durationHours: 2,
       customerName: 'DST Guest',
@@ -1555,8 +1776,82 @@ test('booking on a DST fall-back date computes correct Warsaw instants', async (
     }
   });
   assert.equal(res.statusCode, 201);
-  assert.equal(res.json().startsAt, '2026-10-25T14:00:00.000Z');
-  assert.equal(res.json().endsAt, '2026-10-25T16:00:00.000Z');
+  assert.equal(res.json().startsAt, `${date}T14:00:00.000Z`);
+  assert.equal(res.json().endsAt, `${date}T16:00:00.000Z`);
+});
+
+test('guests book at most 14 days ahead and hold at most 3 upcoming bookings per phone', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.41' };
+  const book = (date: string, tableId: number, phone = '+48 602 111 333') =>
+    app.inject({
+      method: 'POST',
+      url: '/api/bookings',
+      headers: ip,
+      payload: {
+        tableId,
+        date,
+        startHour: 20,
+        durationHours: 1,
+        customerName: 'Limit Guest',
+        customerPhone: phone
+      }
+    });
+
+  const tooFar = await book(
+    nextDate(1).replace(/^\d{4}/, y => String(Number(y) + 1)),
+    1
+  );
+  assert.equal(tooFar.statusCode, 422);
+  assert.equal(tooFar.json().error, 'booking_too_far');
+
+  // Three upcoming bookings on one phone are fine; the fourth is refused
+  // Thursday 20:00 — a slot no other test books
+  const thursday = nextDate(4);
+  for (const tableId of [1, 2, 3]) {
+    assert.equal((await book(thursday, tableId)).statusCode, 201);
+  }
+  const fourth = await book(thursday, 4);
+  assert.equal(fourth.statusCode, 409);
+  assert.equal(fourth.json().error, 'too_many_bookings');
+
+  // Another phone is unaffected
+  assert.equal((await book(thursday, 4, '+48 602 111 334')).statusCode, 201);
+});
+
+test('public booking creation is limited per IP', async () => {
+  const limited = await buildApp({
+    databaseUrl: TEST_URL,
+    logger: false,
+    uploadsDir,
+    rateLimitMax: 1000
+    // bookingCreateLimit left at its production default
+  });
+  try {
+    let refused = false;
+    for (let i = 0; i < 12 && !refused; i++) {
+      const res = await limited.inject({
+        method: 'POST',
+        url: '/api/bookings',
+        headers: { 'x-forwarded-for': '198.51.100.42' },
+        // Invalid on purpose: the limit counts attempts, not just successes
+        payload: {
+          tableId: 1,
+          date: MONDAY,
+          startHour: 3,
+          durationHours: 1,
+          customerName: 'X',
+          customerPhone: '+48 602 111 335'
+        }
+      });
+      if (res.statusCode === 429) {
+        refused = true;
+        assert.equal(res.json().error, 'rate_limited');
+      }
+    }
+    assert.ok(refused, 'expected a 429 within 12 rapid booking attempts');
+  } finally {
+    await limited.close();
+  }
 });
 
 /* Tournaments. The seeded pyramid tournament carries a fixed real-world
@@ -1757,6 +2052,42 @@ test('drafts stay private and a passed deadline shuts sign-ups', async () => {
   assert.equal(backwards.json().error, 'deadline_after_start');
 });
 
+test('a refused tournament edit leaves the row untouched', async () => {
+  const headers = staff('198.51.100.23');
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers,
+    payload: {
+      slug: 'rollback-cup',
+      startsOn: '2027-03-10',
+      registrationDeadline: '2027-03-01',
+      translations: [{ locale: 'en', title: 'Rollback cup' }]
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().id;
+
+  // Moving only the deadline past the (unchanged) start is judged against the
+  // merged row — and the refusal must not have been saved anyway
+  const patched = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${id}`,
+    headers,
+    payload: {
+      registrationDeadline: '2027-03-20',
+      translations: [{ locale: 'en', title: 'Renamed cup' }]
+    }
+  });
+  assert.equal(patched.statusCode, 422);
+  assert.equal(patched.json().error, 'deadline_after_start');
+
+  const list = await app.inject({ method: 'GET', url: '/api/admin/tournaments', headers });
+  const stored = list.json().find((t: { id: number }) => t.id === id);
+  assert.equal(stored.registrationDeadline, '2027-03-01');
+  assert.equal(stored.title, 'Rollback cup');
+});
+
 test('admin roster: walk-ins, the delete guard, and cancelling frees a seat', async () => {
   const created = await createTournament('198.51.100.24', {
     slug: 'walk-in-cup',
@@ -1862,6 +2193,50 @@ test('a cancelled seat can be taken again by the same player', async () => {
     headers: staff('198.51.100.23')
   });
   assert.equal(stillOne.json().length, 1);
+});
+
+test('an unpaid sign-up stops holding its seat after the hold period', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.43' };
+  const created = await createTournament('198.51.100.43', {
+    slug: 'lapsing-cup',
+    registrationDeadline: nextDate(5),
+    maxPlayers: 2
+  });
+  const register = (name: string, phone: string) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/tournaments/lapsing-cup/register',
+      headers: ip,
+      payload: { name, phone }
+    });
+
+  assert.equal((await register('First', '512 700 001')).statusCode, 201);
+  const second = await register('Second', '512 700 002');
+  assert.equal(second.json().tournament.registrationState, 'full');
+
+  // The first sign-up was never paid and has outlived its hold
+  const { db, pool } = createDb(TEST_URL);
+  await db
+    .update(tournamentRegistrations)
+    .set({ createdAt: new Date(Date.now() - PENDING_SEAT_HOLD_MS - 60_000) })
+    .where(eq(tournamentRegistrations.phone, '+48512700001'));
+  await pool.end();
+
+  const page = await app.inject({ method: 'GET', url: '/api/tournaments/lapsing-cup' });
+  assert.equal(page.json().registrationState, 'open');
+  assert.equal(page.json().pendingCount, 1);
+
+  // The lapsed number can sign up again — over its own row, not a second one
+  const again = await register('First', '512 700 001');
+  assert.equal(again.statusCode, 201);
+  assert.equal(again.json().tournament.registrationState, 'full');
+
+  const roster = await app.inject({
+    method: 'GET',
+    url: `/api/admin/tournaments/${created.id}/registrations`,
+    headers: staff('198.51.100.43')
+  });
+  assert.equal(roster.json().length, 2);
 });
 
 test('tournament sign-up is rate limited', async () => {
@@ -2397,4 +2772,148 @@ test('staff edit the game, and a move to a 12ft table settles it to pyramid', as
   });
   assert.equal(refused.statusCode, 422);
   assert.equal(refused.json().error, 'game_not_available');
+});
+
+test('a signed-in guest manages their own bookings from any device, others cannot', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.46' };
+  const register = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    headers: ip,
+    payload: { phone: '+48 602 900 100', name: 'Owner', password: 'owner-pass-1' }
+  });
+  assert.equal(register.statusCode, 201);
+  const session = register.cookies.find(c => c.name === 'token');
+  assert.ok(session);
+  const owner = { ...ip, cookie: `token=${session.value}` };
+
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: owner,
+    payload: {
+      tableId: 5,
+      date: nextDate(2),
+      startHour: 20,
+      durationHours: 1,
+      customerName: 'Owner',
+      customerPhone: '+48 602 900 100'
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const { id } = created.json();
+
+  // No secret needed: the account that booked it is enough…
+  const mine = await app.inject({ method: 'GET', url: '/api/bookings/mine', headers: owner });
+  assert.equal(mine.statusCode, 200);
+  assert.ok(mine.json().some((b: { id: string }) => b.id === id));
+  const viewed = await app.inject({ method: 'GET', url: `/api/bookings/${id}`, headers: owner });
+  assert.equal(viewed.statusCode, 200);
+
+  // …while an anonymous caller with the id gets nothing
+  const stranger = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${id}/cancel`,
+    headers: ip
+  });
+  assert.equal(stranger.statusCode, 404);
+  const anonymousMine = await app.inject({ method: 'GET', url: '/api/bookings/mine', headers: ip });
+  assert.equal(anonymousMine.statusCode, 401);
+
+  const cancelled = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${id}/cancel`,
+    headers: owner
+  });
+  assert.equal(cancelled.statusCode, 200);
+});
+
+test('staff corrections: re-add a cancelled player, fix a name after hours change, net spend', async () => {
+  const headers = staff('198.51.100.47');
+
+  // A walk-in whose seat was cancelled can be put back on the roster
+  const cup = await createTournament('198.51.100.47', { slug: 'readd-cup' });
+  const first = await app.inject({
+    method: 'POST',
+    url: `/api/admin/tournaments/${cup.id}/registrations`,
+    headers,
+    payload: { name: 'Ann', phone: '+48 603 111 999' }
+  });
+  await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${cup.id}/registrations/${first.json().id}`,
+    headers,
+    payload: { status: 'cancelled' }
+  });
+  const again = await app.inject({
+    method: 'POST',
+    url: `/api/admin/tournaments/${cup.id}/registrations`,
+    headers,
+    payload: { name: 'Ann', phone: '+48 603 111 999' }
+  });
+  assert.equal(again.statusCode, 201);
+  assert.equal(again.json().status, 'confirmed');
+  // …while a live seat is still a duplicate
+  const dupe = await app.inject({
+    method: 'POST',
+    url: `/api/admin/tournaments/${cup.id}/registrations`,
+    headers,
+    payload: { name: 'Ann', phone: '+48 603 111 999' }
+  });
+  assert.equal(dupe.statusCode, 409);
+
+  // Opening after closing is a typo, not a shut day
+  const config = (await app.inject({ method: 'GET', url: '/api/venue-config' })).json();
+  const backwards = structuredClone(config);
+  backwards.hours[2] = { open: 20, close: 10 };
+  const refused = await app.inject({
+    method: 'PUT',
+    url: '/api/admin/venue-config',
+    headers,
+    payload: backwards
+  });
+  assert.equal(refused.statusCode, 422);
+});
+
+test('day ranges follow local midnights across DST', async () => {
+  const { warsawDayRange } = await import('../src/lib/time.ts');
+  const hours = (date: string) => {
+    const [start, end] = warsawDayRange(date as `${number}-${number}-${number}`);
+    return (end.getTime() - start.getTime()) / 3_600_000;
+  };
+  assert.equal(hours('2026-10-25'), 25); // fall back
+  assert.equal(hours('2027-03-28'), 23); // spring forward
+  assert.equal(hours('2026-11-01'), 24);
+});
+
+test('one client cannot hold unlimited live-availability sockets', async () => {
+  if (!app.server.listening) await app.listen({ port: 0, host: '127.0.0.1' });
+  const address = app.server.address();
+  assert.ok(address && typeof address === 'object');
+
+  const sockets: WebSocket[] = [];
+  const closeCodes: number[] = [];
+  for (let i = 0; i < 21; i++) {
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/ws`);
+    ws.addEventListener('close', event => closeCodes.push(event.code));
+    await new Promise<void>(resolve => {
+      ws.addEventListener('open', () => resolve());
+      ws.addEventListener('error', () => resolve());
+    });
+    sockets.push(ws);
+  }
+  await new Promise(resolve => setTimeout(resolve, 200));
+  // The 21st from the same address is closed with "policy violation"
+  assert.deepEqual(closeCodes, [1008]);
+
+  for (const ws of sockets) ws.close();
+  await new Promise(resolve => setTimeout(resolve, 200));
+  // Closing frees the slots again
+  const again = new WebSocket(`ws://127.0.0.1:${address.port}/api/ws`);
+  const opened = await new Promise<boolean>(resolve => {
+    again.addEventListener('open', () => resolve(true));
+    again.addEventListener('close', () => resolve(false));
+  });
+  assert.equal(opened, true);
+  again.close();
 });

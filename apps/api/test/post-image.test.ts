@@ -201,7 +201,7 @@ test('reports the specific reason when the page has no picture or the picture is
 
 test('with a Meta token, Instagram posts go through oEmbed and skip the page', async () => {
   const net = fakeNet({
-    'https://graph.facebook.com/v21.0/instagram_oembed': url => {
+    'https://graph.facebook.com/v26.0/instagram_oembed': url => {
       assert.equal(url.searchParams.get('url'), 'https://www.instagram.com/p/abc/');
       assert.equal(url.searchParams.get('access_token'), 'app|secret');
       return new Response(JSON.stringify({ thumbnail_url: 'https://cdn.example.com/thumb.png' }), {
@@ -220,7 +220,7 @@ test('with a Meta token, Instagram posts go through oEmbed and skip the page', a
 
   // oEmbed trouble falls back to the page scrape rather than failing outright
   const fallback = fakeNet({
-    'https://graph.facebook.com/v21.0/instagram_oembed': () =>
+    'https://graph.facebook.com/v26.0/instagram_oembed': () =>
       new Response('{"error":{}}', { status: 400 }),
     'https://www.instagram.com/p/abc/': () =>
       html('<meta property="og:image" content="https://cdn.example.com/thumb.png">'),
@@ -231,4 +231,44 @@ test('with a Meta token, Instagram posts go through oEmbed and skip the page', a
     oembedToken: 'app|secret'
   });
   assert.ok(fallback.requested.includes('https://www.instagram.com/p/abc/'));
+});
+
+test('hostile HTML is scanned in linear time and junk entities are text', () => {
+  // A long run with no '=' or '>' used to take quadratic time (~40 min at 2 MB)
+  const started = performance.now();
+  extractPreviewImage(`<meta ${'a'.repeat(2 * 1024 * 1024)}>`);
+  extractPreviewImage('<meta '.repeat(300_000));
+  assert.ok(performance.now() - started < 1000, 'extractPreviewImage must stay linear');
+
+  // An out-of-range numeric entity used to throw (a 500) instead of staying text
+  assert.equal(
+    extractPreviewImage('<meta property="og:image" content="https://cdn.example/a&#x110000;.png">'),
+    'https://cdn.example/a&#x110000;.png'
+  );
+});
+
+test('the connect-time guard refuses a name that resolves privately after the pre-check', async () => {
+  // A local server stands in for an internal service the attacker wants to reach
+  const { createServer } = await import('node:http');
+  let reached = false;
+  const server = createServer((_req, res) => {
+    reached = true;
+    res.end('internal');
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  try {
+    // DNS rebinding: the pre-check sees a public address, the real lookup of
+    // "localhost" at connect time gives 127.0.0.1 — the default fetch must refuse
+    const err = await failure(
+      importPostImage(`http://localhost:${address.port}/post`, store, {
+        resolve: async () => [PUBLIC_IP]
+      })
+    );
+    assert.equal(err.code, 'import_failed');
+    assert.equal(reached, false, 'the private address must never be connected to');
+  } finally {
+    server.close();
+  }
 });

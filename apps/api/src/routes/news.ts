@@ -1,4 +1,4 @@
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { Locale, NewsArticleDto, NewsItemDto } from '@repo/shared';
 import { DEFAULT_LOCALE, isLocale, isSafeUrl } from '@repo/shared';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';

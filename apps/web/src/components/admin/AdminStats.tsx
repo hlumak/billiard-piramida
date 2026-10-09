@@ -14,7 +14,7 @@ const DAYS = 30;
 export function AdminStats() {
   const { data, isPending, isError, refetch } = useQuery(adminAnalyticsQuery(DAYS));
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !data) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !data) {
     return (
       <div className="flex justify-center py-16">
@@ -58,7 +58,9 @@ export function AdminStats() {
       </StaggerItem>
 
       <StaggerItem className="rounded-[10px] bg-club-green-light p-4">
-        <h3 className="mb-3 font-semibold text-golden">{m.admin_chart_revenue({ days: DAYS })}</h3>
+        <h3 className="mb-3 font-semibold text-golden-light">
+          {m.admin_chart_revenue({ days: DAYS })}
+        </h3>
         {hasData ? (
           <BarChart data={revenueBars} formatValue={v => formatPln(v, intlTag())} />
         ) : (
@@ -67,12 +69,12 @@ export function AdminStats() {
       </StaggerItem>
 
       <StaggerItem className="rounded-[10px] bg-club-green-light p-4">
-        <h3 className="mb-3 font-semibold text-golden">{m.admin_chart_utilization()}</h3>
+        <h3 className="mb-3 font-semibold text-golden-light">{m.admin_chart_utilization()}</h3>
         <UtilizationBars tables={data.tables} />
       </StaggerItem>
 
       <StaggerItem className="rounded-[10px] bg-club-green-light p-4">
-        <h3 className="mb-3 font-semibold text-golden">{m.admin_chart_hours()}</h3>
+        <h3 className="mb-3 font-semibold text-golden-light">{m.admin_chart_hours()}</h3>
         {hourBars.length > 0 ? (
           <BarChart data={hourBars} height={140} formatValue={v => String(v)} />
         ) : (

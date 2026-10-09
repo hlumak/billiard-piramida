@@ -1,0 +1,38 @@
+/*
+ * HeroUI, trimmed. `@import '@heroui/styles'` pulled in all ~80 components —
+ * 448 kB of render-blocking CSS for the 11 this app uses. This mirrors
+ * @heroui/styles/dist/index.css (same layers, same order) with the component
+ * list cut down to what the app renders and what those components render
+ * inside themselves (close button, popover, date input group…).
+ *
+ * Using a new HeroUI component? Add its stylesheet below, in the same relative
+ * order as node_modules/@heroui/styles/dist/components/index.css.
+ */
+@layer theme, base, components, utilities;
+
+@import 'tw-animate-css';
+
+@import '@heroui/styles/base' layer(base);
+@import '@heroui/styles/base/scrollbar.css' layer(base);
+
+@import '@heroui/styles/components/close-button.css' layer(components);
+@import '@heroui/styles/components/description.css' layer(components);
+@import '@heroui/styles/components/field-error.css' layer(components);
+@import '@heroui/styles/components/label.css' layer(components);
+@import '@heroui/styles/components/button.css' layer(components);
+@import '@heroui/styles/components/spinner.css' layer(components);
+@import '@heroui/styles/components/input.css' layer(components);
+@import '@heroui/styles/components/input-group.css' layer(components);
+@import '@heroui/styles/components/textfield.css' layer(components);
+@import '@heroui/styles/components/textarea.css' layer(components);
+@import '@heroui/styles/components/calendar.css' layer(components);
+@import '@heroui/styles/components/calendar-year-picker.css' layer(components);
+@import '@heroui/styles/components/date-field.css' layer(components);
+@import '@heroui/styles/components/date-input-group.css' layer(components);
+@import '@heroui/styles/components/date-picker.css' layer(components);
+@import '@heroui/styles/components/modal.css' layer(components);
+@import '@heroui/styles/components/popover.css' layer(components);
+
+@import '@heroui/styles/themes/default' layer(theme);
+@import '@heroui/styles/utilities';
+@import '@heroui/styles/variants';

@@ -81,10 +81,20 @@ export function discountGroszFor(sportCardCount: number, spotTotalGrosz: number)
   return Math.min(cards * SPORT_CARD_DISCOUNT_GROSZ, Math.max(spotTotalGrosz, 0));
 }
 
+/** Intl formatters are costly to build and lists format a price per row on every poll. */
+const plnFormatters = new Map<string, Intl.NumberFormat>();
+
 export function formatPln(grosz: number, locale: Intl.LocalesArgument): string {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: CURRENCY,
-    minimumFractionDigits: grosz % 100 === 0 ? 0 : 2
-  }).format(grosz / 100);
+  const fractionDigits = grosz % 100 === 0 ? 0 : 2;
+  const key = `${String(locale)}|${fractionDigits}`;
+  let formatter = plnFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: CURRENCY,
+      minimumFractionDigits: fractionDigits
+    });
+    plnFormatters.set(key, formatter);
+  }
+  return formatter.format(grosz / 100);
 }

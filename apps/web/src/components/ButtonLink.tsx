@@ -2,7 +2,8 @@ import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
 const VARIANTS = {
-  primary: 'bg-golden text-btn-text hover:bg-golden-hover text-lg font-bold',
+  primary:
+    'bg-golden text-btn-text hover:bg-golden-hover hover:text-btn-text-hover text-lg font-bold',
   outline: 'border border-golden text-creme hover:bg-golden/10 text-lg font-semibold'
 } as const;
 

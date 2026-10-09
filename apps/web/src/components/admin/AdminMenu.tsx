@@ -6,6 +6,7 @@ import { adminApi, adminMenuQuery } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { intlTag } from '../../lib/format';
 import { categoryLabel } from '../../lib/menu';
+import { parseZloty } from '../../lib/money';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
@@ -32,13 +33,12 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
     onSuccess: invalidate
   });
 
-  const parsedPrice = Math.round(Number(price.replace(',', '.')) * 100);
-  const priceChanged =
-    Number.isFinite(parsedPrice) && parsedPrice >= 0 && parsedPrice !== item.priceGrosz;
+  const parsedPrice = parseZloty(price);
+  const priceChanged = parsedPrice !== null && parsedPrice !== item.priceGrosz;
   const deleteBlocked = remove.error instanceof ApiError && remove.error.code === 'has_orders';
 
   return (
-    <li
+    <div
       className={`rounded-[10px] bg-club-green-light p-3 ${item.isAvailable ? '' : 'opacity-60'}`}
     >
       <div className="flex flex-wrap items-center gap-3">
@@ -52,6 +52,7 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
         <div className="flex flex-wrap items-center gap-2">
           <Input
             aria-label={m.admin_price_label()}
+            aria-invalid={parsedPrice === null}
             value={price}
             onChange={event => setPrice(event.target.value)}
             inputMode="decimal"
@@ -61,7 +62,9 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
             <Button
               size="sm"
               isPending={update.isPending}
-              onPress={() => update.mutate({ priceGrosz: parsedPrice })}
+              onPress={() => {
+                if (parsedPrice !== null) update.mutate({ priceGrosz: parsedPrice });
+              }}
             >
               {m.btn_save()}
             </Button>
@@ -89,16 +92,22 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
         </div>
       </div>
       {deleteBlocked ? (
-        <p className="mt-2 text-xs text-danger-soft-foreground">{m.admin_has_orders()}</p>
+        <p role="alert" className="mt-2 text-sm text-danger-soft-foreground">
+          {m.admin_has_orders()}
+        </p>
+      ) : update.isError || remove.isError ? (
+        <p role="alert" className="mt-2 text-sm text-danger-soft-foreground">
+          {m.err_generic()}
+        </p>
       ) : null}
-    </li>
+    </div>
   );
 }
 
 export function AdminMenu() {
   const { data: items, isPending, isError, refetch } = useQuery(adminMenuQuery());
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !items) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !items) {
     return (
       <div className="flex justify-center py-16">
@@ -115,7 +124,7 @@ export function AdminMenu() {
       <StaggerGroup>
         <ul className="flex flex-col gap-2">
           {items.map(item => (
-            <StaggerItem key={item.id}>
+            <StaggerItem key={item.id} as="li">
               {/* Remount the row when the server price changes so its input re-seeds */}
               <MenuRow key={item.priceGrosz} item={item} />
             </StaggerItem>

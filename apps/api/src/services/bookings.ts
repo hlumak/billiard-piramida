@@ -1,9 +1,27 @@
 import assert from 'node:assert';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { BookingDto, BookingPhase, BookingStatus, NewOrderItem } from '@repo/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.ts';
 import { bookings, foodItems, orderItems, tables } from '../db/schema.ts';
 import { HOUR_MS } from '../lib/time.ts';
+
+/** A fresh manage secret (256 bits) and the hash that is stored in its place. */
+export function createManageToken(): { token: string; hash: string } {
+  const token = randomBytes(32).toString('base64url');
+  return { token, hash: hashManageToken(token) };
+}
+
+export function hashManageToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+/** Constant-time check of a presented secret against the stored hash. */
+export function manageTokenMatches(presented: string, storedHash: string): boolean {
+  const a = Buffer.from(hashManageToken(presented), 'hex');
+  const b = Buffer.from(storedHash, 'hex');
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 export function phaseOf(
   status: BookingStatus,

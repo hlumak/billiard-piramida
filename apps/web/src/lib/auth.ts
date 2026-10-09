@@ -54,8 +54,18 @@ export function storeSession(queryClient: QueryClient, auth: AuthResponseDto): v
   queryClient.setQueryData(profileQuery().queryKey, auth.profile);
 }
 
-export function clearSession(queryClient: QueryClient): void {
-  // Ask the server to clear the HttpOnly cookie + flag, then drop the cache
-  void authApi.logout();
+/**
+ * Sign out for real: only the server can clear the HttpOnly session cookie, so
+ * this waits for it and rejects if it failed — the session is then still alive
+ * and the UI must not claim otherwise (a shared device would stay signed in).
+ */
+export async function clearSession(queryClient: QueryClient): Promise<void> {
+  await authApi.logout();
+  dropSessionData(queryClient);
+}
+
+/** Forget everything cached for the signed-in account. */
+export function dropSessionData(queryClient: QueryClient): void {
   queryClient.removeQueries({ queryKey: profileQuery().queryKey });
+  queryClient.removeQueries({ queryKey: ['bookings', 'mine'] });
 }

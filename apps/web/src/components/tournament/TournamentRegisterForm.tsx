@@ -33,7 +33,15 @@ function errorMessage(error: unknown): string {
  * takes the entry fee at the reception desk, and staff flip the sign-up to
  * confirmed once it is paid, which is what the hint below the button says.
  */
-export function TournamentRegisterForm({ tournament }: { tournament: TournamentDto }) {
+export function TournamentRegisterForm({
+  tournament,
+  onRegistered
+}: {
+  tournament: TournamentDto;
+  /** Lets the page keep this form (and its success panel) mounted once the
+   *  seat just taken flips the roster to "full". */
+  onRegistered: () => void;
+}) {
   const queryClient = useQueryClient();
   const locale = getLocale();
   const { data: profile } = useQuery(profileQuery());
@@ -42,6 +50,7 @@ export function TournamentRegisterForm({ tournament }: { tournament: TournamentD
     mutationFn: (value: { name: string; phone: string }) =>
       api.registerForTournament(tournament.slug, locale, value),
     onSuccess: result => {
+      onRegistered();
       // The response carries the tournament with its counters already updated,
       // so the meter moves without a refetch; the list page still needs one.
       queryClient.setQueryData(
@@ -62,7 +71,7 @@ export function TournamentRegisterForm({ tournament }: { tournament: TournamentD
   if (register.isSuccess) {
     return (
       <div className="rounded-[10px] bg-club-green-light p-4" role="status">
-        <p className="flex items-center gap-2 font-semibold text-golden">
+        <p className="flex items-center gap-2 font-semibold text-golden-light">
           <CheckCircle2 className="size-5 shrink-0" />
           {m.tournament_registered_title()}
         </p>
@@ -80,7 +89,7 @@ export function TournamentRegisterForm({ tournament }: { tournament: TournamentD
         form.handleSubmit();
       }}
     >
-      <h3 className="font-semibold text-golden">{m.tournament_register_title()}</h3>
+      <h3 className="font-semibold text-golden-light">{m.tournament_register_title()}</h3>
 
       <form.Field
         name="name"

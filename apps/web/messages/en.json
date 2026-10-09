@@ -91,7 +91,7 @@
   "my_bookings_title": "My bookings",
   "no_bookings": "No bookings yet",
   "find_booking_title": "Find a booking",
-  "find_booking_hint": "Booked on another device or browser? Enter the phone number you used when booking.",
+  "find_booking_hint": "Booked on another device or browser? Enter the phone number you used to see your upcoming bookings.",
   "find_booking_none": "No upcoming bookings found for this number",
   "btn_find": "Find",
   "loading": "Loading…",
@@ -140,7 +140,7 @@
   "auth_register_btn": "Create account",
   "auth_err_phone_taken": "This phone number is already registered",
   "auth_err_invalid": "Wrong phone or password",
-  "auth_promo": "Have a sport or club card? Sign in to get your discount",
+  "auth_promo": "Have an account? Sign in and we'll fill in your details",
   "profile_welcome": "Welcome, {name}!",
   "profile_cards_title": "Discounts & cards",
   "sport_card_label": "Sport card",
@@ -242,12 +242,30 @@
   "tournament_state_completed": "Finished",
   "tournament_state_cancelled": "Cancelled",
   "tournament_players": "{n} of {total} players",
-  "tournament_players_open": "{n} players signed up",
+  "tournament_players_open": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} player signed up",
+        "nPlural=other": "{n} players signed up"
+      }
+    }
+  ],
   "tournament_confirmed_n": "{n} confirmed",
   "tournament_pending_n": "{n} awaiting the fee",
   "tournament_deadline": "Sign-ups until {date}",
   "tournament_when": "When",
-  "tournament_date_tbd": "The date is set once {n} players are in",
+  "tournament_date_tbd": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "The date is set once {n} player is in",
+        "nPlural=other": "The date is set once {n} players are in"
+      }
+    }
+  ],
   "tournament_fee": "Entry fee",
   "tournament_fee_free": "Free",
   "tournament_fee_hint": "The fee is paid in person at the club reception",
@@ -255,7 +273,7 @@
   "tournament_register_btn": "Sign up",
   "tournament_registering": "Signing you up…",
   "tournament_registered_title": "You're on the list",
-  "tournament_registered_hint": "To confirm your place, come to the club reception and pay the entry fee.",
+  "tournament_registered_hint": "To confirm your place, come to the club reception and pay the entry fee within 3 days — after that an unpaid place can go to someone else.",
   "tournament_err_already": "This number is already on the roster",
   "tournament_err_full": "There are no places left",
   "tournament_err_closed": "Sign-ups for this tournament are closed",
@@ -314,5 +332,27 @@
   "admin_hours_close": "Closes",
   "admin_day_closed": "Closed",
   "admin_hours_invalid": "Closing must be later than opening",
-  "admin_settings_hint": "Changes take effect at once: new bookings are priced at the new rates, existing ones keep theirs."
+  "admin_settings_hint": "Changes take effect at once: new bookings are priced at the new rates, existing ones keep theirs.",
+  "admin_invalid_price": "Enter an amount from 0 to 1000 zł",
+  "admin_tournament_min_above_max": "Minimum players can't exceed the maximum",
+  "err_outside_hours": "That time is outside opening hours. Go back and pick another time.",
+  "err_food_unavailable": "A dish in your order is no longer available. Check your order and try again.",
+  "err_booking_changed": "This booking has changed in the meantime. Refresh the page.",
+  "err_rate_limited": "Too many attempts. Wait a minute and try again.",
+  "err_booking_too_long": "A booking can last at most 8 hours.",
+  "closed_today": "Closed today",
+  "err_booking_too_far": "Bookings open 14 days ahead. Pick an earlier date.",
+  "err_too_many_bookings": "This phone number already has 3 upcoming bookings. Call us to book more.",
+  "find_booking_manage_hint": "To change or cancel one, open it from the link on the booking page you saved, sign in to the account you booked with, or call us.",
+  "err_signout_failed": "Couldn't sign out — check your connection and try again.",
+  "admin_disabled": "The admin panel is switched off on this server.",
+  "news_pause": "Pause the slideshow",
+  "news_play": "Play the slideshow",
+  "nav_profile": "Profile",
+  "nav_home": "Home",
+  "skip_to_content": "Skip to content",
+  "seo_title_profile": "Profile — piramida",
+  "admin_bookings_capped": "Showing the first {n} bookings. Narrow the search by date or phone to see the rest.",
+  "app_name": "piramida — billiard club",
+  "app_description": "Billiard table booking"
 }

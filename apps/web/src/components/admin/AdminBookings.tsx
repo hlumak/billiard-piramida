@@ -8,10 +8,15 @@ import {
   type BookingStatus,
   type IsoDate
 } from '@repo/shared';
-import { adminApi, adminBookingsQuery, type AdminBookingFilters } from '../../lib/admin-api';
-import { api } from '../../lib/api';
+import {
+  adminApi,
+  adminBookingsQuery,
+  ADMIN_BOOKINGS_LIMIT,
+  normalizePhoneSearch,
+  type AdminBookingFilters
+} from '../../lib/admin-api';
 import { formatPhone } from '@repo/shared/phone';
-import { intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
+import { bookingHours, intlTag, warsawDate, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
@@ -41,7 +46,11 @@ function RowActions({ booking }: { booking: BookingDto }) {
   };
 
   const extend = useMutation({
-    mutationFn: () => api.extendBooking(booking.id, 1),
+    // Through the staff edit, not the guest endpoint (that needs the guest's secret)
+    mutationFn: () => {
+      const { start, end } = bookingHours(booking);
+      return adminApi.updateBooking(booking.id, { durationHours: end - start + 1 });
+    },
     onSuccess: invalidate
   });
   const cancel = useMutation({
@@ -56,7 +65,7 @@ function RowActions({ booking }: { booking: BookingDto }) {
   const live = booking.phase === 'upcoming' || booking.phase === 'active';
   // Hide +1h when it would run past closing time (the API would reject it)
   const closeHour = hoursForDate(warsawDate(booking.startsAt), venueHours).close;
-  const canExtend = live && warsawHour(booking.endsAt) < closeHour;
+  const canExtend = live && bookingHours(booking).end < closeHour;
   const actionError = extend.error ?? cancel.error ?? restore.error;
   return (
     <div className="flex flex-col items-end gap-1">
@@ -109,7 +118,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
 
   // Debounce the phone search so we don't refetch per keystroke
   useEffect(() => {
-    const timer = setTimeout(() => setPhone(phoneInput.trim()), 300);
+    const timer = setTimeout(() => setPhone(normalizePhoneSearch(phoneInput)), 300);
     return () => clearTimeout(timer);
   }, [phoneInput]);
 
@@ -156,7 +165,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
         </div>
       </div>
 
-      {isError ? (
+      {isError && !bookings ? (
         <QueryError onRetry={() => refetch()} />
       ) : isPending || !bookings ? (
         <div className="flex justify-center py-16">
@@ -166,61 +175,68 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
         <p className="py-10 text-center text-grey-cool">{m.admin_no_results()}</p>
       ) : (
         <StaggerGroup>
+          {bookings.length >= ADMIN_BOOKINGS_LIMIT ? (
+            <p role="status" className="mb-2 text-sm text-grey-cool">
+              {m.admin_bookings_capped({ n: ADMIN_BOOKINGS_LIMIT })}
+            </p>
+          ) : null}
           <ul className="flex flex-col gap-2">
             {bookings.map(booking => (
-              <StaggerItem key={booking.id}>
-                <li className="rounded-[10px] bg-club-green-light p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold text-creme">
-                        {warsawDate(booking.startsAt)} · {warsawTime(booking.startsAt)}–
-                        {warsawTime(booking.endsAt)}
-                      </span>
-                      <span className="text-sm text-grey-cool">
-                        {spotName(booking.kind, booking.tableLabel)}
-                        {/* Which balls to rack — the one thing on this row that
+              <StaggerItem
+                key={booking.id}
+                as="li"
+                className="rounded-[10px] bg-club-green-light p-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-creme">
+                      {warsawDate(booking.startsAt)} · {warsawTime(booking.startsAt)}–
+                      {warsawTime(booking.endsAt)}
+                    </span>
+                    <span className="text-sm text-grey-cool">
+                      {spotName(booking.kind, booking.tableLabel)}
+                      {/* Which balls to rack — the one thing on this row that
                             is an instruction to the person reading it */}
-                        {booking.game ? (
-                          <span className="ml-1 text-creme">· {gameName(booking.game)}</span>
-                        ) : null}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PHASE_STYLES[booking.phase]}`}
-                      >
-                        {PHASE_LABELS[booking.phase]()}
-                      </span>
-                    </div>
-                    <span className="font-bold text-golden">
-                      {formatPln(booking.totalGrosz, intlTag())}
-                      {booking.discountGrosz > 0 ? (
-                        <span className="ml-1 text-xs font-medium text-grey-cool">
-                          (−{formatPln(booking.discountGrosz, intlTag())})
-                        </span>
+                      {booking.game ? (
+                        <span className="ml-1 text-creme">· {gameName(booking.game)}</span>
                       ) : null}
                     </span>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <span className="text-creme">
-                      {booking.customerName} ·{' '}
-                      <a
-                        href={`tel:${booking.customerPhone.replaceAll(' ', '')}`}
-                        className="text-golden hover:underline"
-                      >
-                        {formatPhone(booking.customerPhone)}
-                      </a>
-                      {booking.items.length > 0 ? (
-                        <span className="ml-2 text-xs text-grey-cool">
-                          {booking.items
-                            .map(
-                              item => `${nameBySlug.get(item.slug) ?? item.slug} × ${item.quantity}`
-                            )
-                            .join(', ')}
-                        </span>
-                      ) : null}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PHASE_STYLES[booking.phase]}`}
+                    >
+                      {PHASE_LABELS[booking.phase]()}
                     </span>
-                    <RowActions booking={booking} />
                   </div>
-                </li>
+                  <span className="font-bold text-golden-light">
+                    {formatPln(booking.totalGrosz, intlTag())}
+                    {booking.discountGrosz > 0 ? (
+                      <span className="ml-1 text-xs font-medium text-grey-cool">
+                        (−{formatPln(booking.discountGrosz, intlTag())})
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="text-creme">
+                    {booking.customerName} ·{' '}
+                    <a
+                      href={`tel:${booking.customerPhone.replaceAll(' ', '')}`}
+                      className="text-golden-light hover:underline"
+                    >
+                      {formatPhone(booking.customerPhone)}
+                    </a>
+                    {booking.items.length > 0 ? (
+                      <span className="ml-2 text-xs text-grey-cool">
+                        {booking.items
+                          .map(
+                            item => `${nameBySlug.get(item.slug) ?? item.slug} × ${item.quantity}`
+                          )
+                          .join(', ')}
+                      </span>
+                    ) : null}
+                  </span>
+                  <RowActions booking={booking} />
+                </div>
               </StaggerItem>
             ))}
           </ul>

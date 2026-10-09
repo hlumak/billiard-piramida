@@ -17,7 +17,7 @@ import {
 import { isValidPhone } from '@repo/shared/phone';
 import { adminApi } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
-import { formatHour, warsawDate, warsawHour, warsawToday } from '../../lib/format';
+import { bookingHours, formatHour, warsawDate, warsawHour, warsawToday } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { gameName, spotName } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
@@ -168,7 +168,7 @@ function isFreeForWindow(
     booking !== undefined &&
     booking.tableId === table.tableId &&
     warsawDate(booking.startsAt) === date
-      ? { start: warsawHour(booking.startsAt), end: warsawHour(booking.endsAt) }
+      ? bookingHours(booking)
       : null;
   const slotByHour = new Map(table.slots.map(s => [s.hour, s]));
   for (let h = startHour; h < startHour + duration; h++) {
@@ -286,8 +286,8 @@ export function AdminBookingModal({
     startHour !== null && tableId !== null && name.trim().length > 0 && isValidPhone(phone);
 
   return (
-    <Modal>
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Backdrop>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />

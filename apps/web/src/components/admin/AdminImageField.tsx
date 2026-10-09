@@ -6,18 +6,11 @@ import { isSafeUrl } from '@repo/shared';
 import { adminApi } from '../../lib/admin-api';
 import { ApiError, resolveAssetUrl } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
+import { uploadErrorMessage } from './upload-errors';
 
 /** Mirrors the API's cap; checked here too so a phone photo fails before it uploads. */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif';
-
-function uploadErrorMessage(err: unknown): string {
-  if (err instanceof ApiError) {
-    if (err.code === 'file_too_large') return m.admin_image_too_large();
-    if (err.code === 'unsupported_image') return m.admin_unsupported_image();
-  }
-  return m.admin_upload_failed();
-}
 
 function importErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
@@ -78,7 +71,7 @@ export function AdminImageField({ value, onChange }: Props) {
 
   return (
     <div className="flex flex-col gap-3 rounded-[10px] bg-club-green p-3">
-      <p className="text-xs font-bold uppercase text-golden">{m.admin_image_label()}</p>
+      <p className="text-xs font-bold uppercase text-golden-light">{m.admin_image_label()}</p>
 
       {preview ? (
         // Decorative: the fields around it say what it is

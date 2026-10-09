@@ -1,6 +1,15 @@
 export const MIN_BOOKING_HOURS = 1;
 /** Upper bound on a single booking, whatever the day's closing time allows. */
 export const MAX_BOOKING_HOURS = 8;
+/** How far ahead a guest may book: today plus this many days minus one. */
+export const BOOKING_DAYS_AHEAD = 14;
+/**
+ * Upcoming bookings one phone number may hold at once on the public flow.
+ * Accounts are optional and nothing verifies a phone, so this — with the
+ * horizon above and a per-IP route limit — is what stops one person from
+ * holding every table. Staff bookings are not counted against it.
+ */
+export const MAX_UPCOMING_BOOKINGS_PER_PHONE = 3;
 export const VENUE_TIMEZONE = 'Europe/Warsaw';
 
 /** A calendar date in YYYY-MM-DD form — narrow via `isIsoDate`, never cast at call sites. */
@@ -56,6 +65,13 @@ export function dateParts(isoDate: IsoDate): [year: number, month: number, day: 
     throw new Error(`Invalid ISO date: ${isoDate}`);
   }
   return [y, m, d];
+}
+
+/** The calendar date `days` after `isoDate` (negative goes back); pure date maths. */
+export function addDays(isoDate: IsoDate, days: number): IsoDate {
+  const [y, m, d] = dateParts(isoDate);
+  // toISOString is defined as YYYY-MM-DDTHH:mm:ss…
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10) as IsoDate;
 }
 
 /**

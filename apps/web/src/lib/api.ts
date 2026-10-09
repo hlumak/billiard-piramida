@@ -1,7 +1,9 @@
 import type {
   AvailabilityDto,
   BookingDto,
+  BookingSummaryDto,
   CreateBookingInput,
+  CreatedBookingDto,
   MenuItemDto,
   NewOrderItem,
   NewsArticleDto,
@@ -12,42 +14,57 @@ import type {
   TournamentRegistrationResultDto,
   VenueConfigDto
 } from '@repo/shared';
+import { notFound } from '@tanstack/react-router';
+import { manageTokenFor } from './recent-bookings';
+import { currentRequestContext } from './request-context';
 
 /**
  * API origin.
  *
- * Browser: call our own public origin (VITE_API_URL — same-origin in prod) so
- * the HttpOnly session cookie rides along.
+ * Browser: VITE_API_URL, or — when unset, as in production — the page's own
+ * origin (relative /api/… URLs through the reverse proxy), so the HttpOnly
+ * session cookie rides along and no build ever bakes in a localhost URL.
  *
- * SSR: the web server must NOT fetch that public hostname. The request would
- * hairpin back through nginx to this same host and hang, 504-ing every route
- * with an SSR loader (/prices, /booking/$id). Reach the API directly over
- * loopback instead. API_PORT rides in the same .env the prod server loads
- * (--env-file), so this needs no extra config; INTERNAL_API_URL is an explicit
- * override for other topologies. In dev (`vite dev`, no --env-file) neither is
- * set, so SSR falls back to the public URL and behaves as before.
+ * SSR: the web server must NOT fetch the public hostname — the request would
+ * hairpin back through the proxy and hang. It reaches the API directly:
+ * INTERNAL_API_URL (e.g. http://api:3001 between containers), else loopback
+ * on API_PORT (default 3001).
  */
-const PUBLIC_API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+export const PUBLIC_API_URL: string = import.meta.env.VITE_API_URL ?? '';
 
 function resolveApiUrl(): string {
-  const publicUrl = PUBLIC_API_URL;
-  if (!import.meta.env.SSR) return publicUrl;
+  if (!import.meta.env.SSR) return PUBLIC_API_URL;
 
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
-  const internalUrl =
-    env?.INTERNAL_API_URL ?? (env?.API_PORT ? `http://127.0.0.1:${env.API_PORT}` : undefined);
-  return internalUrl ?? publicUrl;
+  return env?.INTERNAL_API_URL || `http://127.0.0.1:${env?.API_PORT || 3001}`;
 }
 
 const API_URL: string = resolveApiUrl();
 
 /**
+ * SSR calls reach the API from loopback, so without this every visitor's
+ * page render would share the single rate-limit bucket keyed on 127.0.0.1.
+ * The server entry records the chain nginx built plus the hop that reached
+ * this server; the API trusts loopback/private peers and walks it back to the
+ * visitor. Always undefined in the browser.
+ */
+const forwardedFor = (): string | undefined => currentRequestContext()?.forwardedFor;
+
+/** A render must not wait on a hung API for longer than nginx would. */
+const REQUEST_TIMEOUT_MS = import.meta.env.SSR ? 3_000 : 15_000;
+
+function withTimeout(signal: AbortSignal | undefined): AbortSignal {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+
+/**
  * Staff-uploaded pictures are stored as `/api/uploads/…` and served by the API.
- * Same-origin in production, but in dev the web app (:3000) and the API (:8080)
- * are different origins, so the path needs the API's PUBLIC origin in front —
- * public even during SSR, because this lands in an `<img src>` the browser
- * loads, not in a fetch the server makes.
+ * Same-origin behind nginx and the dev proxy; with VITE_API_URL set to another
+ * origin the path needs that PUBLIC origin in front — public even during SSR,
+ * because this lands in an `<img src>` the browser loads, not in a fetch the
+ * server makes.
  */
 export function resolveAssetUrl(url: string): string {
   return url.startsWith('/api/') ? `${PUBLIC_API_URL}${url}` : url;
@@ -58,6 +75,16 @@ export function resolveAssetUrl(url: string): string {
 export function hasFlagCookie(name: string): boolean {
   if (typeof document === 'undefined') return false;
   return document.cookie.split('; ').some(entry => entry.startsWith(`${name}=`));
+}
+
+/**
+ * A loader's 404 as the router's notFound (a real HTTP 404 with the route's
+ * not-found page), anything else rethrown to the error page. Used where a
+ * missing record used to render a 200 with a spinner — a soft 404.
+ */
+export function notFoundOn404(error: unknown): never {
+  if (error instanceof ApiError && error.status === 404) throw notFound();
+  throw error;
 }
 
 export class ApiError extends Error {
@@ -98,13 +125,15 @@ export async function request<T>(
   path: string,
   { method, body, headers, signal }: RequestOptions = {}
 ): Promise<T> {
+  const forwarded = forwardedFor();
   const response = await fetch(`${API_URL}${path}`, {
     ...(method !== undefined ? { method } : {}),
-    signal: signal ?? null,
+    signal: withTimeout(signal),
     // Send the HttpOnly session cookie (same-origin in prod, same-site in dev)
     credentials: 'include',
     headers: {
       ...headers,
+      ...(forwarded !== undefined ? { 'x-forwarded-for': forwarded } : {}),
       // Fastify rejects an application/json content-type with an empty body
       ...(body !== undefined ? { 'content-type': 'application/json' } : {})
     },
@@ -117,10 +146,24 @@ export async function request<T>(
 export async function upload<T>(path: string, form: FormData): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',
+    // Uploads are the slow path (5 MB on a phone connection): no short timeout
     credentials: 'include',
     body: form
   });
   return parseResponse<T>(response);
+}
+
+/**
+ * The booking's secret (stored when it was made, or adopted from its link),
+ * so the API lets this browser manage it. The id goes into the path encoded:
+ * it arrives from the URL, and "../admin/…" must not become another endpoint.
+ */
+function bookingPath(id: string, suffix = ''): [string, Record<string, string>] {
+  const token = manageTokenFor(id);
+  return [
+    `/api/bookings/${encodeURIComponent(id)}${suffix}`,
+    token !== undefined ? { 'x-booking-token': token } : {}
+  ];
 }
 
 export const api = {
@@ -146,19 +189,28 @@ export const api = {
       `/api/tournaments/${encodeURIComponent(slug)}/register?locale=${locale}`,
       { method: 'POST', body: input }
     ),
-  booking: (id: string, signal?: AbortSignal) =>
-    request<BookingDto>(`/api/bookings/${id}`, { signal }),
+  booking: (id: string, signal?: AbortSignal) => {
+    const [path, headers] = bookingPath(id);
+    return request<BookingDto>(path, { signal, headers });
+  },
+  /** Bookings the signed-in account made, manageable from any device. */
+  myBookings: (signal?: AbortSignal) => request<BookingDto[]>('/api/bookings/mine', { signal }),
   lookupBookings: (phone: string, signal?: AbortSignal) =>
-    request<BookingDto[]>(`/api/bookings/lookup?phone=${encodeURIComponent(phone)}`, { signal }),
-  createBooking: (input: CreateBookingInput) =>
-    request<BookingDto>('/api/bookings', { method: 'POST', body: input }),
-  extendBooking: (id: string, additionalHours: number) =>
-    request<BookingDto>(`/api/bookings/${id}/extend`, {
-      method: 'POST',
-      body: { additionalHours }
+    request<BookingSummaryDto[]>(`/api/bookings/lookup?phone=${encodeURIComponent(phone)}`, {
+      signal
     }),
-  addItems: (id: string, items: NewOrderItem[]) =>
-    request<BookingDto>(`/api/bookings/${id}/items`, { method: 'POST', body: { items } }),
-  cancelBooking: (id: string) =>
-    request<BookingDto>(`/api/bookings/${id}/cancel`, { method: 'POST' })
+  createBooking: (input: CreateBookingInput) =>
+    request<CreatedBookingDto>('/api/bookings', { method: 'POST', body: input }),
+  extendBooking: (id: string, additionalHours: number) => {
+    const [path, headers] = bookingPath(id, '/extend');
+    return request<BookingDto>(path, { method: 'POST', headers, body: { additionalHours } });
+  },
+  addItems: (id: string, items: NewOrderItem[]) => {
+    const [path, headers] = bookingPath(id, '/items');
+    return request<BookingDto>(path, { method: 'POST', headers, body: { items } });
+  },
+  cancelBooking: (id: string) => {
+    const [path, headers] = bookingPath(id, '/cancel');
+    return request<BookingDto>(path, { method: 'POST', headers });
+  }
 };

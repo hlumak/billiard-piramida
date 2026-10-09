@@ -1,4 +1,4 @@
-import { Type, type Static } from '@sinclair/typebox';
+import { Type, type Static } from 'typebox';
 import { MAX_HOURLY_RATE_GROSZ } from '@repo/shared';
 import type {
   AdminAnalyticsDto,
@@ -11,6 +11,8 @@ import type {
   AuthResponseDto,
   AvailabilityDto,
   BookingDto,
+  BookingSummaryDto,
+  CreatedBookingDto,
   IsoDate,
   MenuItemDto,
   NewsArticleDto,
@@ -29,6 +31,18 @@ import type {
  * property not on the allowlist. Drift against the @repo/shared DTOs is a
  * compile error — see the guards at the bottom of this file.
  */
+
+/** Largest Postgres `integer`: anything above reaches the database as a 22003 → 500. */
+export const PG_INT_MAX = 2_147_483_647;
+
+/** Serial/identity id of an `integer` column, bounded so the cast can't overflow. */
+export const INT_ID = Type.Integer({ minimum: 1, maximum: PG_INT_MAX });
+
+/** Strict UUID shape: a loose pattern lets malformed ids reach Postgres as a
+ *  uuid cast and surface as a logged 500 (22P02) instead of a clean 404. */
+export const UUID = Type.String({
+  pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+});
 
 /** JSON Schema stays a plain string pattern; the static type is IsoDate. */
 export const ISO_DATE = Type.Unsafe<IsoDate>(Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }));
@@ -132,6 +146,20 @@ export const BOOKING_RESPONSE = Type.Object({
   sportCardCount: Type.Integer(),
   discountGrosz: Type.Integer(),
   totalGrosz: Type.Integer()
+});
+
+export const CREATED_BOOKING_RESPONSE = Type.Object({
+  ...BOOKING_RESPONSE.properties,
+  manageToken: Type.String()
+});
+
+export const BOOKING_SUMMARY_RESPONSE = Type.Object({
+  startsAt: Type.String(),
+  endsAt: Type.String(),
+  tableId: Type.Integer(),
+  kind: ACTIVITY_KIND,
+  tableLabel: Type.String(),
+  phase: BOOKING_RESPONSE.properties.phase
 });
 
 export const LOCALE_SCHEMA = Type.Union([
@@ -305,7 +333,6 @@ export const PROFILE_RESPONSE = Type.Object({
 });
 
 export const AUTH_RESPONSE = Type.Object({
-  token: Type.String(),
   profile: PROFILE_RESPONSE
 });
 
@@ -345,6 +372,8 @@ export type SchemaDriftChecks = [
   Expect<Equals<Static<typeof AVAILABILITY_RESPONSE>, AvailabilityDto>>,
   Expect<Equals<Static<typeof MENU_ITEM_RESPONSE>, MenuItemDto>>,
   Expect<Equals<Static<typeof BOOKING_RESPONSE>, BookingDto>>,
+  Expect<Equals<Static<typeof CREATED_BOOKING_RESPONSE>, CreatedBookingDto>>,
+  Expect<Equals<Static<typeof BOOKING_SUMMARY_RESPONSE>, BookingSummaryDto>>,
   Expect<Equals<Static<typeof ADMIN_CUSTOMER_RESPONSE>, AdminCustomerDto>>,
   Expect<Equals<Static<typeof ADMIN_STATS_RESPONSE>, AdminStatsDto>>,
   Expect<Equals<Static<typeof PROFILE_RESPONSE>, UserProfileDto>>,

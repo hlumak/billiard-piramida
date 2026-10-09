@@ -91,7 +91,7 @@
   "my_bookings_title": "Мої бронювання",
   "no_bookings": "Поки що немає бронювань",
   "find_booking_title": "Знайти бронювання",
-  "find_booking_hint": "Бронювали з іншого пристрою чи браузера? Введіть номер телефону, вказаний під час бронювання.",
+  "find_booking_hint": "Бронювали на іншому пристрої чи в іншому браузері? Введіть номер телефону, вказаний під час бронювання, щоб побачити майбутні бронювання.",
   "find_booking_none": "Активних бронювань за цим номером не знайдено",
   "btn_find": "Знайти",
   "loading": "Завантаження…",
@@ -140,7 +140,7 @@
   "auth_register_btn": "Зареєструватися",
   "auth_err_phone_taken": "Цей номер уже зареєстрований",
   "auth_err_invalid": "Невірний телефон або пароль",
-  "auth_promo": "Маєте спорткартку чи клубну картку? Увійдіть і отримайте знижку",
+  "auth_promo": "Маєте акаунт? Увійдіть — і ми заповнимо ваші дані",
   "profile_welcome": "Вітаємо, {name}!",
   "profile_cards_title": "Знижки та картки",
   "sport_card_label": "Спортивна картка",
@@ -242,12 +242,45 @@
   "tournament_state_completed": "Завершено",
   "tournament_state_cancelled": "Скасовано",
   "tournament_players": "{n} з {total} гравців",
-  "tournament_players_open": "{n} гравців записалося",
+  "tournament_players_open": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} гравець записався",
+        "nPlural=few": "{n} гравці записалися",
+        "nPlural=many": "{n} гравців записалося",
+        "nPlural=other": "{n} гравця записалося"
+      }
+    }
+  ],
   "tournament_confirmed_n": "{n} підтверджено",
-  "tournament_pending_n": "{n} очікують внеску",
+  "tournament_pending_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} очікує внеску",
+        "nPlural=few": "{n} очікують внеску",
+        "nPlural=many": "{n} очікують внеску",
+        "nPlural=other": "{n} очікують внеску"
+      }
+    }
+  ],
   "tournament_deadline": "Реєстрація до {date}",
   "tournament_when": "Коли",
-  "tournament_date_tbd": "Дата визначиться, щойно набереться {n} гравців",
+  "tournament_date_tbd": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "Дата визначиться, щойно набереться {n} гравець",
+        "nPlural=few": "Дата визначиться, щойно наберуться {n} гравці",
+        "nPlural=many": "Дата визначиться, щойно набереться {n} гравців",
+        "nPlural=other": "Дата визначиться, щойно набереться {n} гравця"
+      }
+    }
+  ],
   "tournament_fee": "Турнірний внесок",
   "tournament_fee_free": "Безкоштовно",
   "tournament_fee_hint": "Внесок сплачується особисто на рецепції клубу",
@@ -255,7 +288,7 @@
   "tournament_register_btn": "Зареєструватися",
   "tournament_registering": "Реєструємо…",
   "tournament_registered_title": "Місце за вами",
-  "tournament_registered_hint": "Щоб підтвердити участь, підійдіть на рецепцію клубу та внесіть турнірний внесок.",
+  "tournament_registered_hint": "Щоб підтвердити участь, протягом 3 днів підійдіть на рецепцію клубу та внесіть турнірний внесок — після цього неоплачене місце може дістатися комусь іншому.",
   "tournament_err_already": "Цей номер уже зареєстровано на турнір",
   "tournament_err_full": "Вільних місць уже немає",
   "tournament_err_closed": "Реєстрацію на цей турнір закрито",
@@ -314,5 +347,27 @@
   "admin_hours_close": "Закриття",
   "admin_day_closed": "Вихідний",
   "admin_hours_invalid": "Закриття має бути пізніше за відкриття",
-  "admin_settings_hint": "Зміни діють одразу: нові бронювання рахуються за новими цінами, а вже створені зберігають свою."
+  "admin_settings_hint": "Зміни діють одразу: нові бронювання рахуються за новими цінами, а вже створені зберігають свою.",
+  "admin_invalid_price": "Вкажіть суму від 0 до 1000 зл",
+  "admin_tournament_min_above_max": "Мінімум гравців не може перевищувати максимум",
+  "err_outside_hours": "Цей час поза годинами роботи. Поверніться й оберіть інший.",
+  "err_food_unavailable": "Одна зі страв у замовленні вже недоступна. Перевірте замовлення й спробуйте ще раз.",
+  "err_booking_changed": "Це бронювання тим часом змінилося. Оновіть сторінку.",
+  "err_rate_limited": "Забагато спроб. Зачекайте хвилину й спробуйте ще раз.",
+  "err_booking_too_long": "Бронювання може тривати щонайбільше 8 годин.",
+  "closed_today": "Сьогодні зачинено",
+  "err_booking_too_far": "Бронювання відкрите на 14 днів наперед. Оберіть ранішу дату.",
+  "err_too_many_bookings": "На цей номер уже є 3 майбутні бронювання. Зателефонуйте нам, щоб забронювати більше.",
+  "find_booking_manage_hint": "Щоб змінити чи скасувати бронювання, відкрийте його за збереженим посиланням на сторінку бронювання, увійдіть в акаунт, з якого бронювали, або зателефонуйте нам.",
+  "err_signout_failed": "Не вдалося вийти — перевірте зʼєднання і спробуйте ще раз.",
+  "admin_disabled": "Адмінпанель вимкнена на цьому сервері.",
+  "news_pause": "Призупинити показ слайдів",
+  "news_play": "Відновити показ слайдів",
+  "nav_profile": "Профіль",
+  "nav_home": "Головна",
+  "skip_to_content": "Перейти до вмісту",
+  "seo_title_profile": "Профіль — piramida",
+  "admin_bookings_capped": "Показано перші {n} бронювань. Звузьте пошук за датою чи телефоном, щоб побачити решту.",
+  "app_name": "piramida — більярдний клуб",
+  "app_description": "Бронювання більярдних столів"
 }

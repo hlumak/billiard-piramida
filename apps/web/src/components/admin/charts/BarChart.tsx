@@ -12,7 +12,9 @@ export interface BarDatum {
 /**
  * Single-series vertical bar chart (dataviz mark specs: thin marks, 4px rounded
  * data ends on the baseline, 2px surface gaps, recessive axes, per-mark hover
- * tooltip, selective direct label on the max only).
+ * tooltip, selective direct label on the max only). The picture is hover-only
+ * and mouse-only, so screen readers get the same tooltip lines as a list
+ * instead; the caller's heading names the chart.
  */
 export function BarChart({
   data,
@@ -35,7 +37,7 @@ export function BarChart({
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" aria-hidden>
         {/* Recessive baseline */}
         <line
           x1={0}
@@ -103,6 +105,11 @@ export function BarChart({
           {data[hovered].tooltip}
         </div>
       ) : null}
+      <ul className="sr-only">
+        {data.map(d => (
+          <li key={d.key}>{d.tooltip}</li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 @import './fonts.css';
 @import 'tailwindcss';
-@import '@heroui/styles';
+@import './heroui.css';
 /* Imported here rather than from PhoneField.tsx so the club's overrides below
    always come after the library's own rules. */
 @import 'react-phone-number-input/style.css';
@@ -12,6 +12,9 @@
 
   --color-golden: #feaa00;
   --color-golden-hover: #ffb732;
+  /* Golden for small text on club-green-light cards: #feaa00 there is 3.4:1,
+     under WCAG AA; this is 4.6:1 on the cards and 6.9:1 on club-green. */
+  --color-golden-light: #ffd36b;
   --color-creme: #f9f9e1;
   --color-deep-cream: #dbdabc;
   --color-club-green: #0b4e31;
@@ -21,6 +24,8 @@
      club-green-light option buttons read as lifted off it. */
   --color-club-green-dark: #083220;
   --color-btn-text: #373328;
+  /* Figma "primary button tx/hover" */
+  --color-btn-text-hover: #000000;
   --color-grey-warm: #585650;
   /* Secondary text: lightened from #b2b2b2 to clear WCAG AA (4.5:1) on the
      club-green-light card surface (#176b47), where the old value was ~3.05:1. */
@@ -68,9 +73,7 @@
   --field-border-width: 0px;
   --field-border: transparent;
   --field-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.04),
-    0 1px 2px rgba(0, 0, 0, 0.06),
-    0 0 1px rgba(0, 0, 0, 0.06);
+    0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.06);
 
   --segment: #176b47;
   --segment-foreground: #f9f9e1;
@@ -252,7 +255,30 @@ body {
   }
 }
 
+/* Indeterminate: a third-width segment sweeping across. Without motion it
+   stays a static segment, which still says "loading". */
+@keyframes nav-progress-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+/* Figma darkens the primary button's label on hover; HeroUI only changes the
+   background (same selector as its own hover rule; unlayered, so it wins) */
+@media (hover: hover) {
+  .button--primary:is(:hover, [data-hovered='true']):not([data-disabled='true']) {
+    --button-fg: var(--color-btn-text-hover);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .nav-progress-bar {
+    animation: nav-progress-sweep 1.1s ease-in-out infinite;
+  }
+
   .anim-reveal {
     animation: fade-up-in 0.4s ease-out backwards;
   }

@@ -5,7 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import jwt from '@fastify/jwt';
-import { Type } from '@sinclair/typebox';
+import { Type } from 'typebox';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyError } from 'fastify';
@@ -13,7 +13,7 @@ import { createDb, type Db } from './db/client.ts';
 import { AvailabilityHub } from './lib/availability-hub.ts';
 import { VenueConfigStore } from './services/venue-config.ts';
 import { ImageStore, UPLOADS_URL_PREFIX } from './services/images.ts';
-import { DEFAULT_TRUSTED_PROXIES, DEFAULT_UPLOADS_DIR } from './lib/config.ts';
+import { DEFAULT_TRUSTED_PROXIES, DEFAULT_UPLOADS_DIR, type AllowedOrigin } from './lib/config.ts';
 import { ERROR_RESPONSE } from './lib/schemas.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
@@ -46,11 +46,23 @@ declare module 'fastify' {
   }
 }
 
+/** Machine-readable codes for errors Fastify and its plugins raise themselves,
+ *  so a client can tell "slow down" or "too big" apart from bad input. */
+const FRAMEWORK_ERROR_CODES: Record<number, string> = {
+  401: 'unauthorized',
+  404: 'not_found',
+  405: 'method_not_allowed',
+  406: 'not_acceptable',
+  413: 'payload_too_large',
+  415: 'unsupported_media_type',
+  429: 'rate_limited'
+};
+
 export interface AppOptions {
   databaseUrl: string;
   logger?: boolean | { level: string };
-  /** Explicit CORS allowlist; undefined reflects any origin (dev). */
-  allowedOrigins?: string[] | undefined;
+  /** CORS allowlist; undefined = same-origin only (no cross-origin access). */
+  allowedOrigins?: AllowedOrigin[] | undefined;
   /** Shared secret for /api/admin; admin routes 503 when unset. */
   adminToken?: string | undefined;
   /** JWT signing secret; auth routes 503 when unset (accounts stay optional). */
@@ -64,6 +76,11 @@ export interface AppOptions {
    * shares one bucket that a real client never would.
    */
   rateLimitMax?: number | undefined;
+  /**
+   * Public booking creations per IP per hour. Tests raise it for the same
+   * reason as `rateLimitMax`; the limit itself is exercised separately.
+   */
+  bookingCreateLimit?: number | undefined;
   /**
    * Peers whose X-Forwarded-* headers are trusted: comma-separated IPs/CIDRs or
    * @fastify/proxy-addr presets. Default covers nginx on the same host or in a
@@ -84,6 +101,7 @@ export async function buildApp({
   jwtSecret,
   cookieSecure = false,
   rateLimitMax = 100,
+  bookingCreateLimit = 10,
   trustedProxies = DEFAULT_TRUSTED_PROXIES,
   uploadsDir = DEFAULT_UPLOADS_DIR,
   oembedToken
@@ -101,7 +119,7 @@ export async function buildApp({
     trustProxy: trustedProxies
   }).withTypeProvider<TypeBoxTypeProvider>();
 
-  const { db, pool } = createDb(databaseUrl);
+  const { db, pool } = createDb(databaseUrl, { requestTimeouts: true });
   // A pg Pool emits 'error' when an idle backend connection dies (e.g. Postgres
   // restart); with no listener that throws as an uncaughtException and kills the
   // process. Log and let the pool recycle the client on next checkout.
@@ -122,7 +140,9 @@ export async function buildApp({
   // hooks only apply to routes registered after them.
   await app.register(helmet);
   await app.register(cors, {
-    origin: allowedOrigins ?? true,
+    // Never "reflect any origin": with credentials that would let any site
+    // read authenticated responses
+    origin: allowedOrigins ?? false,
     // PATCH is used by profile and admin menu updates
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
     // Auth rides in cookies now, so cross-origin requests must send credentials
@@ -188,7 +208,9 @@ export async function buildApp({
       return reply.code(500).send({ error: 'internal_error' });
     }
     request.log.info({ err: error }, 'request rejected');
-    return reply.code(statusCode).send({ error: 'bad_request' });
+    return reply
+      .code(statusCode)
+      .send({ error: FRAMEWORK_ERROR_CODES[statusCode] ?? 'bad_request' });
   });
 
   app.get(
@@ -222,7 +244,7 @@ export async function buildApp({
   menuRoutes(app);
   newsRoutes(app);
   tournamentRoutes(app);
-  bookingRoutes(app);
+  bookingRoutes(app, { createLimitPerHour: bookingCreateLimit });
   liveRoutes(app);
   authRoutes(app, jwtSecret !== undefined);
   await adminRoutes(app, adminToken);

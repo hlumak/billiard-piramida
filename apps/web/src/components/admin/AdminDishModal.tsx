@@ -1,13 +1,19 @@
 import { useState } from 'react';
-import { Button, Input, Label, Modal, TextField } from '@heroui/react';
+import { Button, FieldError, Input, Label, Modal, TextField } from '@heroui/react';
+import { parseZloty } from '../../lib/money';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { AdminMenuItemDto, Locale, MenuTranslationDto } from '@repo/shared';
+import {
+  SUPPORTED_LOCALES,
+  type AdminMenuItemDto,
+  type Locale,
+  type MenuTranslationDto
+} from '@repo/shared';
 import { adminApi } from '../../lib/admin-api';
+import { isDraftChanged } from './draft';
 import { categoryLabel } from '../../lib/menu';
 import { m } from '../../paraglide/messages.js';
 
 const CATEGORIES = ['snack', 'main', 'drink', 'dessert'] as const;
-const LOCALES: Locale[] = ['uk', 'pl', 'en'];
 
 interface DishDraft {
   category: string;
@@ -37,15 +43,17 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
   const [isOpen, setOpen] = useState(false);
   const [draft, setDraft] = useState<DishDraft>(() => draftFrom(item));
 
+  const isChanged = isOpen && isDraftChanged(draft, draftFrom(item));
+
   const open = () => {
     setDraft(draftFrom(item));
     setOpen(true);
   };
 
-  const priceGrosz = Math.round(Number(draft.price.replace(',', '.')) * 100);
+  const priceGrosz = parseZloty(draft.price);
   // One pass: a locale with a blank name is left out entirely
   const translations: MenuTranslationDto[] = [];
-  for (const locale of LOCALES) {
+  for (const locale of SUPPORTED_LOCALES) {
     const name = draft.names[locale].trim();
     if (name === '') continue;
     translations.push({
@@ -54,18 +62,20 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
       description: draft.descriptions[locale].trim() || null
     });
   }
-  const canSubmit =
-    Number.isFinite(priceGrosz) && priceGrosz >= 0 && translations.length === LOCALES.length;
+  const canSubmit = priceGrosz !== null && translations.length === SUPPORTED_LOCALES.length;
 
   const save = useMutation({
-    mutationFn: () =>
-      item === null
+    mutationFn: () => {
+      // Guarded by canSubmit; narrowing here keeps the input type honest
+      if (priceGrosz === null) throw new Error('invalid price');
+      return item === null
         ? adminApi.createMenuItem({ category: draft.category, priceGrosz, translations })
         : adminApi.updateMenuItem(item.id, {
             category: draft.category,
             priceGrosz,
             translations
-          }),
+          });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'menu'] });
       queryClient.invalidateQueries({ queryKey: ['menu'] });
@@ -74,7 +84,7 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
   });
 
   return (
-    <Modal>
+    <Modal isOpen={isOpen} onOpenChange={setOpen}>
       {item === null ? (
         <Button size="sm" className="font-semibold" onPress={open}>
           {m.admin_add_dish()}
@@ -84,7 +94,7 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
           {m.admin_edit_btn()}
         </Button>
       )}
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+      <Modal.Backdrop isDismissable={!isChanged} isKeyboardDismissDisabled={isChanged}>
         <Modal.Container scroll="inside">
           <Modal.Dialog className="sm:max-w-lg">
             <Modal.CloseTrigger />
@@ -120,14 +130,18 @@ export function AdminDishModal({ item }: { item: AdminMenuItemDto | null }) {
                   name="price"
                   value={draft.price}
                   onChange={price => setDraft({ ...draft, price })}
+                  // Untouched-and-blank is not flagged; anything typed must parse
+                  isInvalid={draft.price.trim() !== '' && priceGrosz === null}
+                  isRequired
                 >
                   <Label>{m.admin_price_label()}</Label>
                   <Input inputMode="decimal" placeholder="25" />
+                  <FieldError>{m.admin_invalid_price()}</FieldError>
                 </TextField>
 
-                {LOCALES.map(locale => (
+                {SUPPORTED_LOCALES.map(locale => (
                   <div key={locale} className="rounded-[10px] bg-club-green p-3">
-                    <p className="mb-2 text-xs font-bold uppercase text-golden">{locale}</p>
+                    <p className="mb-2 text-xs font-bold uppercase text-golden-light">{locale}</p>
                     <div className="flex flex-col gap-3">
                       <TextField
                         name={`name-${locale}`}

@@ -11,6 +11,7 @@ import {
 } from '@repo/shared';
 import { adminApi, adminVenueConfigQuery } from '../../lib/admin-api';
 import { formatHour, weekdayName } from '../../lib/format';
+import { parseZloty } from '../../lib/money';
 import { WEEKDAY_DISPLAY_ORDER } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
@@ -35,11 +36,9 @@ function ratesToDraft(config: VenueConfigDto): RateDraft {
   };
 }
 
+/** Blank is invalid, not a free hour — see parseZloty. */
 function parseRate(value: string): number | null {
-  const parsed = Number(value.trim().replace(',', '.'));
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  const grosz = Math.round(parsed * 100);
-  return grosz <= MAX_HOURLY_RATE_GROSZ ? grosz : null;
+  return parseZloty(value, MAX_HOURLY_RATE_GROSZ);
 }
 
 function HourSelect({
@@ -115,7 +114,7 @@ export function AdminVenueConfig() {
     }
   });
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !config) return <QueryError onRetry={() => refetch()} />;
   if (isPending || !current) {
     return (
       <div className="flex justify-center py-16">
@@ -137,7 +136,7 @@ export function AdminVenueConfig() {
   return (
     <div className="flex flex-col gap-6">
       <section className="rounded-[10px] bg-club-green-light p-4">
-        <h3 className="mb-3 font-semibold text-golden">{m.admin_rates_title()}</h3>
+        <h3 className="mb-3 font-semibold text-golden-light">{m.admin_rates_title()}</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {RATE_ROWS.map(row => (
             <TextField
@@ -158,7 +157,7 @@ export function AdminVenueConfig() {
       </section>
 
       <section className="rounded-[10px] bg-club-green-light p-4">
-        <h3 className="mb-3 font-semibold text-golden">{m.admin_hours_title()}</h3>
+        <h3 className="mb-3 font-semibold text-golden-light">{m.admin_hours_title()}</h3>
         <ul className="flex flex-col gap-2">
           {WEEKDAY_DISPLAY_ORDER.map(weekday => {
             const day = current.hours[weekday];
@@ -218,7 +217,7 @@ export function AdminVenueConfig() {
         >
           {m.btn_save()}
         </Button>
-        {save.isSuccess ? <span className="text-sm text-golden">{m.saved_ok()}</span> : null}
+        {save.isSuccess ? <span className="text-sm text-golden-light">{m.saved_ok()}</span> : null}
         {save.isError ? (
           <span className="text-sm text-danger-soft-foreground">{m.err_generic()}</span>
         ) : null}
