@@ -325,5 +325,7 @@
   "closed_today": "Closed today",
   "err_booking_too_far": "Bookings open 14 days ahead. Pick an earlier date.",
   "err_too_many_bookings": "This phone number already has 3 upcoming bookings. Call us to book more.",
-  "find_booking_manage_hint": "To change or cancel one, open it from the link on the booking page you saved, sign in to the account you booked with, or call us."
+  "find_booking_manage_hint": "To change or cancel one, open it from the link on the booking page you saved, sign in to the account you booked with, or call us.",
+  "err_signout_failed": "Couldn't sign out — check your connection and try again.",
+  "admin_disabled": "The admin panel is switched off on this server."
 }

@@ -7,7 +7,7 @@ import { CardFields, type CardsState } from './CardFields';
 import { Reveal } from '../motion';
 import { QueryError } from '../QueryError';
 import { ApiError } from '../../lib/api';
-import { authApi, clearSession, profileQuery } from '../../lib/auth';
+import { authApi, clearSession, dropSessionData, profileQuery } from '../../lib/auth';
 import { m } from '../../paraglide/messages.js';
 
 export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
@@ -38,14 +38,19 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
     }
   });
 
-  const signOut = () => {
-    clearSession(queryClient);
-    onSignedOut();
-  };
+  const signOut = useMutation({
+    mutationFn: () => clearSession(queryClient),
+    onSuccess: onSignedOut
+  });
 
-  // A dead/expired token (401) would loop — treat it as signed out
+  // A dead/expired token (401) would loop — treat it as signed out. The
+  // server is still asked to clear its cookies, but the session is already
+  // worthless, so the UI doesn't wait on that.
   useEffect(() => {
-    if (isAuthError) signOut();
+    if (!isAuthError) return;
+    void authApi.logout().catch(() => undefined);
+    dropSessionData(queryClient);
+    onSignedOut();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthError]);
 
@@ -69,10 +74,20 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
           </h2>
           <p className="text-sm text-grey-cool">{formatPhone(profile.phone)}</p>
         </div>
-        <Button variant="ghost" size="sm" onPress={signOut}>
+        <Button
+          variant="ghost"
+          size="sm"
+          isPending={signOut.isPending}
+          onPress={() => signOut.mutate()}
+        >
           {m.admin_logout()}
         </Button>
       </div>
+      {signOut.isError ? (
+        <p role="alert" className="-mt-4 mb-4 text-sm text-danger-soft-foreground">
+          {m.err_signout_failed()}
+        </p>
+      ) : null}
 
       <Link to="/bookings" className="mb-6 block font-semibold text-golden hover:underline">
         {m.nav_my_bookings()} →

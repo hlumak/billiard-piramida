@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
 import { adminApi } from '../../lib/admin-api';
+import { ApiError } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
 
 export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
@@ -12,6 +13,19 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
     mutationFn: (candidate: string) => adminApi.session(candidate),
     onSuccess: () => onSuccess()
   });
+
+  // Only a 401 means the key is wrong: rate limiting, a disabled admin panel or
+  // a network failure used to read "Invalid access key" too, and staff kept
+  // retyping straight into the lockout
+  const error = login.error;
+  const errorText =
+    error instanceof ApiError && error.status === 401
+      ? m.admin_bad_token()
+      : error instanceof ApiError && error.status === 429
+        ? m.err_rate_limited()
+        : error instanceof ApiError && error.status === 503
+          ? m.admin_disabled()
+          : m.err_generic();
 
   return (
     <form
@@ -36,7 +50,7 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
       >
         <Label>{m.admin_token_label()}</Label>
         <Input autoComplete="current-password" />
-        <FieldError>{m.admin_bad_token()}</FieldError>
+        <FieldError>{errorText}</FieldError>
       </TextField>
       <Button
         type="submit"
