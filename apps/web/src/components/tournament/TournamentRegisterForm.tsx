@@ -33,7 +33,15 @@ function errorMessage(error: unknown): string {
  * takes the entry fee at the reception desk, and staff flip the sign-up to
  * confirmed once it is paid, which is what the hint below the button says.
  */
-export function TournamentRegisterForm({ tournament }: { tournament: TournamentDto }) {
+export function TournamentRegisterForm({
+  tournament,
+  onRegistered
+}: {
+  tournament: TournamentDto;
+  /** Lets the page keep this form (and its success panel) mounted once the
+   *  seat just taken flips the roster to "full". */
+  onRegistered: () => void;
+}) {
   const queryClient = useQueryClient();
   const locale = getLocale();
   const { data: profile } = useQuery(profileQuery());
@@ -42,6 +50,7 @@ export function TournamentRegisterForm({ tournament }: { tournament: TournamentD
     mutationFn: (value: { name: string; phone: string }) =>
       api.registerForTournament(tournament.slug, locale, value),
     onSuccess: result => {
+      onRegistered();
       // The response carries the tournament with its counters already updated,
       // so the meter moves without a refetch; the list page still needs one.
       queryClient.setQueryData(

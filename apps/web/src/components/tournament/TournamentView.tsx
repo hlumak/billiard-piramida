@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { CalendarDays, CircleDollarSign, Clock } from 'lucide-react';
 import { formatPln, type TournamentDto } from '@repo/shared';
@@ -33,6 +34,7 @@ function Fact({
 export function TournamentView({ tournament }: { tournament: TournamentDto }) {
   const when = whenLabel(tournament);
   const { entryFeeGrosz, registrationDeadline, registrationState, minPlayers } = tournament;
+  const [registered, setRegistered] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -92,8 +94,13 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
       ) : null}
 
       <Reveal delay={0.15}>
-        {registrationState === 'open' ? (
-          <TournamentRegisterForm tournament={tournament} />
+        {/* Stays up after a sign-up even if that seat filled the roster, so
+            the success panel isn't swapped for "full" under the new player */}
+        {registrationState === 'open' || registered ? (
+          <TournamentRegisterForm
+            tournament={tournament}
+            onRegistered={() => setRegistered(true)}
+          />
         ) : (
           <p className="rounded-[10px] bg-club-green-light p-4 text-center text-grey-cool">
             {stateLabel(registrationState)}

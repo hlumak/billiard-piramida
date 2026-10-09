@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { hoursForDate } from '@repo/shared';
+import { hoursForDate, isClosedAllDay } from '@repo/shared';
 import { HomeHeader } from '../components/AppHeader';
 import { NewsCarousel } from '../components/NewsCarousel';
 import { Reveal } from '../components/motion';
@@ -34,7 +34,7 @@ export const Route = createFileRoute('/')({
 });
 
 function Home() {
-  const { open, close } = hoursForDate(warsawToday(), useVenueConfig().hours);
+  const today = hoursForDate(warsawToday(), useVenueConfig().hours);
 
   return (
     <div className="relative min-h-dvh overflow-hidden">
@@ -69,7 +69,9 @@ function Home() {
             <ButtonLink to="/book">{m.book_now()}</ButtonLink>
           </div>
           <p className="text-sm text-creme/80">
-            {m.open_today({ open: formatHour(open), close: formatHour(close) })}
+            {isClosedAllDay(today)
+              ? m.closed_today()
+              : m.open_today({ open: formatHour(today.open), close: formatHour(today.close) })}
           </p>
         </Reveal>
       </div>

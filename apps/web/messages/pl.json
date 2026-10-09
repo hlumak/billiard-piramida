@@ -321,5 +321,6 @@
   "err_food_unavailable": "Jedna z pozycji zamówienia jest już niedostępna. Sprawdź zamówienie i spróbuj ponownie.",
   "err_booking_changed": "Ta rezerwacja w międzyczasie się zmieniła. Odśwież stronę.",
   "err_rate_limited": "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
-  "err_booking_too_long": "Rezerwacja może trwać najwyżej 8 godzin."
+  "err_booking_too_long": "Rezerwacja może trwać najwyżej 8 godzin.",
+  "closed_today": "Dziś nieczynne"
 }
