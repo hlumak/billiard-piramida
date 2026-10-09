@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { formatPln, hoursForDate, type BookingDto } from '@repo/shared';
+import { formatPln, hoursForDate, MAX_BOOKING_HOURS, type BookingDto } from '@repo/shared';
 import { useVenueConfig } from '../../lib/venue-config';
-import { formatDayLong, intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
+import { bookingHours, formatDayLong, intlTag, warsawDate, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
@@ -24,7 +24,12 @@ export function BookingDetails({
 
   const date = warsawDate(booking.startsAt);
   const closeHour = hoursForDate(date, useVenueConfig().hours).close;
-  const maxExtend = booking.status === 'confirmed' ? closeHour - warsawHour(booking.endsAt) : 0;
+  const { start, end } = bookingHours(booking);
+  // Up to closing time, and never past the longest booking the API accepts
+  const maxExtend =
+    booking.status === 'confirmed'
+      ? Math.max(0, Math.min(closeHour - end, MAX_BOOKING_HOURS - (end - start)))
+      : 0;
 
   const canManage = booking.phase === 'upcoming' || booking.phase === 'active';
 

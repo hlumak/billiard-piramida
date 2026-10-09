@@ -88,6 +88,23 @@ export function warsawDate(instant: string | Date): IsoDate {
   ) as IsoDate;
 }
 
+/**
+ * Venue-local start and end hour of a booking, on one scale: a booking ending
+ * at midnight ends at 24. `warsawHour(endsAt)` reads that as 0, which made a
+ * 22–24 booking look like it ended before it began. Bookings are whole hours
+ * and never cross midnight, so start hour + duration is exact.
+ */
+export function bookingHours(booking: { startsAt: string; endsAt: string }): {
+  start: number;
+  end: number;
+} {
+  const start = warsawHour(booking.startsAt);
+  const duration = Math.round(
+    (Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3_600_000
+  );
+  return { start, end: start + duration };
+}
+
 /** Warsaw wall-clock hour (0–23) of an instant. */
 export function warsawHour(instant: string | Date): number {
   return Number(

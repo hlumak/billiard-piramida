@@ -11,7 +11,7 @@ import {
 import { adminApi, adminBookingsQuery, type AdminBookingFilters } from '../../lib/admin-api';
 import { api } from '../../lib/api';
 import { formatPhone } from '@repo/shared/phone';
-import { intlTag, warsawDate, warsawHour, warsawTime } from '../../lib/format';
+import { bookingHours, intlTag, warsawDate, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
@@ -56,7 +56,7 @@ function RowActions({ booking }: { booking: BookingDto }) {
   const live = booking.phase === 'upcoming' || booking.phase === 'active';
   // Hide +1h when it would run past closing time (the API would reject it)
   const closeHour = hoursForDate(warsawDate(booking.startsAt), venueHours).close;
-  const canExtend = live && warsawHour(booking.endsAt) < closeHour;
+  const canExtend = live && bookingHours(booking).end < closeHour;
   const actionError = extend.error ?? cancel.error ?? restore.error;
   return (
     <div className="flex flex-col items-end gap-1">

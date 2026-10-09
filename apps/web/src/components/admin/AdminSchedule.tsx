@@ -9,18 +9,26 @@ import { adminBookingsQuery } from '../../lib/admin-api';
 import { tablesQuery } from '../../lib/queries';
 import { spotName } from '../../lib/spots';
 import { availabilityLive } from '../../lib/availability-live';
-import { addDays, formatDayLong, formatHour, warsawHour, warsawToday } from '../../lib/format';
+import {
+  addDays,
+  bookingHours,
+  formatDayLong,
+  formatHour,
+  warsawHour,
+  warsawToday
+} from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { AdminDatePicker } from './AdminDatePicker';
 import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
 
 /** (tableId, hour) → the confirmed booking covering that hour. Bookings are
- *  hour-aligned and never cross midnight (close is 23 at the latest). */
+ *  hour-aligned and never cross midnight; one may end at 24 (see bookingHours). */
 function occupancyOf(bookings: BookingDto[]): Map<string, BookingDto> {
   const map = new Map<string, BookingDto>();
   for (const booking of bookings) {
-    for (let h = warsawHour(booking.startsAt); h < warsawHour(booking.endsAt); h++) {
+    const { start, end } = bookingHours(booking);
+    for (let h = start; h < end; h++) {
       map.set(`${booking.tableId}:${h}`, booking);
     }
   }
@@ -57,8 +65,10 @@ function TableRow({
   for (let hour = open; hour < close;) {
     const booking = occupancy.get(`${tableId}:${hour}`);
     if (booking) {
-      const endHour = warsawHour(booking.endsAt);
-      const span = endHour - hour;
+      const endHour = bookingHours(booking).end;
+      // A booking can outlast the grid when staff have since moved closing time
+      // earlier: clamp, or it would push every following row out of place
+      const span = Math.min(endHour, close) - hour;
       const time = `${formatHour(hour)}–${formatHour(endHour)}`;
       cells.push(
         <button

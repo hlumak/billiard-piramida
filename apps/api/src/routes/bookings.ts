@@ -231,6 +231,10 @@ export function bookingRoutes(app: AppInstance) {
       }
 
       const newEndsAt = new Date(booking.endsAt.getTime() + request.body.additionalHours * HOUR_MS);
+      // Extending is still one booking: the same ceiling as creating one
+      if (newEndsAt.getTime() - booking.startsAt.getTime() > MAX_BOOKING_HOURS * HOUR_MS) {
+        return reply.code(422).send({ error: 'booking_too_long' });
+      }
       const bookingDate = warsawDateOf(booking.startsAt);
       const { hours } = await app.venueConfig.get();
       const closesAt = warsawInstant(bookingDate, hoursForDate(bookingDate, hours).close);

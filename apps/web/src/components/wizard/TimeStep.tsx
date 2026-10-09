@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button, Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
-import type { AvailabilityDto, IsoDate } from '@repo/shared';
+import { MAX_BOOKING_HOURS, type AvailabilityDto, type IsoDate } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
 import { formatHour } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
@@ -62,7 +62,9 @@ export function TimeStep({ date }: { date: IsoDate }) {
   // else books it). Trust the refreshed list, not the stale local selection, so
   // Next disables and the empty Duration section doesn't render.
   const validStart = start != null && hours.includes(start) ? start : null;
-  const maxHours = validStart == null ? 0 : maxDuration(availability, validStart);
+  // The API caps a booking at MAX_BOOKING_HOURS even on a longer opening day
+  const maxHours =
+    validStart == null ? 0 : Math.min(maxDuration(availability, validStart), MAX_BOOKING_HOURS);
   const durations = Array.from({ length: maxHours }, (_, i) => i + 1);
   const effectiveDuration = Math.min(duration, Math.max(maxHours, 1));
 
