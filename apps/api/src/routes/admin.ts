@@ -33,6 +33,7 @@ import {
   lte,
   max,
   min,
+  notInArray,
   sql
 } from 'drizzle-orm';
 import {
@@ -1259,6 +1260,17 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
               : await tx.select().from(newsItems).where(eq(newsItems.id, request.params.id));
           if (!item) return null;
           if (translations !== undefined && translations.length > 0) {
+            // The set sent is the whole set: a locale the editor cleared is
+            // deleted, or its old copy would keep showing to those visitors.
+            await tx.delete(newsItemTranslations).where(
+              and(
+                eq(newsItemTranslations.newsItemId, item.id),
+                notInArray(
+                  newsItemTranslations.locale,
+                  translations.map(t => t.locale)
+                )
+              )
+            );
             // One statement for all the locales sent, as in the menu PATCH above.
             await tx
               .insert(newsItemTranslations)

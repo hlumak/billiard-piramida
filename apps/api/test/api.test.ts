@@ -930,6 +930,11 @@ test('admin news CRUD: create, hide, reorder, url guard, delete', async () => {
   const plRow = retitled.json().translations.find((t: { locale: string }) => t.locale === 'pl');
   assert.equal(plRow.title, 'Turniej klubowy');
   assert.equal(retitled.json().isPublished, false); // untouched by the patch
+  // The translations sent replace the set: uk and en were cleared in the editor
+  assert.deepEqual(
+    retitled.json().translations.map((t: { locale: string }) => t.locale),
+    ['pl']
+  );
 
   // Blank clears a URL column
   const cleared = await app.inject({
