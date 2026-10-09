@@ -24,6 +24,8 @@
      club-green-light option buttons read as lifted off it. */
   --color-club-green-dark: #083220;
   --color-btn-text: #373328;
+  /* Figma "primary button tx/hover" */
+  --color-btn-text-hover: #000000;
   --color-grey-warm: #585650;
   /* Secondary text: lightened from #b2b2b2 to clear WCAG AA (4.5:1) on the
      club-green-light card surface (#176b47), where the old value was ~3.05:1. */
@@ -261,6 +263,14 @@ body {
   }
   to {
     transform: translateX(300%);
+  }
+}
+
+/* Figma darkens the primary button's label on hover; HeroUI only changes the
+   background (same selector as its own hover rule; unlayered, so it wins) */
+@media (hover: hover) {
+  .button--primary:is(:hover, [data-hovered='true']):not([data-disabled='true']) {
+    --button-fg: var(--color-btn-text-hover);
   }
 }
 

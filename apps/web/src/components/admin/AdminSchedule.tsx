@@ -78,14 +78,15 @@ function TableRow({
           style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
           onClick={() => onShowBooking(booking.customerPhone)}
           title={`${booking.customerName} · ${formatPhone(booking.customerPhone)} · ${time}`}
-          className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] bg-club-green-light px-2 text-left transition-colors hover:bg-surface-hover ${
+          // Figma: a #ffb732 fill at half strength, solid golden on hover. Figma
+          // also fades the label to half, which leaves creme at ~3.8:1; black at
+          // full strength (its hover colour) keeps it readable (5.3:1).
+          className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] bg-golden-hover/50 px-2 text-left text-btn-text-hover transition-colors hover:bg-golden ${
             isPastHour(endHour - 1) ? 'opacity-50' : ''
           }`}
         >
-          <span className="w-full truncate text-sm font-semibold text-creme">
-            {booking.customerName}
-          </span>
-          <span className="text-xs text-grey-cool">{time}</span>
+          <span className="w-full truncate text-sm font-semibold">{booking.customerName}</span>
+          <span className="text-xs">{time}</span>
         </button>
       );
       hour = endHour;
@@ -101,7 +102,7 @@ function TableRow({
           aria-label={`${name}, ${formatHour(slotHour)} — ${m.admin_free()}`}
           onClick={() => onPickSlot(slotHour)}
           className={`h-12 rounded-[10px] border transition-colors hover:bg-surface-hover ${
-            isPastHour(slotHour) ? 'border-grey-warm opacity-40' : 'border-golden/60'
+            isPastHour(slotHour) ? 'border-black opacity-40' : 'border-golden/60'
           }`}
         />
       );
@@ -215,7 +216,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
               <div
                 key={hour}
                 className={`pb-1 text-center text-sm font-semibold ${
-                  hour === nowHour ? 'text-golden-light' : 'text-grey-cool'
+                  hour === nowHour ? 'text-golden' : 'text-grey-cool'
                 }`}
               >
                 {formatHour(hour)}
@@ -244,7 +245,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
           {m.admin_free()}
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-3 rounded bg-club-green-light" />
+          <span aria-hidden className="size-3 rounded bg-golden-hover/50" />
           {m.admin_booked()}
         </span>
       </div>
