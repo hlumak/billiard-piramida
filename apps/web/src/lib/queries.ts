@@ -1,3 +1,4 @@
+import { adoptTokenFromLocation } from './recent-bookings';
 import { queryOptions } from '@tanstack/react-query';
 import { api } from './api';
 
@@ -70,7 +71,11 @@ export const tournamentQuery = (slug: string, locale: string) =>
 export const bookingQuery = (id: string) =>
   queryOptions({
     queryKey: ['booking', id],
-    queryFn: ({ signal }) => api.booking(id, signal),
+    queryFn: ({ signal }) => {
+      // Opened from the booking's own link on this device: keep its secret
+      adoptTokenFromLocation(id);
+      return api.booking(id, signal);
+    },
     staleTime: 30_000,
     // Poll only bookings that can still change; finished/cancelled are terminal
     refetchInterval: query => {

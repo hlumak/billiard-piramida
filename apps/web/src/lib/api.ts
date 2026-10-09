@@ -1,7 +1,9 @@
 import type {
   AvailabilityDto,
   BookingDto,
+  BookingSummaryDto,
   CreateBookingInput,
+  CreatedBookingDto,
   MenuItemDto,
   NewOrderItem,
   NewsArticleDto,
@@ -14,6 +16,7 @@ import type {
 } from '@repo/shared';
 import { createIsomorphicFn } from '@tanstack/react-start';
 import { getRequestHeader, getRequestIP } from '@tanstack/react-start/server';
+import { manageTokenFor } from './recent-bookings';
 
 /**
  * API origin.
@@ -153,6 +156,19 @@ export async function upload<T>(path: string, form: FormData): Promise<T> {
   return parseResponse<T>(response);
 }
 
+/**
+ * The booking's secret (stored when it was made, or adopted from its link),
+ * so the API lets this browser manage it. The id goes into the path encoded:
+ * it arrives from the URL, and "../admin/…" must not become another endpoint.
+ */
+function bookingPath(id: string, suffix = ''): [string, Record<string, string>] {
+  const token = manageTokenFor(id);
+  return [
+    `/api/bookings/${encodeURIComponent(id)}${suffix}`,
+    token !== undefined ? { 'x-booking-token': token } : {}
+  ];
+}
+
 export const api = {
   tables: (signal?: AbortSignal) => request<TableDto[]>('/api/tables', { signal }),
   availability: (date: string, signal?: AbortSignal) =>
@@ -176,19 +192,28 @@ export const api = {
       `/api/tournaments/${encodeURIComponent(slug)}/register?locale=${locale}`,
       { method: 'POST', body: input }
     ),
-  booking: (id: string, signal?: AbortSignal) =>
-    request<BookingDto>(`/api/bookings/${id}`, { signal }),
+  booking: (id: string, signal?: AbortSignal) => {
+    const [path, headers] = bookingPath(id);
+    return request<BookingDto>(path, { signal, headers });
+  },
+  /** Bookings the signed-in account made, manageable from any device. */
+  myBookings: (signal?: AbortSignal) => request<BookingDto[]>('/api/bookings/mine', { signal }),
   lookupBookings: (phone: string, signal?: AbortSignal) =>
-    request<BookingDto[]>(`/api/bookings/lookup?phone=${encodeURIComponent(phone)}`, { signal }),
-  createBooking: (input: CreateBookingInput) =>
-    request<BookingDto>('/api/bookings', { method: 'POST', body: input }),
-  extendBooking: (id: string, additionalHours: number) =>
-    request<BookingDto>(`/api/bookings/${id}/extend`, {
-      method: 'POST',
-      body: { additionalHours }
+    request<BookingSummaryDto[]>(`/api/bookings/lookup?phone=${encodeURIComponent(phone)}`, {
+      signal
     }),
-  addItems: (id: string, items: NewOrderItem[]) =>
-    request<BookingDto>(`/api/bookings/${id}/items`, { method: 'POST', body: { items } }),
-  cancelBooking: (id: string) =>
-    request<BookingDto>(`/api/bookings/${id}/cancel`, { method: 'POST' })
+  createBooking: (input: CreateBookingInput) =>
+    request<CreatedBookingDto>('/api/bookings', { method: 'POST', body: input }),
+  extendBooking: (id: string, additionalHours: number) => {
+    const [path, headers] = bookingPath(id, '/extend');
+    return request<BookingDto>(path, { method: 'POST', headers, body: { additionalHours } });
+  },
+  addItems: (id: string, items: NewOrderItem[]) => {
+    const [path, headers] = bookingPath(id, '/items');
+    return request<BookingDto>(path, { method: 'POST', headers, body: { items } });
+  },
+  cancelBooking: (id: string) => {
+    const [path, headers] = bookingPath(id, '/cancel');
+    return request<BookingDto>(path, { method: 'POST', headers });
+  }
 };

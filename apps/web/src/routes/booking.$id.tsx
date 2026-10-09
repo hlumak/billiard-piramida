@@ -14,10 +14,14 @@ export const Route = createFileRoute('/booking/$id')({
   // the next one's inferred types
   validateSearch: (search: Record<string, unknown>): { new?: boolean } =>
     search.new === true || search.new === 'true' ? { new: true } : {},
-  // Prefetch for SSR and hover-preload; errors (404) are owned by the component
+  // The booking needs its secret, which lives in this browser (or the link's
+  // fragment) and never reaches the server — so it is only fetched client-side.
+  // Errors (404) are owned by the component.
   loader: ({ context, params }) =>
     Promise.allSettled([
-      context.queryClient.ensureQueryData(bookingQuery(params.id)),
+      typeof window === 'undefined'
+        ? null
+        : context.queryClient.ensureQueryData(bookingQuery(params.id)),
       context.queryClient.ensureQueryData(menuQuery(getLocale()))
     ]),
   head: () => ({ meta: noindexMeta(m.booking_title()) }),

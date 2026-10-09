@@ -91,7 +91,7 @@
   "my_bookings_title": "Moje rezerwacje",
   "no_bookings": "Nie masz jeszcze rezerwacji",
   "find_booking_title": "Znajdź rezerwację",
-  "find_booking_hint": "Rezerwacja z innego urządzenia lub przeglądarki? Podaj numer telefonu użyty podczas rezerwacji.",
+  "find_booking_hint": "Rezerwowałeś na innym urządzeniu lub w innej przeglądarce? Wpisz numer telefonu użyty przy rezerwacji, aby zobaczyć nadchodzące rezerwacje.",
   "find_booking_none": "Nie znaleziono nadchodzących rezerwacji dla tego numeru",
   "btn_find": "Znajdź",
   "loading": "Ładowanie…",
@@ -324,5 +324,6 @@
   "err_booking_too_long": "Rezerwacja może trwać najwyżej 8 godzin.",
   "closed_today": "Dziś nieczynne",
   "err_booking_too_far": "Rezerwacje są otwarte na 14 dni naprzód. Wybierz wcześniejszą datę.",
-  "err_too_many_bookings": "Ten numer ma już 3 nadchodzące rezerwacje. Zadzwoń do nas, aby zarezerwować więcej."
+  "err_too_many_bookings": "Ten numer ma już 3 nadchodzące rezerwacje. Zadzwoń do nas, aby zarezerwować więcej.",
+  "find_booking_manage_hint": "Aby zmienić lub anulować rezerwację, otwórz ją z zapisanego linku strony rezerwacji, zaloguj się na konto, z którego rezerwowałeś, albo zadzwoń do nas."
 }

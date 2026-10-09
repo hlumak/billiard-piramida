@@ -14,7 +14,6 @@ import {
   normalizePhoneSearch,
   type AdminBookingFilters
 } from '../../lib/admin-api';
-import { api } from '../../lib/api';
 import { formatPhone } from '@repo/shared/phone';
 import { bookingHours, intlTag, warsawDate, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
@@ -46,7 +45,11 @@ function RowActions({ booking }: { booking: BookingDto }) {
   };
 
   const extend = useMutation({
-    mutationFn: () => api.extendBooking(booking.id, 1),
+    // Through the staff edit, not the guest endpoint (that needs the guest's secret)
+    mutationFn: () => {
+      const { start, end } = bookingHours(booking);
+      return adminApi.updateBooking(booking.id, { durationHours: end - start + 1 });
+    },
     onSuccess: invalidate
   });
   const cancel = useMutation({

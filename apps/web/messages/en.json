@@ -91,7 +91,7 @@
   "my_bookings_title": "My bookings",
   "no_bookings": "No bookings yet",
   "find_booking_title": "Find a booking",
-  "find_booking_hint": "Booked on another device or browser? Enter the phone number you used when booking.",
+  "find_booking_hint": "Booked on another device or browser? Enter the phone number you used to see your upcoming bookings.",
   "find_booking_none": "No upcoming bookings found for this number",
   "btn_find": "Find",
   "loading": "Loading…",
@@ -324,5 +324,6 @@
   "err_booking_too_long": "A booking can last at most 8 hours.",
   "closed_today": "Closed today",
   "err_booking_too_far": "Bookings open 14 days ahead. Pick an earlier date.",
-  "err_too_many_bookings": "This phone number already has 3 upcoming bookings. Call us to book more."
+  "err_too_many_bookings": "This phone number already has 3 upcoming bookings. Call us to book more.",
+  "find_booking_manage_hint": "To change or cancel one, open it from the link on the booking page you saved, sign in to the account you booked with, or call us."
 }

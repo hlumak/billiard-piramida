@@ -73,8 +73,10 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
   const createBooking = useMutation({
     mutationFn: api.createBooking,
-    onSuccess: async (booking, input) => {
-      rememberBooking(booking.id);
+    onSuccess: async ({ manageToken, ...booking }, input) => {
+      // The secret comes back this once: keep it, and put it in the page's
+      // link (fragment, never sent to a server) so a bookmark manages it too
+      rememberBooking(booking.id, manageToken);
       // Seed the detail page cache (no refetch on landing) and drop the now-stale slot grid
       queryClient.setQueryData(bookingQuery(booking.id).queryKey, booking);
       queryClient.invalidateQueries({ queryKey: availabilityQuery(input.date).queryKey });
@@ -84,7 +86,8 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
       await navigate({
         to: '/booking/$id',
         params: { id: booking.id },
-        search: { new: true }
+        search: { new: true },
+        hash: `key=${manageToken}`
       });
       resetWizard();
     },
