@@ -1,6 +1,7 @@
-import { count, inArray } from 'drizzle-orm';
+import { and, count, eq, gt, inArray, or } from 'drizzle-orm';
 import {
   isIsoDate,
+  PENDING_SEAT_HOLD_MS,
   registrationStateOf,
   type AdminTournamentDto,
   type IsoDate,
@@ -27,10 +28,21 @@ export interface SeatCounts {
 
 const NO_SEATS: SeatCounts = { confirmed: 0, pending: 0 };
 
+/** A pending sign-up still holds its seat (see PENDING_SEAT_HOLD_MS). */
+export function holdsSeat(
+  registration: { status: string; createdAt: Date },
+  now: Date = new Date()
+): boolean {
+  if (registration.status === 'confirmed') return true;
+  if (registration.status !== 'pending') return false;
+  return registration.createdAt.getTime() > now.getTime() - PENDING_SEAT_HOLD_MS;
+}
+
 /**
  * Roster sizes for a set of tournaments, in one grouped pass rather than a
  * count per row. Cancelled sign-ups are released: they hold no seat, so a
- * player who drops out frees their place for the next one.
+ * player who drops out frees their place for the next one — and so are
+ * pending ones older than PENDING_SEAT_HOLD_MS.
  */
 export async function seatCountsFor(db: Db, ids: number[]): Promise<Map<number, SeatCounts>> {
   const seats = new Map<number, SeatCounts>();
@@ -43,7 +55,21 @@ export async function seatCountsFor(db: Db, ids: number[]): Promise<Map<number, 
       total: count()
     })
     .from(tournamentRegistrations)
-    .where(inArray(tournamentRegistrations.tournamentId, ids))
+    .where(
+      and(
+        inArray(tournamentRegistrations.tournamentId, ids),
+        or(
+          eq(tournamentRegistrations.status, 'confirmed'),
+          and(
+            eq(tournamentRegistrations.status, 'pending'),
+            gt(
+              tournamentRegistrations.createdAt,
+              new Date(Date.now() - PENDING_SEAT_HOLD_MS)
+            )
+          )
+        )
+      )
+    )
     .groupBy(tournamentRegistrations.tournamentId, tournamentRegistrations.status);
 
   for (const row of rows) {

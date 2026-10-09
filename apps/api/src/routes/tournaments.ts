@@ -11,6 +11,7 @@ import {
 import { UNIQUE_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import {
   copyFor,
+  holdsSeat,
   seatCountsFor,
   toTournamentDto,
   toTournamentDtos,
@@ -119,7 +120,9 @@ export function tournamentRoutes(app: AppInstance) {
       // worth protecting: throttle well below the global 100/min. Not lower than
       // this, though — a club full of phones shares one Wi-Fi address, and a
       // mistyped number costs an attempt.
-      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      // …and over an hour, not a minute: 20/min let one IP fill a 16-seat
+      // roster in under a minute (lapsing pending seats are the other half)
+      config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
       schema: {
         params: SLUG_PARAMS,
         querystring: LOCALE_QUERY,
@@ -160,7 +163,8 @@ export function tournamentRoutes(app: AppInstance) {
               .select({
                 id: tournamentRegistrations.id,
                 phone: tournamentRegistrations.phone,
-                status: tournamentRegistrations.status
+                status: tournamentRegistrations.status,
+                createdAt: tournamentRegistrations.createdAt
               })
               .from(tournamentRegistrations)
               .where(eq(tournamentRegistrations.tournamentId, row.id)),
@@ -173,14 +177,18 @@ export function tournamentRoutes(app: AppInstance) {
           const copy = copyFor(translations, locale);
           if (!copy) return { error: 'not_found', status: 404 } as const;
 
+          const now = new Date();
           const mine = seatRows.find(seat => seat.phone === phone);
-          if (mine && mine.status !== 'cancelled') {
+          // A lapsed pending seat can be taken over — otherwise whoever typed
+          // this number first (not necessarily its owner) would hold it forever
+          if (mine && holdsSeat(mine, now)) {
             return { error: 'already_registered', status: 409 } as const;
           }
 
+          const holding = seatRows.filter(seat => holdsSeat(seat, now));
           const seats: SeatCounts = {
-            confirmed: seatRows.filter(seat => seat.status === 'confirmed').length,
-            pending: seatRows.filter(seat => seat.status === 'pending').length
+            confirmed: holding.filter(seat => seat.status === 'confirmed').length,
+            pending: holding.filter(seat => seat.status === 'pending').length
           };
           // Ask the DTO rather than re-deriving: whatever the storefront was
           // told about this tournament is exactly what the sign-up is checked against.
@@ -193,11 +201,12 @@ export function tournamentRoutes(app: AppInstance) {
 
           const seat = { name, phone, userId: user?.id ?? null, status: 'pending' as const };
           if (mine) {
-            // A cancelled seat is reused rather than duplicated: the unique index
-            // on (tournament, phone) means there is only ever one row per player.
+            // A cancelled or lapsed seat is reused rather than duplicated (the
+            // unique index on (tournament, phone) allows one row per player); its
+            // clock restarts, since the hold runs from the sign-up.
             await tx
               .update(tournamentRegistrations)
-              .set(seat)
+              .set({ ...seat, createdAt: now })
               .where(eq(tournamentRegistrations.id, mine.id));
           } else {
             await tx.insert(tournamentRegistrations).values({ tournamentId: row.id, ...seat });
