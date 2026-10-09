@@ -61,10 +61,10 @@ function withTimeout(signal: AbortSignal | undefined): AbortSignal {
 
 /**
  * Staff-uploaded pictures are stored as `/api/uploads/…` and served by the API.
- * Same-origin in production, but in dev the web app (:3000) and the API (:8080)
- * are different origins, so the path needs the API's PUBLIC origin in front —
- * public even during SSR, because this lands in an `<img src>` the browser
- * loads, not in a fetch the server makes.
+ * Same-origin behind nginx and the dev proxy; with VITE_API_URL set to another
+ * origin the path needs that PUBLIC origin in front — public even during SSR,
+ * because this lands in an `<img src>` the browser loads, not in a fetch the
+ * server makes.
  */
 export function resolveAssetUrl(url: string): string {
   return url.startsWith('/api/') ? `${PUBLIC_API_URL}${url}` : url;

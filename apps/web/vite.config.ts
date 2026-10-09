@@ -28,8 +28,15 @@ function checkSiteUrl(mode: string) {
 
 const config = defineConfig(({ mode }) => {
   checkSiteUrl(mode);
+  const apiPort = loadEnv(mode, ENV_DIR, 'API_').API_PORT || '3001';
   return {
     envDir: ENV_DIR,
+    // Dev mirrors production: the browser calls /api/… on the page's own
+    // origin and this forwards it (WebSocket included) to the API, the way
+    // nginx does in production. No VITE_API_URL needed, no CORS involved.
+    server: {
+      proxy: { '/api': { target: `http://127.0.0.1:${apiPort}`, ws: true } }
+    },
     // Production SSR bundles its dependencies: the runtime image then needs
     // only srvx, not ~340 MB of node_modules (much of it build tooling)
     ...(mode === 'production' ? { ssr: { noExternal: true } } : {}),
