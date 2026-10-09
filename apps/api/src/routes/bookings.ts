@@ -75,7 +75,10 @@ class BookingRefused extends Error {
   }
 }
 
-export function bookingRoutes(app: AppInstance, { createLimitPerHour }: { createLimitPerHour: number }) {
+export function bookingRoutes(
+  app: AppInstance,
+  { createLimitPerHour }: { createLimitPerHour: number }
+) {
   app.post(
     '/api/bookings',
     {

@@ -1684,7 +1684,10 @@ test('guests book at most 14 days ahead and hold at most 3 upcoming bookings per
       }
     });
 
-  const tooFar = await book(nextDate(1).replace(/^\d{4}/, y => String(Number(y) + 1)), 1);
+  const tooFar = await book(
+    nextDate(1).replace(/^\d{4}/, y => String(Number(y) + 1)),
+    1
+  );
   assert.equal(tooFar.statusCode, 422);
   assert.equal(tooFar.json().error, 'booking_too_far');
 
@@ -1718,7 +1721,14 @@ test('public booking creation is limited per IP', async () => {
         url: '/api/bookings',
         headers: { 'x-forwarded-for': '198.51.100.42' },
         // Invalid on purpose: the limit counts attempts, not just successes
-        payload: { tableId: 1, date: MONDAY, startHour: 3, durationHours: 1, customerName: 'X', customerPhone: '+48 602 111 335' }
+        payload: {
+          tableId: 1,
+          date: MONDAY,
+          startHour: 3,
+          durationHours: 1,
+          customerName: 'X',
+          customerPhone: '+48 602 111 335'
+        }
       });
       if (res.statusCode === 429) {
         refused = true;

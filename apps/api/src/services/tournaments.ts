@@ -62,10 +62,7 @@ export async function seatCountsFor(db: Db, ids: number[]): Promise<Map<number, 
           eq(tournamentRegistrations.status, 'confirmed'),
           and(
             eq(tournamentRegistrations.status, 'pending'),
-            gt(
-              tournamentRegistrations.createdAt,
-              new Date(Date.now() - PENDING_SEAT_HOLD_MS)
-            )
+            gt(tournamentRegistrations.createdAt, new Date(Date.now() - PENDING_SEAT_HOLD_MS))
           )
         )
       )
