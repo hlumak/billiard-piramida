@@ -1,36 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Button, Input, Spinner } from '@heroui/react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { formatPln } from '@repo/shared';
-import { adminCustomersQuery } from '../../lib/admin-api';
+import { adminCustomersQuery, normalizePhoneSearch } from '../../lib/admin-api';
 import { formatPhone } from '@repo/shared/phone';
 import { intlTag, warsawDate } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { StaggerGroup, StaggerItem } from '../motion';
 import { QueryError } from '../QueryError';
 
-const PAGE_SIZE = 50;
-
 export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: string) => void }) {
   const [phoneInput, setPhoneInput] = useState('');
   const [phone, setPhone] = useState('');
-  const [limit, setLimit] = useState(PAGE_SIZE);
 
-  // Debounce the phone search; reset paging whenever the query changes
+  // Debounce the phone search (a new search starts again from the first page)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setPhone(phoneInput.trim());
-      setLimit(PAGE_SIZE);
-    }, 300);
+    const timer = setTimeout(() => setPhone(normalizePhoneSearch(phoneInput)), 300);
     return () => clearTimeout(timer);
   }, [phoneInput]);
 
-  const {
-    data: customers,
-    isPending,
-    isError,
-    refetch
-  } = useQuery(adminCustomersQuery({ limit, phone: phone || undefined }));
+  const { data, isPending, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    useInfiniteQuery(adminCustomersQuery(phone));
+  const customers = data?.pages.flat();
 
   const search = (
     <Input
@@ -42,7 +33,16 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
     />
   );
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  // Only a failure with nothing to show replaces the list — and the search
+  // box stays, so a bad search can be corrected
+  if (isError && !customers) {
+    return (
+      <div>
+        {search}
+        <QueryError onRetry={() => refetch()} />
+      </div>
+    );
+  }
   if (isPending || !customers) {
     return (
       <div>
@@ -62,9 +62,6 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
       </div>
     );
   }
-
-  // Got a full page back → there may be more to load
-  const canLoadMore = customers.length === limit;
 
   return (
     <div>
@@ -119,12 +116,13 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
           ))}
         </ul>
       </StaggerGroup>
-      {canLoadMore ? (
+      {hasNextPage ? (
         <div className="mt-4 flex justify-center">
           <Button
             variant="outline"
             className="border-golden text-creme"
-            onPress={() => setLimit(limit + PAGE_SIZE)}
+            isPending={isFetchingNextPage}
+            onPress={() => void fetchNextPage()}
           >
             {m.admin_load_more()}
           </Button>

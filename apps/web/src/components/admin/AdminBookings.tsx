@@ -8,7 +8,12 @@ import {
   type BookingStatus,
   type IsoDate
 } from '@repo/shared';
-import { adminApi, adminBookingsQuery, type AdminBookingFilters } from '../../lib/admin-api';
+import {
+  adminApi,
+  adminBookingsQuery,
+  normalizePhoneSearch,
+  type AdminBookingFilters
+} from '../../lib/admin-api';
 import { api } from '../../lib/api';
 import { formatPhone } from '@repo/shared/phone';
 import { bookingHours, intlTag, warsawDate, warsawTime } from '../../lib/format';
@@ -109,7 +114,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
 
   // Debounce the phone search so we don't refetch per keystroke
   useEffect(() => {
-    const timer = setTimeout(() => setPhone(phoneInput.trim()), 300);
+    const timer = setTimeout(() => setPhone(normalizePhoneSearch(phoneInput)), 300);
     return () => clearTimeout(timer);
   }, [phoneInput]);
 
