@@ -1,0 +1,26 @@
+# Keep the build context to sources: installs happen inside the image, and
+# nothing secret or machine-specific may end up in a layer.
+**/node_modules
+**/dist
+**/.output
+**/.nitro
+**/.tanstack
+**/coverage
+**/*.log
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Generated at build time inside the image
+apps/web/src/paraglide
+apps/web/src/routeTree.gen.ts
+apps/web/project.inlang/cache
+
+# Runtime data and tooling that no image needs
+apps/api/uploads
+.git
+.claude
+.zed
+brand

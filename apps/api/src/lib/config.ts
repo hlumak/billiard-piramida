@@ -83,7 +83,9 @@ export function loadConfig(warn: (message: string) => void = console.warn): ApiC
   return {
     databaseUrl,
     port: Number(process.env.API_PORT ?? 3001),
-    host: process.env.API_HOST ?? '0.0.0.0',
+    // Loopback unless told otherwise (the container image sets 0.0.0.0): a host
+    // install must not expose the API port next to the reverse proxy
+    host: process.env.API_HOST ?? '127.0.0.1',
     logLevel: process.env.LOG_LEVEL ?? 'info',
     // Same-origin in production unless listed; never "reflect any origin"
     allowedOrigins: listed && listed.length > 0 ? listed : production ? undefined : DEV_ORIGINS,
