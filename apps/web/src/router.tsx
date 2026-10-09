@@ -1,6 +1,7 @@
 import { createRouter as createTanStackRouter, lazyRouteComponent } from '@tanstack/react-router';
 import { routeTree } from './routeTree.gen';
 import { currentRequestContext } from './lib/request-context';
+import { deLocalizeUrl, localizeUrl } from './paraglide/runtime.js';
 
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 import { getContext } from './integrations/tanstack-query/root-provider';
@@ -14,6 +15,12 @@ export function getRouter() {
   const router = createTanStackRouter({
     routeTree,
     context,
+    // Routes are defined once, without a language: "/uk/prices" is matched as
+    // "/prices", and every link and redirect gets the current prefix back
+    rewrite: {
+      input: ({ url }) => deLocalizeUrl(url),
+      output: ({ url }) => localizeUrl(url)
+    },
     ...(nonce !== undefined ? { ssr: { nonce } } : {}),
     scrollRestoration: true,
     defaultPreload: 'intent',

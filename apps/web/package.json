@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "vite dev --port 3000",
-    "generate": "tsr generate && paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy cookie preferredLanguage baseLocale --silent",
+    "generate": "tsr generate && paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --strategy url cookie preferredLanguage baseLocale --silent",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node --env-file-if-exists=../../.env server.mjs",

@@ -1,5 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { SUPPORTED_LOCALES } from '@repo/shared';
 import { SITE_URL } from '../lib/seo';
+import { localizeHref } from '../paraglide/runtime.js';
+
+/** App pages with nothing to index, in every language's address space. */
+const PRIVATE_PATHS = ['/admin', '/book', '/booking/', '/bookings', '/profile'];
+const DISALLOW = PRIVATE_PATHS.flatMap(path =>
+  SUPPORTED_LOCALES.map(locale => `Disallow: ${localizeHref(path, { locale })}`)
+);
 
 /**
  * Generated from VITE_SITE_URL so it names the deployed domain. A staging
@@ -18,11 +26,7 @@ export const Route = createFileRoute('/robots.txt')({
             : [
                 'User-agent: *',
                 'Allow: /',
-                'Disallow: /admin',
-                'Disallow: /book',
-                'Disallow: /booking/',
-                'Disallow: /bookings',
-                'Disallow: /profile',
+                ...DISALLOW,
                 '',
                 `Sitemap: ${SITE_URL}/sitemap.xml`,
                 ''

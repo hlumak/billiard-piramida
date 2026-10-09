@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { DEFAULT_LOCALE } from '@repo/shared';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@repo/shared';
 import { api } from '../lib/api';
-import { SITE_URL } from '../lib/seo';
+import { localizedPageUrl } from '../lib/seo';
 
 /** The public pages; private ones (/book, /booking, /bookings, /admin, /profile) stay out. */
 const STATIC_PAGES: { path: string; priority: string }[] = [
@@ -39,12 +39,31 @@ export const Route = createFileRoute('/sitemap.xml')({
             priority: '0.6'
           }))
         ];
+        // Every page once per language, each entry listing all three versions
+        // (Google's sitemap form of hreflang)
+        const alternates = (path: string) =>
+          [
+            ...SUPPORTED_LOCALES.map(locale => [locale, localizedPageUrl(path, locale)] as const),
+            ['x-default', localizedPageUrl(path, DEFAULT_LOCALE)] as const
+          ]
+            .map(
+              ([hreflang, href]) =>
+                `    <xhtml:link rel="alternate" hreflang="${hreflang}" href="${escapeXml(href)}"/>`
+            )
+            .join('\n');
         const body = [
           '<?xml version="1.0" encoding="UTF-8"?>',
-          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-          ...urls.map(
-            url =>
-              `  <url><loc>${escapeXml(`${SITE_URL}${url.loc}`)}</loc><priority>${url.priority}</priority></url>`
+          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+          ...urls.flatMap(url =>
+            SUPPORTED_LOCALES.map(locale =>
+              [
+                `  <url>`,
+                `    <loc>${escapeXml(localizedPageUrl(url.loc, locale))}</loc>`,
+                alternates(url.loc),
+                `    <priority>${url.priority}</priority>`,
+                `  </url>`
+              ].join('\n')
+            )
           ),
           '</urlset>',
           ''

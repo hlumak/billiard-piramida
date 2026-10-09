@@ -13,6 +13,7 @@ import { adminApi } from '../../lib/admin-api';
 import { isDraftChanged } from './draft';
 import { ApiError } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
+import { localizeHref } from '../../paraglide/runtime.js';
 import { AdminImageField, uploadErrorMessage } from './AdminImageField';
 
 const REQUIRED_LOCALE: Locale = 'pl';
@@ -209,7 +210,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
                   <p className="text-sm text-grey-cool">
                     {m.admin_page_address()}:{' '}
                     <a
-                      href={`/news/${item.slug}`}
+                      href={localizeHref(`/news/${item.slug}`)}
                       target="_blank"
                       rel="noreferrer"
                       className="text-golden hover:text-golden-hover"

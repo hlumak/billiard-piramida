@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { baseLocale, isLocale } from '../paraglide/runtime.js';
+import { baseLocale, isLocale, localizeHref } from '../paraglide/runtime.js';
 import { m } from '../paraglide/messages.js';
 
 /**
@@ -18,7 +18,8 @@ export const Route = createFileRoute('/manifest.webmanifest')({
           short_name: 'piramida',
           description: m.app_description({}, { locale }),
           lang: locale,
-          start_url: '/',
+          // An installed app opens in the language it was installed from
+          start_url: localizeHref('/', { locale }),
           display: 'standalone',
           background_color: '#0b4e31',
           theme_color: '#0b4e31',

@@ -40,7 +40,13 @@ const config = defineConfig(({ mode }) => {
       paraglideVitePlugin({
         project: './project.inlang',
         outdir: './src/paraglide',
-        strategy: ['cookie', 'preferredLanguage', 'baseLocale']
+        // The language is part of the address: Polish (the base) at /, the
+        // others under /uk and /en. Each language is then its own crawlable
+        // page with hreflang alternates; before, all three shared one URL and
+        // search engines only ever saw the Polish one. The cookie and the
+        // browser's preference still decide where the URL can't (API calls).
+        // Keep in step with the "generate" script in package.json.
+        strategy: ['url', 'cookie', 'preferredLanguage', 'baseLocale']
       }),
       // React Aria ships UI strings (and calendars) for 34 locales; keep the app's
       // three (packages/shared SUPPORTED_LOCALES) out of the client bundle's ~53 kB

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminNewsItemDto } from '@repo/shared';
 import { adminApi, adminNewsQuery } from '../../lib/admin-api';
 import { m } from '../../paraglide/messages.js';
+import { localizeHref } from '../../paraglide/runtime.js';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
 import { AdminNewsModal } from './AdminNewsModal';
@@ -43,7 +44,7 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
           {/* Where the card leads: its own page when it has an article, else the explicit link */}
           {item.hasArticle ? (
             <a
-              href={`/news/${item.slug}`}
+              href={localizeHref(`/news/${item.slug}`)}
               target="_blank"
               rel="noreferrer"
               className="truncate text-xs text-golden-light hover:underline"
