@@ -21,8 +21,8 @@
   },
   "devDependencies": {
     "oxfmt": "0.72.0",
-    "oxlint": "1.81.0",
-    "oxlint-plugin-react-doctor": "0.9.13",
+    "oxlint": "1.87.0",
+    "oxlint-plugin-react-doctor": "0.9.17",
     "typescript": "7.0.2"
   },
   "engines": {

@@ -20,6 +20,7 @@ import {
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { AdminDatePicker } from './AdminDatePicker';
+import { useNowMinute } from '../../lib/use-now';
 import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
 
 /** (tableId, hour) → the confirmed booking covering that hour. Bookings are
@@ -148,8 +149,9 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
     [date, queryClient]
   );
 
-  const today = warsawToday();
-  const nowHour = date === today ? warsawHour(new Date()) : null;
+  const now = useNowMinute();
+  const today = warsawToday(now);
+  const nowHour = date === today ? warsawHour(now) : null;
   const { open, close } = hoursForDate(date, useVenueConfig().hours);
   const hours = Array.from({ length: close - open }, (_, i) => open + i);
   const occupancy = occupancyOf(bookings ?? []);

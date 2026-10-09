@@ -21,10 +21,10 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
 }
 
 /** Today's date (YYYY-MM-DD) in the venue's timezone. */
-export function warsawToday(): IsoDate {
+export function warsawToday(at: number = Date.now()): IsoDate {
   // en-CA short style is defined as YYYY-MM-DD
   return formatter('en-CA', { timeZone: VENUE_TIMEZONE, dateStyle: 'short' }).format(
-    new Date()
+    new Date(at)
   ) as IsoDate;
 }
 
@@ -101,7 +101,7 @@ export function bookingHours(booking: { startsAt: string; endsAt: string }): {
 }
 
 /** Warsaw wall-clock hour (0–23) of an instant. */
-export function warsawHour(instant: string | Date): number {
+export function warsawHour(instant: string | number | Date): number {
   return Number(
     formatter('en-GB', { timeZone: VENUE_TIMEZONE, hour: 'numeric', hourCycle: 'h23' }).format(
       new Date(instant)
