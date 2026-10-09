@@ -16,7 +16,7 @@ import {
   UUID
 } from '../lib/schemas.ts';
 import { UNIQUE_VIOLATION, pgErrorCode } from '../lib/errors.ts';
-import { slugify } from '../lib/slug.ts';
+import { insertWithFreeSlug, slugify } from '../lib/slug.ts';
 import { seatCountsFor, toAdminTournamentDto } from '../services/tournaments.ts';
 
 const TRANSLATIONS_BODY = Type.Array(
@@ -180,31 +180,25 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
       const base = slugify(request.body.slug ?? titleForSlug, 'tournament');
 
       const created = await admin.db.transaction(async tx => {
-        // Unique slug: append a counter on collision, same as menu items
-        let slug = base;
-        for (let attempt = 2; attempt < 20; attempt++) {
-          const [existing] = await tx
-            .select({ id: tournaments.id })
-            .from(tournaments)
-            .where(eq(tournaments.slug, slug));
-          if (!existing) break;
-          slug = `${base}-${attempt}`;
-        }
-
-        const [row] = await tx
-          .insert(tournaments)
-          .values({
-            slug,
-            imageUrl,
-            ...(status !== undefined ? { status } : {}),
-            ...(startsOn !== undefined ? { startsOn } : {}),
-            ...(startHour !== undefined ? { startHour } : {}),
-            ...(registrationDeadline !== undefined ? { registrationDeadline } : {}),
-            ...(entryFeeGrosz !== undefined ? { entryFeeGrosz } : {}),
-            ...(minPlayers !== undefined ? { minPlayers } : {}),
-            ...(maxPlayers !== undefined ? { maxPlayers } : {})
-          })
-          .returning();
+        // Unique slug: base, then base-2, base-3… (atomic, see insertWithFreeSlug)
+        const row = await insertWithFreeSlug(base, async slug => {
+          const [inserted] = await tx
+            .insert(tournaments)
+            .values({
+              slug,
+              imageUrl,
+              ...(status !== undefined ? { status } : {}),
+              ...(startsOn !== undefined ? { startsOn } : {}),
+              ...(startHour !== undefined ? { startHour } : {}),
+              ...(registrationDeadline !== undefined ? { registrationDeadline } : {}),
+              ...(entryFeeGrosz !== undefined ? { entryFeeGrosz } : {}),
+              ...(minPlayers !== undefined ? { minPlayers } : {}),
+              ...(maxPlayers !== undefined ? { maxPlayers } : {})
+            })
+            .onConflictDoNothing({ target: tournaments.slug })
+            .returning();
+          return inserted;
+        });
         assert(row, 'insert returned no row');
 
         await tx.insert(tournamentTranslations).values(

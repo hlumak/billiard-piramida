@@ -17,6 +17,27 @@ const STROKED_LETTERS: Record<string, string> = {
  * Latin letters at all (a fully Cyrillic one) collapses to nothing, which is
  * what `fallback` is for.
  */
+/** Attempts before giving up: base, base-2 … base-20. */
+const MAX_SLUG_ATTEMPTS = 20;
+
+/**
+ * Insert a row under the first free slug among base, base-2, base-3…
+ * `insert` must use ON CONFLICT (slug) DO NOTHING RETURNING and resolve to
+ * undefined on a conflict: the database decides atomically, where the old
+ * check-then-insert raced (a double-click hit the unique index as a 500) and
+ * inserted attempt 19's slug unchecked.
+ */
+export async function insertWithFreeSlug<T>(
+  base: string,
+  insert: (slug: string) => Promise<T | undefined>
+): Promise<T> {
+  for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt++) {
+    const row = await insert(attempt === 1 ? base : `${base}-${attempt}`);
+    if (row !== undefined) return row;
+  }
+  throw new Error(`no free slug for "${base}" after ${MAX_SLUG_ATTEMPTS} attempts`);
+}
+
 export function slugify(name: string, fallback: string): string {
   const base = name
     .toLowerCase()

@@ -66,7 +66,7 @@ import { adminImageRoutes } from './admin-images.ts';
 import { hasArticleText } from './news.ts';
 import { adminTournamentRoutes } from './admin-tournaments.ts';
 import { adminVenueConfigRoutes } from './admin-venue-config.ts';
-import { slugify } from '../lib/slug.ts';
+import { insertWithFreeSlug, slugify } from '../lib/slug.ts';
 import { HOUR_MS, warsawDateOf, warsawDayRange, warsawHourOf, warsawInstant } from '../lib/time.ts';
 import { normalizePhone } from '@repo/shared/phone';
 import {
@@ -971,20 +971,15 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const base = slugify((en ?? uk ?? translations[0]!).name, 'dish');
 
         const created = await admin.db.transaction(async tx => {
-          // Unique slug: append a counter on collision
-          let slug = base;
-          for (let attempt = 2; attempt < 20; attempt++) {
-            const [existing] = await tx
-              .select({ id: foodItems.id })
-              .from(foodItems)
-              .where(eq(foodItems.slug, slug));
-            if (!existing) break;
-            slug = `${base}-${attempt}`;
-          }
-          const [item] = await tx
-            .insert(foodItems)
-            .values({ slug, category, priceGrosz })
-            .returning();
+          // Unique slug: base, then base-2, base-3… (atomic, see insertWithFreeSlug)
+          const item = await insertWithFreeSlug(base, async slug => {
+            const [inserted] = await tx
+              .insert(foodItems)
+              .values({ slug, category, priceGrosz })
+              .onConflictDoNothing({ target: foodItems.slug })
+              .returning();
+            return inserted;
+          });
           assert(item, 'insert returned no row');
           await tx.insert(foodItemTranslations).values(
             translations.map(t => ({
@@ -1182,27 +1177,21 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const base = slugify(request.body.slug ?? titleForSlug, 'news');
 
         const created = await admin.db.transaction(async tx => {
-          // Unique slug: append a counter on collision, same as tournaments
-          let slug = base;
-          for (let attempt = 2; attempt < 20; attempt++) {
-            const [existing] = await tx
-              .select({ id: newsItems.id })
-              .from(newsItems)
-              .where(eq(newsItems.slug, slug));
-            if (!existing) break;
-            slug = `${base}-${attempt}`;
-          }
-
-          const [item] = await tx
-            .insert(newsItems)
-            .values({
-              slug,
-              imageUrl,
-              linkUrl,
-              ...(sortOrder !== undefined ? { sortOrder } : {}),
-              ...(isPublished !== undefined ? { isPublished } : {})
-            })
-            .returning();
+          // Unique slug: base, then base-2, base-3… (atomic, see insertWithFreeSlug)
+          const item = await insertWithFreeSlug(base, async slug => {
+            const [inserted] = await tx
+              .insert(newsItems)
+              .values({
+                slug,
+                imageUrl,
+                linkUrl,
+                ...(sortOrder !== undefined ? { sortOrder } : {}),
+                ...(isPublished !== undefined ? { isPublished } : {})
+              })
+              .onConflictDoNothing({ target: newsItems.slug })
+              .returning();
+            return inserted;
+          });
           assert(item, 'insert returned no row');
           await tx.insert(newsItemTranslations).values(
             translations.map(t => ({

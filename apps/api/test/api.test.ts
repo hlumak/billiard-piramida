@@ -32,6 +32,20 @@ const TABLE_12FT_ID = 8;
 const ADMIN_URL = process.env.DATABASE_URL ?? LOCAL_DATABASE_URL;
 const TEST_URL = ADMIN_URL.replace(/\/[^/]+$/, '/piramida_test');
 
+// The suite DROPs and re-creates a database on whatever server DATABASE_URL
+// names. Only ever a local one, unless explicitly overridden.
+{
+  const host = new URL(ADMIN_URL).hostname;
+  if (
+    !['localhost', '127.0.0.1', '::1', 'postgres'].includes(host) &&
+    !process.env.ALLOW_REMOTE_TEST_DB
+  ) {
+    throw new Error(
+      `Refusing to run the API tests against ${host}: set ALLOW_REMOTE_TEST_DB=1 to override`
+    );
+  }
+}
+
 /**
  * Next date (≥ 7 days out, so always in the future) falling on `weekday`.
  * Computed entirely in UTC so the weekday matches the toISOString() date string
@@ -2865,4 +2879,36 @@ test('day ranges follow local midnights across DST', async () => {
   assert.equal(hours('2026-10-25'), 25); // fall back
   assert.equal(hours('2027-03-28'), 23); // spring forward
   assert.equal(hours('2026-11-01'), 24);
+});
+
+test('one client cannot hold unlimited live-availability sockets', async () => {
+  if (!app.server.listening) await app.listen({ port: 0, host: '127.0.0.1' });
+  const address = app.server.address();
+  assert.ok(address && typeof address === 'object');
+
+  const sockets: WebSocket[] = [];
+  const closeCodes: number[] = [];
+  for (let i = 0; i < 21; i++) {
+    const ws = new WebSocket(`ws://127.0.0.1:${address.port}/api/ws`);
+    ws.addEventListener('close', event => closeCodes.push(event.code));
+    await new Promise<void>(resolve => {
+      ws.addEventListener('open', () => resolve());
+      ws.addEventListener('error', () => resolve());
+    });
+    sockets.push(ws);
+  }
+  await new Promise(resolve => setTimeout(resolve, 200));
+  // The 21st from the same address is closed with "policy violation"
+  assert.deepEqual(closeCodes, [1008]);
+
+  for (const ws of sockets) ws.close();
+  await new Promise(resolve => setTimeout(resolve, 200));
+  // Closing frees the slots again
+  const again = new WebSocket(`ws://127.0.0.1:${address.port}/api/ws`);
+  const opened = await new Promise<boolean>(resolve => {
+    again.addEventListener('open', () => resolve(true));
+    again.addEventListener('close', () => resolve(false));
+  });
+  assert.equal(opened, true);
+  again.close();
 });

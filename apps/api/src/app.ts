@@ -119,7 +119,7 @@ export async function buildApp({
     trustProxy: trustedProxies
   }).withTypeProvider<TypeBoxTypeProvider>();
 
-  const { db, pool } = createDb(databaseUrl);
+  const { db, pool } = createDb(databaseUrl, { requestTimeouts: true });
   // A pg Pool emits 'error' when an idle backend connection dies (e.g. Postgres
   // restart); with no listener that throws as an uncaughtException and kills the
   // process. Log and let the pool recycle the client on next checkout.
