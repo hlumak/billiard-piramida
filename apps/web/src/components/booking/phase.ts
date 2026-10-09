@@ -29,7 +29,9 @@ const BOOKING_ERRORS: Record<string, () => string> = {
   only_upcoming_can_be_cancelled: m.err_booking_changed,
   invalid_phone: m.err_phone_invalid,
   invalid_name: m.err_name_required,
-  rate_limited: m.err_rate_limited
+  rate_limited: m.err_rate_limited,
+  booking_too_far: m.err_booking_too_far,
+  too_many_bookings: m.err_too_many_bookings
 };
 
 /** Map booking-mutation failures to localized copy. */

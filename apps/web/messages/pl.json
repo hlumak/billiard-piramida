@@ -255,7 +255,7 @@
   "tournament_register_btn": "Zapisz się",
   "tournament_registering": "Zapisujemy…",
   "tournament_registered_title": "Miejsce zarezerwowane",
-  "tournament_registered_hint": "Aby potwierdzić udział, podejdź do recepcji klubu i wpłać wpisowe.",
+  "tournament_registered_hint": "Aby potwierdzić udział, w ciągu 3 dni podejdź do recepcji klubu i wpłać wpisowe — potem nieopłacone miejsce może przejść na kogoś innego.",
   "tournament_err_already": "Ten numer jest już zapisany na turniej",
   "tournament_err_full": "Nie ma już wolnych miejsc",
   "tournament_err_closed": "Zapisy na ten turniej są zamknięte",
@@ -322,5 +322,7 @@
   "err_booking_changed": "Ta rezerwacja w międzyczasie się zmieniła. Odśwież stronę.",
   "err_rate_limited": "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
   "err_booking_too_long": "Rezerwacja może trwać najwyżej 8 godzin.",
-  "closed_today": "Dziś nieczynne"
+  "closed_today": "Dziś nieczynne",
+  "err_booking_too_far": "Rezerwacje są otwarte na 14 dni naprzód. Wybierz wcześniejszą datę.",
+  "err_too_many_bookings": "Ten numer ma już 3 nadchodzące rezerwacje. Zadzwoń do nas, aby zarezerwować więcej."
 }

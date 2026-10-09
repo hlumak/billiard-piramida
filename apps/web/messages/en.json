@@ -255,7 +255,7 @@
   "tournament_register_btn": "Sign up",
   "tournament_registering": "Signing you up…",
   "tournament_registered_title": "You're on the list",
-  "tournament_registered_hint": "To confirm your place, come to the club reception and pay the entry fee.",
+  "tournament_registered_hint": "To confirm your place, come to the club reception and pay the entry fee within 3 days — after that an unpaid place can go to someone else.",
   "tournament_err_already": "This number is already on the roster",
   "tournament_err_full": "There are no places left",
   "tournament_err_closed": "Sign-ups for this tournament are closed",
@@ -322,5 +322,7 @@
   "err_booking_changed": "This booking has changed in the meantime. Refresh the page.",
   "err_rate_limited": "Too many attempts. Wait a minute and try again.",
   "err_booking_too_long": "A booking can last at most 8 hours.",
-  "closed_today": "Closed today"
+  "closed_today": "Closed today",
+  "err_booking_too_far": "Bookings open 14 days ahead. Pick an earlier date.",
+  "err_too_many_bookings": "This phone number already has 3 upcoming bookings. Call us to book more."
 }

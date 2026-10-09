@@ -8,6 +8,7 @@ import {
   BILLIARD_TABLES_COUNT,
   DARTBOARDS_COUNT,
   DEFAULT_HOURLY_RATE_GROSZ,
+  PENDING_SEAT_HOLD_MS,
   SPORT_CARD_DISCOUNT_GROSZ,
   SPOTS_COUNT
 } from '@repo/shared';
@@ -17,7 +18,7 @@ import pg from 'pg';
 import { buildApp } from '../src/app.ts';
 import { LOCAL_DATABASE_URL } from '../src/lib/config.ts';
 import { createDb } from '../src/db/client.ts';
-import { bookings, users } from '../src/db/schema.ts';
+import { bookings, tournamentRegistrations, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
 
 /** Derived from the shared constants — a rate change must not silently rot these. */
@@ -76,7 +77,9 @@ before(async () => {
     uploadsDir,
     // inject reports one source address for every request, so the global bucket
     // is shared by the whole suite. Route-level limits are still exercised below.
-    rateLimitMax: 1000
+    rateLimitMax: 1000,
+    // Same reasoning for the per-IP booking limit; its own test builds an app with the default
+    bookingCreateLimit: 1000
   });
   await app.ready();
 });
@@ -1624,21 +1627,35 @@ test('admin session cookie authenticates admin requests; bad token is rejected',
   assert.equal(stats.statusCode, 200);
 });
 
+/** The next EU fall-back Sunday (last Sunday of October) at least a day out. */
+function nextFallBackSunday(): string {
+  const now = new Date();
+  for (const year of [now.getUTCFullYear(), now.getUTCFullYear() + 1]) {
+    const day = new Date(Date.UTC(year, 9, 31));
+    day.setUTCDate(31 - day.getUTCDay());
+    if (day.getTime() > now.getTime() + 86_400_000) return day.toISOString().slice(0, 10);
+  }
+  throw new Error('unreachable');
+}
+
 test('booking on a DST fall-back date computes correct Warsaw instants', async () => {
-  // 2026-10-25 is the EU fall-back Sunday (25-hour day); 15:00 Warsaw is CET
-  // (UTC+1) that afternoon, so the stored instant must be 14:00Z — not 13:00Z.
-  const avail = await app.inject({ method: 'GET', url: '/api/availability?date=2026-10-25' });
+  // The fall-back Sunday is a 25-hour day; 15:00 Warsaw is CET (UTC+1) that
+  // afternoon, so the stored instant must be 14:00Z — not 13:00Z. Computed,
+  // not hardcoded (a fixed date silently turns into "start in the past"), and
+  // booked from the desk, which isn't bound by the guests' 14-day horizon.
+  const date = nextFallBackSunday();
+  const avail = await app.inject({ method: 'GET', url: `/api/availability?date=${date}` });
   assert.equal(avail.statusCode, 200);
   assert.equal(avail.json().open, 15);
   assert.equal(avail.json().close, 23);
 
   const res = await app.inject({
     method: 'POST',
-    url: '/api/bookings',
-    headers: { 'x-forwarded-for': '198.51.100.8' },
+    url: '/api/admin/bookings',
+    headers: { 'x-admin-token': 'test-admin-token', 'x-forwarded-for': '198.51.100.8' },
     payload: {
       tableId: 1,
-      date: '2026-10-25',
+      date,
       startHour: 15,
       durationHours: 2,
       customerName: 'DST Guest',
@@ -1646,8 +1663,72 @@ test('booking on a DST fall-back date computes correct Warsaw instants', async (
     }
   });
   assert.equal(res.statusCode, 201);
-  assert.equal(res.json().startsAt, '2026-10-25T14:00:00.000Z');
-  assert.equal(res.json().endsAt, '2026-10-25T16:00:00.000Z');
+  assert.equal(res.json().startsAt, `${date}T14:00:00.000Z`);
+  assert.equal(res.json().endsAt, `${date}T16:00:00.000Z`);
+});
+
+test('guests book at most 14 days ahead and hold at most 3 upcoming bookings per phone', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.41' };
+  const book = (date: string, tableId: number, phone = '+48 602 111 333') =>
+    app.inject({
+      method: 'POST',
+      url: '/api/bookings',
+      headers: ip,
+      payload: {
+        tableId,
+        date,
+        startHour: 20,
+        durationHours: 1,
+        customerName: 'Limit Guest',
+        customerPhone: phone
+      }
+    });
+
+  const tooFar = await book(nextDate(1).replace(/^\d{4}/, y => String(Number(y) + 1)), 1);
+  assert.equal(tooFar.statusCode, 422);
+  assert.equal(tooFar.json().error, 'booking_too_far');
+
+  // Three upcoming bookings on one phone are fine; the fourth is refused
+  // Thursday 20:00 — a slot no other test books
+  const thursday = nextDate(4);
+  for (const tableId of [1, 2, 3]) {
+    assert.equal((await book(thursday, tableId)).statusCode, 201);
+  }
+  const fourth = await book(thursday, 4);
+  assert.equal(fourth.statusCode, 409);
+  assert.equal(fourth.json().error, 'too_many_bookings');
+
+  // Another phone is unaffected
+  assert.equal((await book(thursday, 4, '+48 602 111 334')).statusCode, 201);
+});
+
+test('public booking creation is limited per IP', async () => {
+  const limited = await buildApp({
+    databaseUrl: TEST_URL,
+    logger: false,
+    uploadsDir,
+    rateLimitMax: 1000
+    // bookingCreateLimit left at its production default
+  });
+  try {
+    let refused = false;
+    for (let i = 0; i < 12 && !refused; i++) {
+      const res = await limited.inject({
+        method: 'POST',
+        url: '/api/bookings',
+        headers: { 'x-forwarded-for': '198.51.100.42' },
+        // Invalid on purpose: the limit counts attempts, not just successes
+        payload: { tableId: 1, date: MONDAY, startHour: 3, durationHours: 1, customerName: 'X', customerPhone: '+48 602 111 335' }
+      });
+      if (res.statusCode === 429) {
+        refused = true;
+        assert.equal(res.json().error, 'rate_limited');
+      }
+    }
+    assert.ok(refused, 'expected a 429 within 12 rapid booking attempts');
+  } finally {
+    await limited.close();
+  }
 });
 
 /* Tournaments. The seeded pyramid tournament carries a fixed real-world
@@ -1989,6 +2070,50 @@ test('a cancelled seat can be taken again by the same player', async () => {
     headers: staff('198.51.100.23')
   });
   assert.equal(stillOne.json().length, 1);
+});
+
+test('an unpaid sign-up stops holding its seat after the hold period', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.43' };
+  const created = await createTournament('198.51.100.43', {
+    slug: 'lapsing-cup',
+    registrationDeadline: nextDate(5),
+    maxPlayers: 2
+  });
+  const register = (name: string, phone: string) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/tournaments/lapsing-cup/register',
+      headers: ip,
+      payload: { name, phone }
+    });
+
+  assert.equal((await register('First', '512 700 001')).statusCode, 201);
+  const second = await register('Second', '512 700 002');
+  assert.equal(second.json().tournament.registrationState, 'full');
+
+  // The first sign-up was never paid and has outlived its hold
+  const { db, pool } = createDb(TEST_URL);
+  await db
+    .update(tournamentRegistrations)
+    .set({ createdAt: new Date(Date.now() - PENDING_SEAT_HOLD_MS - 60_000) })
+    .where(eq(tournamentRegistrations.phone, '+48512700001'));
+  await pool.end();
+
+  const page = await app.inject({ method: 'GET', url: '/api/tournaments/lapsing-cup' });
+  assert.equal(page.json().registrationState, 'open');
+  assert.equal(page.json().pendingCount, 1);
+
+  // The lapsed number can sign up again — over its own row, not a second one
+  const again = await register('First', '512 700 001');
+  assert.equal(again.statusCode, 201);
+  assert.equal(again.json().tournament.registrationState, 'full');
+
+  const roster = await app.inject({
+    method: 'GET',
+    url: `/api/admin/tournaments/${created.id}/registrations`,
+    headers: staff('198.51.100.43')
+  });
+  assert.equal(roster.json().length, 2);
 });
 
 test('tournament sign-up is rate limited', async () => {

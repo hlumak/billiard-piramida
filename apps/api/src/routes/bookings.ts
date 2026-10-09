@@ -1,6 +1,8 @@
 import assert from 'node:assert';
 import { Type } from '@sinclair/typebox';
 import {
+  addDays,
+  BOOKING_DAYS_AHEAD,
   discountGroszFor,
   hoursForDate,
   isIsoDate,
@@ -8,13 +10,14 @@ import {
   MAX_BOOKING_HOURS,
   MAX_ORDER_ITEM_QUANTITY,
   MAX_SPORT_CARDS_PER_BOOKING,
+  MAX_UPCOMING_BOOKINGS_PER_PHONE,
   MIN_BOOKING_HOURS,
   hourlyRateGrosz,
   MAX_SPOT_ID,
   resolveBookingGame
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
-import { and, asc, eq, gt } from 'drizzle-orm';
+import { and, asc, count, eq, gt, sql } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BILLIARD_GAME, BOOKING_RESPONSE, ERROR_RESPONSE, INT_ID, UUID } from '../lib/schemas.ts';
@@ -63,10 +66,22 @@ const CREATE_BOOKING_BODY = Type.Object(
 /** Allow bookings that start at most 5 minutes ago ("book the table right now"). */
 const START_GRACE_MS = 5 * 60_000;
 
-export function bookingRoutes(app: AppInstance) {
+/** Thrown inside the create transaction so a refusal rolls the booking back. */
+class BookingRefused extends Error {
+  readonly code: string;
+  constructor(code: string) {
+    super(code);
+    this.code = code;
+  }
+}
+
+export function bookingRoutes(app: AppInstance, { createLimitPerHour }: { createLimitPerHour: number }) {
   app.post(
     '/api/bookings',
     {
+      // Anonymous and unverified, so the abuse limits live here: per IP (this),
+      // per phone (in the transaction) and how far ahead (below)
+      config: { rateLimit: { max: createLimitPerHour, timeWindow: '1 hour' } },
       schema: {
         body: CREATE_BOOKING_BODY,
         response: { 201: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
@@ -85,6 +100,11 @@ export function bookingRoutes(app: AppInstance) {
       const customerPhone = normalizePhone(request.body.customerPhone);
       if (customerPhone === null) {
         return reply.code(422).send({ error: 'invalid_phone' });
+      }
+      // The wizard only offers the next BOOKING_DAYS_AHEAD days; the API holds
+      // the same line, or one script could fill the calendar years ahead
+      if (date > addDays(warsawDateOf(new Date()), BOOKING_DAYS_AHEAD - 1)) {
+        return reply.code(422).send({ error: 'booking_too_far' });
       }
       const { rates, hours } = await app.venueConfig.get();
       if (!isValidBookingWindow(date, startHour, durationHours, hours)) {
@@ -115,6 +135,23 @@ export function bookingRoutes(app: AppInstance) {
 
       try {
         const bookingId = await app.db.transaction(async tx => {
+          // Serialize creations per phone so two parallel requests can't both
+          // pass the count below; released at commit/rollback
+          await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${customerPhone}))`);
+          const [held] = await tx
+            .select({ n: count() })
+            .from(bookings)
+            .where(
+              and(
+                eq(bookings.customerPhone, customerPhone),
+                eq(bookings.status, 'confirmed'),
+                gt(bookings.endsAt, new Date())
+              )
+            );
+          if ((held?.n ?? 0) >= MAX_UPCOMING_BOOKINGS_PER_PHONE) {
+            throw new BookingRefused('too_many_bookings');
+          }
+
           const [created] = await tx
             .insert(bookings)
             .values({
@@ -142,6 +179,7 @@ export function bookingRoutes(app: AppInstance) {
         if (pgErrorCode(err) === EXCLUSION_VIOLATION) {
           return reply.code(409).send({ error: 'slot_taken' });
         }
+        if (err instanceof BookingRefused) return reply.code(409).send({ error: err.code });
         if (err instanceof Error && err.message === 'unknown_food_item') {
           return reply.code(422).send({ error: 'unknown_food_item' });
         }

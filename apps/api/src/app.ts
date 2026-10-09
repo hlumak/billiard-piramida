@@ -77,6 +77,11 @@ export interface AppOptions {
    */
   rateLimitMax?: number | undefined;
   /**
+   * Public booking creations per IP per hour. Tests raise it for the same
+   * reason as `rateLimitMax`; the limit itself is exercised separately.
+   */
+  bookingCreateLimit?: number | undefined;
+  /**
    * Peers whose X-Forwarded-* headers are trusted: comma-separated IPs/CIDRs or
    * @fastify/proxy-addr presets. Default covers nginx on the same host or in a
    * container on the same private network.
@@ -96,6 +101,7 @@ export async function buildApp({
   jwtSecret,
   cookieSecure = false,
   rateLimitMax = 100,
+  bookingCreateLimit = 10,
   trustedProxies = DEFAULT_TRUSTED_PROXIES,
   uploadsDir = DEFAULT_UPLOADS_DIR,
   oembedToken
@@ -236,7 +242,7 @@ export async function buildApp({
   menuRoutes(app);
   newsRoutes(app);
   tournamentRoutes(app);
-  bookingRoutes(app);
+  bookingRoutes(app, { createLimitPerHour: bookingCreateLimit });
   liveRoutes(app);
   authRoutes(app, jwtSecret !== undefined);
   await adminRoutes(app, adminToken);

@@ -28,12 +28,7 @@ export function warsawToday(): IsoDate {
   ) as IsoDate;
 }
 
-export function addDays(isoDate: IsoDate, days: number): IsoDate {
-  const [y, m, d] = dateParts(isoDate);
-  const date = new Date(Date.UTC(y, m - 1, d + days));
-  // toISOString is defined as YYYY-MM-DDTHH:mm:ss…
-  return date.toISOString().slice(0, 10) as IsoDate;
-}
+export { addDays } from '@repo/shared';
 
 function utcDate(isoDate: IsoDate): Date {
   const [y, m, d] = dateParts(isoDate);
