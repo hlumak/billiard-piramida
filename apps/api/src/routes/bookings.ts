@@ -1,27 +1,17 @@
 import assert from 'node:assert';
 import { Type } from 'typebox';
 import {
-  addDays,
-  BOOKING_DAYS_AHEAD,
   discountGroszFor,
   hoursForDate,
-  isIsoDate,
-  isValidBookingWindow,
   MAX_BOOKING_HOURS,
   MAX_ORDER_ITEM_QUANTITY,
-  MAX_SPORT_CARDS_PER_BOOKING,
-  MAX_UPCOMING_BOOKINGS_PER_PHONE,
-  MIN_BOOKING_HOURS,
-  hourlyRateGrosz,
-  MAX_SPOT_ID,
-  resolveBookingGame
+  MIN_BOOKING_HOURS
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
-import { and, asc, count, desc, eq, gt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import {
-  BILLIARD_GAME,
   BOOKING_RESPONSE,
   BOOKING_SUMMARY_RESPONSE,
   CREATED_BOOKING_RESPONSE,
@@ -30,8 +20,8 @@ import {
   UUID
 } from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
+import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
 import {
-  createManageToken,
   insertOrderItems,
   loadBookingDto,
   manageTokenMatches,
@@ -59,35 +49,9 @@ const NEW_ITEMS = Type.Array(
 );
 
 const CREATE_BOOKING_BODY = Type.Object(
-  {
-    tableId: Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }),
-    date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
-    startHour: Type.Integer({ minimum: 0, maximum: 23 }),
-    durationHours: Type.Integer({ minimum: MIN_BOOKING_HOURS, maximum: MAX_BOOKING_HOURS }),
-    customerName: Type.String({ minLength: 1, maxLength: 120 }),
-    customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
-    /** Self-declared and open to guests — staff check the cards at reception */
-    sportCardCount: Type.Optional(
-      Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })
-    ),
-    items: Type.Optional(NEW_ITEMS),
-    /** Billiard only. Omitted, the spot's first offered game is stored. */
-    game: Type.Optional(BILLIARD_GAME)
-  },
+  { ...NEW_BOOKING_FIELDS, items: Type.Optional(NEW_ITEMS) },
   { additionalProperties: false }
 );
-
-/** Allow bookings that start at most 5 minutes ago ("book the table right now"). */
-const START_GRACE_MS = 5 * 60_000;
-
-/** Thrown inside the create transaction so a refusal rolls the booking back. */
-class BookingRefused extends Error {
-  readonly code: string;
-  constructor(code: string) {
-    super(code);
-    this.code = code;
-  }
-}
 
 export function bookingRoutes(
   app: AppInstance,
@@ -129,106 +93,16 @@ export function bookingRoutes(
       }
     },
     async (request, reply) => {
-      const { tableId, date, startHour, durationHours } = request.body;
-      const customerName = request.body.customerName.trim();
-      if (customerName === '') return reply.code(422).send({ error: 'invalid_name' });
-      const items = request.body.items ?? [];
-      const sportCardCount = request.body.sportCardCount ?? 0;
-
-      if (!isIsoDate(date)) {
-        return reply.code(400).send({ error: 'invalid_date' });
-      }
-      const customerPhone = normalizePhone(request.body.customerPhone);
-      if (customerPhone === null) {
-        return reply.code(422).send({ error: 'invalid_phone' });
-      }
-      // The wizard only offers the next BOOKING_DAYS_AHEAD days; the API holds
-      // the same line, or one script could fill the calendar years ahead
-      if (date > addDays(warsawDateOf(new Date()), BOOKING_DAYS_AHEAD - 1)) {
-        return reply.code(422).send({ error: 'booking_too_far' });
-      }
-      const { rates, hours } = await app.venueConfig.get();
-      if (!isValidBookingWindow(date, startHour, durationHours, hours)) {
-        return reply.code(422).send({ error: 'outside_operating_hours' });
-      }
-
-      const startsAt = warsawInstant(date, startHour);
-      const endsAt = new Date(startsAt.getTime() + durationHours * HOUR_MS);
-      if (startsAt.getTime() < Date.now() - START_GRACE_MS) {
-        return reply.code(422).send({ error: 'start_in_past' });
-      }
-
-      // The rate follows the spot, so an unknown id must fail before pricing
-      const [spot] = await app.db.select().from(tables).where(eq(tables.id, tableId));
-      if (!spot) return reply.code(422).send({ error: 'unknown_table' });
-
-      // Pool on a 12ft table, or any game on a dartboard, is not a thing the
-      // room can serve — reject rather than quietly storing something else.
-      const game = resolveBookingGame(tableId, request.body.game);
-      if (!game.ok) return reply.code(422).send({ error: 'game_not_available' });
-
-      // Optional sign-in: guests book exactly the same way, discounts included —
-      // the cards belong to the players at the spot, not to an account
+      // Optional sign-in: guests book exactly the same way, discounts included
       const user = await app.authenticatedUser(request);
-      // Locked onto the row: a later reprice must not rewrite this receipt
-      const hourlyRateGroszNow = hourlyRateGrosz(spot, rates);
-      const discountGrosz = discountGroszFor(sportCardCount, hourlyRateGroszNow * durationHours);
-
-      const manage = createManageToken();
-      try {
-        const bookingId = await app.db.transaction(async tx => {
-          // Serialize creations per phone so two parallel requests can't both
-          // pass the count below; released at commit/rollback
-          await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${customerPhone}))`);
-          const [held] = await tx
-            .select({ n: count() })
-            .from(bookings)
-            .where(
-              and(
-                eq(bookings.customerPhone, customerPhone),
-                eq(bookings.status, 'confirmed'),
-                gt(bookings.endsAt, new Date())
-              )
-            );
-          if ((held?.n ?? 0) >= MAX_UPCOMING_BOOKINGS_PER_PHONE) {
-            throw new BookingRefused('too_many_bookings');
-          }
-
-          const [created] = await tx
-            .insert(bookings)
-            .values({
-              tableId,
-              game: game.game,
-              customerName,
-              customerPhone,
-              startsAt,
-              endsAt,
-              userId: user?.id ?? null,
-              sportCardCount,
-              hourlyRateGrosz: hourlyRateGroszNow,
-              discountGrosz,
-              manageTokenHash: manage.hash
-            })
-            .returning({ id: bookings.id });
-          assert(created, 'insert returned no row');
-          const itemError = await insertOrderItems(tx, created.id, items);
-          if (itemError) throw new Error(itemError);
-          return created.id;
-        });
-        const dto = await mustLoadBookingDto(app.db, bookingId);
-        app.availabilityHub.notify(date);
-        // The only time the secret leaves the server
-        return reply.code(201).send({ ...dto, manageToken: manage.token });
-      } catch (err) {
-        if (pgErrorCode(err) === EXCLUSION_VIOLATION) {
-          return reply.code(409).send({ error: 'slot_taken' });
-        }
-        if (err instanceof BookingRefused) return reply.code(409).send({ error: err.code });
-        if (err instanceof Error && err.message === 'unknown_food_item') {
-          return reply.code(422).send({ error: 'unknown_food_item' });
-        }
-        throw err;
-      }
+      const result = await createBooking(app, request.body, {
+        kind: 'guest',
+        userId: user?.id ?? null
+      });
+      if (!result.ok) return reply.code(result.status).send({ error: result.error });
+      assert(result.manageToken !== null, 'guest bookings carry a manage secret');
+      // The only time the secret leaves the server
+      return reply.code(201).send({ ...result.booking, manageToken: result.manageToken });
     }
   );
 

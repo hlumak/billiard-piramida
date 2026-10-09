@@ -64,6 +64,7 @@ import { issueAdminSession, secretsMatch, verifyAdminSession } from '../lib/admi
 import { FailureLimiter } from '../lib/failure-limiter.ts';
 import { EXCLUSION_VIOLATION, FOREIGN_KEY_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { adminImageRoutes } from './admin-images.ts';
+import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
 import { hasArticleText } from './news.ts';
 import { adminTournamentRoutes } from './admin-tournaments.ts';
 import { adminVenueConfigRoutes } from './admin-venue-config.ts';
@@ -456,78 +457,14 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       '/api/admin/bookings',
       {
         schema: {
-          body: Type.Object(
-            {
-              tableId: Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }),
-              date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
-              startHour: Type.Integer({ minimum: 0, maximum: 23 }),
-              durationHours: Type.Integer({
-                minimum: MIN_BOOKING_HOURS,
-                maximum: MAX_BOOKING_HOURS
-              }),
-              customerName: Type.String({ minLength: 1, maxLength: 120 }),
-              customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
-              sportCardCount: Type.Optional(
-                Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })
-              ),
-              game: Type.Optional(BILLIARD_GAME)
-            },
-            { additionalProperties: false }
-          ),
+          body: Type.Object(NEW_BOOKING_FIELDS, { additionalProperties: false }),
           response: { 201: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
         }
       },
       async (request, reply) => {
-        const { tableId, date, startHour, durationHours } = request.body;
-        const customerName = request.body.customerName.trim();
-        if (customerName === '') return reply.code(422).send({ error: 'invalid_name' });
-        if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
-        const customerPhone = normalizePhone(request.body.customerPhone);
-        if (customerPhone === null) return reply.code(422).send({ error: 'invalid_phone' });
-        const { rates, hours } = await admin.venueConfig.get();
-        if (!isValidBookingWindow(date, startHour, durationHours, hours)) {
-          return reply.code(422).send({ error: 'outside_operating_hours' });
-        }
-        const startsAt = warsawInstant(date, startHour);
-        const dayStart = warsawInstant(warsawDateOf(new Date()), 0);
-        if (startsAt.getTime() < dayStart.getTime()) {
-          return reply.code(422).send({ error: 'start_in_past' });
-        }
-        const endsAt = new Date(startsAt.getTime() + durationHours * HOUR_MS);
-
-        const [spot] = await admin.db.select().from(tables).where(eq(tables.id, tableId));
-        if (!spot) return reply.code(422).send({ error: 'unknown_table' });
-        const game = resolveBookingGame(tableId, request.body.game);
-        if (!game.ok) return reply.code(422).send({ error: 'game_not_available' });
-        const sportCardCount = request.body.sportCardCount ?? 0;
-        const lockedRateGrosz = hourlyRateGrosz(spot, rates);
-        const discountGrosz = discountGroszFor(sportCardCount, lockedRateGrosz * durationHours);
-
-        try {
-          const [created] = await admin.db
-            .insert(bookings)
-            .values({
-              tableId,
-              game: game.game,
-              customerName,
-              customerPhone,
-              startsAt,
-              endsAt,
-              sportCardCount,
-              hourlyRateGrosz: lockedRateGrosz,
-              discountGrosz
-            })
-            .returning({ id: bookings.id });
-          assert(created, 'insert returned no row');
-          const dto = await mustLoadBookingDto(admin.db, created.id);
-          admin.availabilityHub.notify(date);
-          return reply.code(201).send(dto);
-        } catch (err) {
-          if (pgErrorCode(err) === EXCLUSION_VIOLATION) {
-            return reply.code(409).send({ error: 'slot_taken' });
-          }
-          throw err;
-        }
+        const result = await createBooking(admin, request.body, { kind: 'staff' });
+        if (!result.ok) return reply.code(result.status).send({ error: result.error });
+        return reply.code(201).send(result.booking);
       }
     );
 
