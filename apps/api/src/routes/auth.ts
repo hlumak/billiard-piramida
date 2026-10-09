@@ -118,7 +118,9 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
 
       const token = await reply.jwtSign({ sub: created.id });
       setUserCookies(reply, token, app.cookieSecure);
-      return reply.code(201).send({ token, profile: toProfile(created) });
+      // The token goes out only as the HttpOnly cookie: returning it in the
+      // body too would hand any script running at login a 30-day credential
+      return reply.code(201).send({ profile: toProfile(created) });
     }
   );
 
@@ -149,7 +151,7 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
 
       const token = await reply.jwtSign({ sub: user.id });
       setUserCookies(reply, token, app.cookieSecure);
-      return { token, profile: toProfile(user) };
+      return { profile: toProfile(user) };
     }
   );
 

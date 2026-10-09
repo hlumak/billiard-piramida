@@ -317,7 +317,6 @@ export const PROFILE_RESPONSE = Type.Object({
 });
 
 export const AUTH_RESPONSE = Type.Object({
-  token: Type.String(),
   profile: PROFILE_RESPONSE
 });
 

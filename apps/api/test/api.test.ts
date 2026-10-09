@@ -456,8 +456,9 @@ test('auth: register, login, profile update', async () => {
     payload: { phone: '+48 600 700 800', name: 'Auth Test', password: 'secret-pass-1' }
   });
   assert.equal(registered.statusCode, 201);
-  const { token, profile } = registered.json();
-  assert.ok(token.length > 20);
+  const { profile } = registered.json();
+  assert.equal('token' in registered.json(), false);
+  assert.ok(registered.cookies.find(c => c.name === 'token' && c.httpOnly));
   assert.equal(profile.sportCardType, null);
 
   const dupe = await app.inject({
@@ -481,7 +482,11 @@ test('auth: register, login, profile update', async () => {
   });
   assert.equal(login.statusCode, 200);
 
-  const auth = { authorization: `Bearer ${login.json().token}` };
+  // The session is the HttpOnly cookie only — nothing in the body to steal
+  assert.equal('token' in login.json(), false);
+  const sessionCookie = login.cookies.find(c => c.name === 'token');
+  assert.ok(sessionCookie);
+  const auth = { cookie: `token=${sessionCookie.value}` };
   const updated = await app.inject({
     method: 'PATCH',
     url: '/api/auth/me',

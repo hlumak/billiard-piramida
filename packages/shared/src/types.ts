@@ -125,8 +125,8 @@ export interface UserProfileDto {
   sportCardNumber: string | null;
 }
 
+/** The session itself travels only as an HttpOnly cookie — never in a body script can read. */
 export interface AuthResponseDto {
-  token: string;
   profile: UserProfileDto;
 }
 
