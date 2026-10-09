@@ -19,6 +19,7 @@ import {
 } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
+import { PHASE_LABELS } from '../booking/phase';
 import { AdminDatePicker } from './AdminDatePicker';
 import { useNowMinute } from '../../lib/use-now';
 import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
@@ -71,6 +72,8 @@ function TableRow({
       // earlier: clamp, or it would push every following row out of place
       const span = Math.min(endHour, close) - hour;
       const time = `${formatHour(hour)}–${formatHour(endHour)}`;
+      // Being played right now (the grid re-renders every minute)
+      const active = nowHour !== null && hour <= nowHour && nowHour < endHour;
       cells.push(
         <button
           key={hour}
@@ -78,14 +81,21 @@ function TableRow({
           style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
           onClick={() => onShowBooking(booking.customerPhone)}
           title={`${booking.customerName} · ${formatPhone(booking.customerPhone)} · ${time}`}
-          // Figma: a #ffb732 fill at half strength, solid golden on hover. Figma
-          // also fades the label to half, which leaves creme at ~3.8:1; black at
-          // full strength (its hover colour) keeps it readable (5.3:1).
-          className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] bg-golden-hover/50 px-2 text-left text-btn-text-hover transition-colors hover:bg-golden ${
-            isPastHour(endHour - 1) ? 'opacity-50' : ''
-          }`}
+          // Figma: a game in progress is solid golden, any other booking a
+          // #ffb732 fill at half strength. Figma also fades that label to half,
+          // which leaves creme at ~3.8:1; black at full strength keeps it
+          // readable (5.3:1). Hover only brightens the fill a step.
+          className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] px-2 text-left text-btn-text-hover transition-colors ${
+            active
+              ? 'bg-golden hover:bg-golden-hover'
+              : 'bg-golden-hover/50 hover:bg-golden-hover/70'
+          } ${isPastHour(endHour - 1) ? 'opacity-50' : ''}`}
         >
-          <span className="w-full truncate text-sm font-semibold">{booking.customerName}</span>
+          <span className="w-full truncate text-sm font-semibold">
+            {booking.customerName}
+            {/* The colour alone says "playing now" only to those who see it */}
+            {active ? <span className="sr-only">, {PHASE_LABELS.active()}</span> : null}
+          </span>
           <span className="text-xs">{time}</span>
         </button>
       );
@@ -247,6 +257,10 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
         <span className="flex items-center gap-1.5">
           <span aria-hidden className="size-3 rounded bg-golden-hover/50" />
           {m.admin_booked()}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="size-3 rounded bg-golden" />
+          {PHASE_LABELS.active()}
         </span>
       </div>
 
