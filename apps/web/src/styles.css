@@ -1,6 +1,6 @@
 @import './fonts.css';
 @import 'tailwindcss';
-@import '@heroui/styles';
+@import './heroui.css';
 /* Imported here rather than from PhoneField.tsx so the club's overrides below
    always come after the library's own rules. */
 @import 'react-phone-number-input/style.css';
