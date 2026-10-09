@@ -6,6 +6,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
+import optimizeLocales from '@react-aria/optimize-locales-plugin';
 
 /** The monorepo keeps one .env at its root (the API reads it too). */
 const ENV_DIR = '../..';
@@ -41,6 +42,9 @@ const config = defineConfig(({ mode }) => {
         outdir: './src/paraglide',
         strategy: ['cookie', 'preferredLanguage', 'baseLocale']
       }),
+      // React Aria ships UI strings (and calendars) for 34 locales; keep the app's
+      // three (packages/shared SUPPORTED_LOCALES) out of the client bundle's ~53 kB
+      optimizeLocales.vite({ locales: ['uk', 'pl', 'en'] }),
       tanstackStart(),
       viteReact()
     ]
