@@ -60,7 +60,7 @@ export class VenueConfigStore {
       if ((TIERS as string[]).includes(row.tier)) rates[row.tier as RateTier] = row.hourlyGrosz;
     }
 
-    const hours = DEFAULT_WEEKLY_HOURS.map(day => ({ ...day })) as WeeklyHours;
+    const hours = DEFAULT_WEEKLY_HOURS.map(({ open, close }) => ({ open, close })) as WeeklyHours;
     for (const row of hourRows) {
       if (row.weekday >= 0 && row.weekday <= 6) {
         hours[row.weekday] = { open: row.opens, close: row.closes };

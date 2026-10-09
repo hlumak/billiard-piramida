@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
@@ -11,7 +11,7 @@ import { formatDayLong, intlTag, warsawDate, warsawTime } from '../lib/format';
 import { bookingQuery } from '../lib/queries';
 import { ApiError, api } from '../lib/api';
 import { QueryError } from '../components/QueryError';
-import { recentBookingIds, rememberBooking } from '../lib/recent-bookings';
+import { rememberBooking, useRecentBookingIds } from '../lib/recent-bookings';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 import { spotName } from '../lib/spots';
@@ -22,9 +22,8 @@ export const Route = createFileRoute('/bookings')({
 });
 
 function MyBookingsPage() {
-  // localStorage is browser-only; read after mount to stay SSR-safe
-  const [ids, setIds] = useState<string[] | null>(null);
-  useEffect(() => setIds(recentBookingIds()), []);
+  // localStorage is browser-only: null through SSR and hydration
+  const ids = useRecentBookingIds();
 
   const results = useQueries({
     queries: (ids ?? []).map(id => bookingQuery(id))
@@ -92,14 +91,14 @@ function MyBookingsPage() {
           </StaggerGroup>
         )}
 
-        <LookupSection onFound={() => setIds(recentBookingIds())} />
+        <LookupSection />
       </main>
     </div>
   );
 }
 
 /** Recover bookings made on another device/browser by the phone used to book. */
-function LookupSection({ onFound }: { onFound: () => void }) {
+function LookupSection() {
   const queryClient = useQueryClient();
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -112,7 +111,6 @@ function LookupSection({ onFound }: { onFound: () => void }) {
         // Seed the per-booking cache so the list above renders without refetching
         queryClient.setQueryData(bookingQuery(booking.id).queryKey, booking);
       }
-      if (found.length > 0) onFound();
     }
   });
 

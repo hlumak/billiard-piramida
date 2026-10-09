@@ -13,7 +13,8 @@ import { getLocale } from '../paraglide/runtime.js';
 export const Route = createFileRoute('/tournaments/')({
   // SSR + hover-preload: the list is server data and the page is indexable
   loader: ({ context }) => context.queryClient.ensureQueryData(tournamentsQuery(getLocale())),
-  head: ({ match }) => pageHead(m.seo_title_tournaments(), m.seo_desc_tournaments(), match.pathname),
+  head: ({ match }) =>
+    pageHead(m.seo_title_tournaments(), m.seo_desc_tournaments(), match.pathname),
   component: TournamentsPage
 });
 

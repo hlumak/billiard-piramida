@@ -186,7 +186,7 @@ export function AdminTournamentRoster({ tournamentId }: { tournamentId: number }
                 (remove.isPending && remove.variables === registration.id)
               }
               onSetStatus={status => setStatus.mutate({ id: registration.id, status })}
-              onRename={name => rename.mutate({ id: registration.id, name })}
+              onRename={nextName => rename.mutate({ id: registration.id, name: nextName })}
               onRemove={() => remove.mutate(registration.id)}
             />
           ))}
