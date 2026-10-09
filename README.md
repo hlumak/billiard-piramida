@@ -28,6 +28,19 @@ Monorepo for the booking site of a billiard club in Poland: nine billiard tables
 
 Node 26.11.1 (`.node-version`), pnpm 12.10.1 (`packageManager`).
 
+Installing pnpm on a dev machine: pnpm's standalone installer, pinned to the
+project's version (without `PNPM_VERSION` it installs the latest):
+
+```sh
+# Linux / macOS
+curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=12.10.1 sh -
+# Windows (PowerShell)
+$env:PNPM_VERSION = "12.10.1"; Invoke-WebRequest https://get.pnpm.io/install.ps1 -UseBasicParsing | Invoke-Expression
+```
+
+Servers need no pnpm: everything builds inside Docker, and the runtime images
+contain only Node and the built output.
+
 ## Local development
 
 ```sh
