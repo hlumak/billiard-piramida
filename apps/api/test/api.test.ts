@@ -169,6 +169,26 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   assert.equal(booking.foodTotalGrosz, 2 * fries.priceGrosz);
   assert.equal(booking.totalGrosz, 2 * BILLIARD_HOUR + 2 * fries.priceGrosz);
   assert.equal(booking.phase, 'upcoming');
+  // The secret that manages this booking comes back once, with the booking
+  assert.equal(typeof booking.manageToken, 'string');
+  const manage = { 'x-booking-token': booking.manageToken };
+
+  // The id alone is not enough any more — not to read it, not to change it
+  const withoutToken = await app.inject({ method: 'GET', url: `/api/bookings/${booking.id}` });
+  assert.equal(withoutToken.statusCode, 404);
+  const wrongToken = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${booking.id}/cancel`,
+    headers: { 'x-booking-token': 'not-the-token' }
+  });
+  assert.equal(wrongToken.statusCode, 404);
+  const withToken = await app.inject({
+    method: 'GET',
+    url: `/api/bookings/${booking.id}`,
+    headers: manage
+  });
+  assert.equal(withToken.statusCode, 200);
+  assert.equal('manageToken' in withToken.json(), false);
 
   // overlapping booking on the same table → 409 via EXCLUDE constraint
   const conflict = await app.inject({
@@ -213,6 +233,7 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const extend = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/extend`,
+    headers: manage,
     payload: { additionalHours: 1 }
   });
   assert.equal(extend.statusCode, 200);
@@ -222,6 +243,7 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const tooLong = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/extend`,
+    headers: manage,
     payload: { additionalHours: 5 }
   });
   assert.equal(tooLong.statusCode, 422);
@@ -231,6 +253,7 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const addFood = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/items`,
+    headers: manage,
     payload: { items: [{ foodItemId: beer.id, quantity: 3 }] }
   });
   assert.equal(addFood.statusCode, 200);
@@ -240,12 +263,17 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const badFood = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/items`,
+    headers: manage,
     payload: { items: [{ foodItemId: 99999, quantity: 1 }] }
   });
   assert.equal(badFood.statusCode, 422);
 
   // cancel frees the slot
-  const cancel = await app.inject({ method: 'POST', url: `/api/bookings/${booking.id}/cancel` });
+  const cancel = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${booking.id}/cancel`,
+    headers: manage
+  });
   assert.equal(cancel.statusCode, 200);
   assert.equal(cancel.json().phase, 'cancelled');
 
@@ -592,6 +620,7 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
   const extended = await app.inject({
     method: 'POST',
     url: `/api/bookings/${dartsDto.id}/extend`,
+    headers: { 'x-booking-token': dartsDto.manageToken },
     payload: { additionalHours: 1 }
   });
   assert.equal(extended.statusCode, 200);
@@ -1242,7 +1271,7 @@ test('guest phone lookup returns only active bookings and normalizes the query',
     }
   });
   assert.equal(created.statusCode, 201);
-  const id = created.json().id;
+  const { id, startsAt, manageToken } = created.json();
 
   // National-format query must match the E.164-stored number
   const found = await app.inject({
@@ -1251,10 +1280,19 @@ test('guest phone lookup returns only active bookings and normalizes the query',
     headers: ip
   });
   assert.equal(found.statusCode, 200);
-  assert.ok(found.json().some((b: { id: string }) => b.id === id));
+  const summary = found.json().find((b: { startsAt: string }) => b.startsAt === startsAt);
+  assert.ok(summary);
+  // Knowing a number tells you when — never who, nor how to manage it
+  for (const secret of ['id', 'customerName', 'customerPhone', 'manageToken']) {
+    assert.equal(secret in summary, false, `lookup must not expose ${secret}`);
+  }
 
   // Cancelled bookings drop out of the recovery list
-  await app.inject({ method: 'POST', url: `/api/bookings/${id}/cancel`, headers: ip });
+  await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${id}/cancel`,
+    headers: { ...ip, 'x-booking-token': manageToken }
+  });
   const afterCancel = await app.inject({
     method: 'GET',
     url: '/api/bookings/lookup?phone=512100100',
@@ -1400,6 +1438,7 @@ test('extend colliding with a later booking on the same table returns 409', asyn
   });
   assert.equal(first.statusCode, 201);
   const firstId = first.json().id;
+  const firstManage = { 'x-booking-token': first.json().manageToken };
 
   // A later booking leaves a 19–20 gap after the first (18–19)
   const later = await app.inject({
@@ -1421,7 +1460,7 @@ test('extend colliding with a later booking on the same table returns 409', asyn
   const collide = await app.inject({
     method: 'POST',
     url: `/api/bookings/${firstId}/extend`,
-    headers: ip,
+    headers: { ...ip, ...firstManage },
     payload: { additionalHours: 2 }
   });
   assert.equal(collide.statusCode, 409);
@@ -1431,7 +1470,7 @@ test('extend colliding with a later booking on the same table returns 409', asyn
   const ok = await app.inject({
     method: 'POST',
     url: `/api/bookings/${firstId}/extend`,
-    headers: ip,
+    headers: { ...ip, ...firstManage },
     payload: { additionalHours: 1 }
   });
   assert.equal(ok.statusCode, 200);
@@ -2714,4 +2753,58 @@ test('staff edit the game, and a move to a 12ft table settles it to pyramid', as
   });
   assert.equal(refused.statusCode, 422);
   assert.equal(refused.json().error, 'game_not_available');
+});
+
+test('a signed-in guest manages their own bookings from any device, others cannot', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.46' };
+  const register = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    headers: ip,
+    payload: { phone: '+48 602 900 100', name: 'Owner', password: 'owner-pass-1' }
+  });
+  assert.equal(register.statusCode, 201);
+  const session = register.cookies.find(c => c.name === 'token');
+  assert.ok(session);
+  const owner = { ...ip, cookie: `token=${session.value}` };
+
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: owner,
+    payload: {
+      tableId: 5,
+      date: nextDate(2),
+      startHour: 20,
+      durationHours: 1,
+      customerName: 'Owner',
+      customerPhone: '+48 602 900 100'
+    }
+  });
+  assert.equal(created.statusCode, 201);
+  const { id } = created.json();
+
+  // No secret needed: the account that booked it is enough…
+  const mine = await app.inject({ method: 'GET', url: '/api/bookings/mine', headers: owner });
+  assert.equal(mine.statusCode, 200);
+  assert.ok(mine.json().some((b: { id: string }) => b.id === id));
+  const viewed = await app.inject({ method: 'GET', url: `/api/bookings/${id}`, headers: owner });
+  assert.equal(viewed.statusCode, 200);
+
+  // …while an anonymous caller with the id gets nothing
+  const stranger = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${id}/cancel`,
+    headers: ip
+  });
+  assert.equal(stranger.statusCode, 404);
+  const anonymousMine = await app.inject({ method: 'GET', url: '/api/bookings/mine', headers: ip });
+  assert.equal(anonymousMine.statusCode, 401);
+
+  const cancelled = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${id}/cancel`,
+    headers: owner
+  });
+  assert.equal(cancelled.statusCode, 200);
 });

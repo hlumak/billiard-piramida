@@ -17,19 +17,33 @@ import {
   resolveBookingGame
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
-import { and, asc, count, eq, gt, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, sql } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
-import { BILLIARD_GAME, BOOKING_RESPONSE, ERROR_RESPONSE, INT_ID, UUID } from '../lib/schemas.ts';
+import {
+  BILLIARD_GAME,
+  BOOKING_RESPONSE,
+  BOOKING_SUMMARY_RESPONSE,
+  CREATED_BOOKING_RESPONSE,
+  ERROR_RESPONSE,
+  INT_ID,
+  UUID
+} from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
 import {
+  createManageToken,
   insertOrderItems,
   loadBookingDto,
+  manageTokenMatches,
   mustLoadBookingDto,
   phaseOf,
   toBookingDtos
 } from '../services/bookings.ts';
+import type { FastifyRequest } from 'fastify';
 import type { AppInstance } from '../app.ts';
+
+/** Header carrying the secret returned when the booking was made. */
+const MANAGE_TOKEN_HEADER = 'x-booking-token';
 
 const BOOKING_ID_PARAM = Type.Object({ id: UUID });
 
@@ -79,6 +93,30 @@ export function bookingRoutes(
   app: AppInstance,
   { createLimitPerHour }: { createLimitPerHour: number }
 ) {
+  /**
+   * The booking, if this request may manage it: it presents the booking's
+   * secret, or comes from the signed-in account that made it. Rows from
+   * before secrets existed (no hash) stay reachable by id until they are over.
+   * Anything else reads as "not found" — no hint that the id exists.
+   */
+  async function loadManagedBooking(request: FastifyRequest<{ Params: { id: string } }>) {
+    const [booking] = await app.db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.id, request.params.id));
+    if (!booking) return null;
+    if (booking.manageTokenHash === null) return booking;
+    const presented = request.headers[MANAGE_TOKEN_HEADER];
+    if (typeof presented === 'string' && manageTokenMatches(presented, booking.manageTokenHash)) {
+      return booking;
+    }
+    if (booking.userId !== null) {
+      const user = await app.authenticatedUser(request);
+      if (user?.id === booking.userId) return booking;
+    }
+    return null;
+  }
+
   app.post(
     '/api/bookings',
     {
@@ -87,7 +125,7 @@ export function bookingRoutes(
       config: { rateLimit: { max: createLimitPerHour, timeWindow: '1 hour' } },
       schema: {
         body: CREATE_BOOKING_BODY,
-        response: { 201: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
+        response: { 201: CREATED_BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
       }
     },
     async (request, reply) => {
@@ -136,6 +174,7 @@ export function bookingRoutes(
       const hourlyRateGroszNow = hourlyRateGrosz(spot, rates);
       const discountGrosz = discountGroszFor(sportCardCount, hourlyRateGroszNow * durationHours);
 
+      const manage = createManageToken();
       try {
         const bookingId = await app.db.transaction(async tx => {
           // Serialize creations per phone so two parallel requests can't both
@@ -167,7 +206,8 @@ export function bookingRoutes(
               userId: user?.id ?? null,
               sportCardCount,
               hourlyRateGrosz: hourlyRateGroszNow,
-              discountGrosz
+              discountGrosz,
+              manageTokenHash: manage.hash
             })
             .returning({ id: bookings.id });
           assert(created, 'insert returned no row');
@@ -177,7 +217,8 @@ export function bookingRoutes(
         });
         const dto = await mustLoadBookingDto(app.db, bookingId);
         app.availabilityHub.notify(date);
-        return reply.code(201).send(dto);
+        // The only time the secret leaves the server
+        return reply.code(201).send({ ...dto, manageToken: manage.token });
       } catch (err) {
         if (pgErrorCode(err) === EXCLUSION_VIOLATION) {
           return reply.code(409).send({ error: 'slot_taken' });
@@ -201,27 +242,61 @@ export function bookingRoutes(
           { phone: Type.String({ minLength: 5, maxLength: 25 }) },
           { additionalProperties: false }
         ),
-        response: { 200: Type.Array(BOOKING_RESPONSE), '4xx': ERROR_RESPONSE }
+        response: { 200: Type.Array(BOOKING_SUMMARY_RESPONSE), '4xx': ERROR_RESPONSE }
       }
     },
     async (request, reply) => {
       const phone = normalizePhone(request.query.phone);
       if (phone === null) return reply.code(422).send({ error: 'invalid_phone' });
 
-      // Only bookings the guest can still use; finished history stays private
+      // Only bookings the guest can still use; finished history stays private.
+      // Summaries only: anyone can type a number, so this must reveal neither
+      // who booked nor anything that lets the caller manage the booking.
+      const now = new Date();
       const rows = await app.db
-        .select()
+        .select({
+          startsAt: bookings.startsAt,
+          endsAt: bookings.endsAt,
+          status: bookings.status,
+          tableId: bookings.tableId,
+          kind: tables.kind,
+          tableLabel: tables.label
+        })
         .from(bookings)
+        .innerJoin(tables, eq(bookings.tableId, tables.id))
         .where(
           and(
             eq(bookings.customerPhone, phone),
             eq(bookings.status, 'confirmed'),
-            gt(bookings.endsAt, new Date())
+            gt(bookings.endsAt, now)
           )
         )
         .orderBy(asc(bookings.startsAt))
         .limit(20);
-      // Batch-load order items in one query instead of N+1 per booking
+      return rows.map(row => ({
+        startsAt: row.startsAt.toISOString(),
+        endsAt: row.endsAt.toISOString(),
+        tableId: row.tableId,
+        kind: row.kind,
+        tableLabel: row.tableLabel,
+        phase: phaseOf(row.status, row.startsAt, row.endsAt, now)
+      }));
+    }
+  );
+
+  app.get(
+    '/api/bookings/mine',
+    { schema: { response: { 200: Type.Array(BOOKING_RESPONSE), '4xx': ERROR_RESPONSE } } },
+    async (request, reply) => {
+      // A signed-in guest manages the bookings their account made from any device
+      const user = await app.authenticatedUser(request);
+      if (!user) return reply.code(401).send({ error: 'unauthorized' });
+      const rows = await app.db
+        .select()
+        .from(bookings)
+        .where(eq(bookings.userId, user.id))
+        .orderBy(desc(bookings.startsAt))
+        .limit(20);
       return toBookingDtos(app.db, rows);
     }
   );
@@ -235,7 +310,8 @@ export function bookingRoutes(
       }
     },
     async (request, reply) => {
-      const dto = await loadBookingDto(app.db, request.params.id);
+      const booking = await loadManagedBooking(request);
+      const dto = booking && (await loadBookingDto(app.db, booking.id));
       if (!dto) return reply.code(404).send({ error: 'not_found' });
       return dto;
     }
@@ -259,10 +335,7 @@ export function bookingRoutes(
       }
     },
     async (request, reply) => {
-      const [booking] = await app.db
-        .select()
-        .from(bookings)
-        .where(eq(bookings.id, request.params.id));
+      const booking = await loadManagedBooking(request);
       if (!booking) return reply.code(404).send({ error: 'not_found' });
 
       const now = new Date();
@@ -324,10 +397,7 @@ export function bookingRoutes(
       if (request.body.items.length === 0) {
         return reply.code(400).send({ error: 'empty_items' });
       }
-      const [booking] = await app.db
-        .select()
-        .from(bookings)
-        .where(eq(bookings.id, request.params.id));
+      const booking = await loadManagedBooking(request);
       if (!booking) return reply.code(404).send({ error: 'not_found' });
 
       const phase = phaseOf(booking.status, booking.startsAt, booking.endsAt, new Date());
@@ -350,10 +420,7 @@ export function bookingRoutes(
       }
     },
     async (request, reply) => {
-      const [booking] = await app.db
-        .select()
-        .from(bookings)
-        .where(eq(bookings.id, request.params.id));
+      const booking = await loadManagedBooking(request);
       if (!booking) return reply.code(404).send({ error: 'not_found' });
 
       const phase = phaseOf(booking.status, booking.startsAt, booking.endsAt, new Date());

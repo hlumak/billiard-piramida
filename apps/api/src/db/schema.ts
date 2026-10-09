@@ -85,6 +85,13 @@ export const bookings = pgTable(
      *  line's unit price: repricing the club must not rewrite old receipts. */
     hourlyRateGrosz: integer('hourly_rate_grosz').notNull(),
     discountGrosz: integer('discount_grosz').notNull().default(0),
+    /**
+     * SHA-256 of the secret handed to the guest once, at creation: holding it
+     * (or being the signed-in owner) is what lets someone view, extend, add to
+     * or cancel the booking. Null on bookings written before it existed,
+     * which stay reachable by id alone until they are over.
+     */
+    manageTokenHash: text('manage_token_hash'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   t => [

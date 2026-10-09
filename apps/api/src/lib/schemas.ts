@@ -11,6 +11,8 @@ import type {
   AuthResponseDto,
   AvailabilityDto,
   BookingDto,
+  BookingSummaryDto,
+  CreatedBookingDto,
   IsoDate,
   MenuItemDto,
   NewsArticleDto,
@@ -144,6 +146,20 @@ export const BOOKING_RESPONSE = Type.Object({
   sportCardCount: Type.Integer(),
   discountGrosz: Type.Integer(),
   totalGrosz: Type.Integer()
+});
+
+export const CREATED_BOOKING_RESPONSE = Type.Object({
+  ...BOOKING_RESPONSE.properties,
+  manageToken: Type.String()
+});
+
+export const BOOKING_SUMMARY_RESPONSE = Type.Object({
+  startsAt: Type.String(),
+  endsAt: Type.String(),
+  tableId: Type.Integer(),
+  kind: ACTIVITY_KIND,
+  tableLabel: Type.String(),
+  phase: BOOKING_RESPONSE.properties.phase
 });
 
 export const LOCALE_SCHEMA = Type.Union([
@@ -356,6 +372,8 @@ export type SchemaDriftChecks = [
   Expect<Equals<Static<typeof AVAILABILITY_RESPONSE>, AvailabilityDto>>,
   Expect<Equals<Static<typeof MENU_ITEM_RESPONSE>, MenuItemDto>>,
   Expect<Equals<Static<typeof BOOKING_RESPONSE>, BookingDto>>,
+  Expect<Equals<Static<typeof CREATED_BOOKING_RESPONSE>, CreatedBookingDto>>,
+  Expect<Equals<Static<typeof BOOKING_SUMMARY_RESPONSE>, BookingSummaryDto>>,
   Expect<Equals<Static<typeof ADMIN_CUSTOMER_RESPONSE>, AdminCustomerDto>>,
   Expect<Equals<Static<typeof ADMIN_STATS_RESPONSE>, AdminStatsDto>>,
   Expect<Equals<Static<typeof PROFILE_RESPONSE>, UserProfileDto>>,

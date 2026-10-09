@@ -115,6 +115,30 @@ export interface BookingDto {
   totalGrosz: number;
 }
 
+/**
+ * What the guest gets back when a booking is made: the booking plus the
+ * secret that manages it. The secret is returned this once and only its hash
+ * is stored — whoever holds it (or the signed-in owner) may view, extend,
+ * add food to or cancel the booking. Sent back as the `x-booking-token` header.
+ */
+export interface CreatedBookingDto extends BookingDto {
+  manageToken: string;
+}
+
+/**
+ * Phone lookup result: enough to tell a guest "you have a booking on Friday
+ * at 18:00", but no id, name or phone — knowing a number must not be enough to
+ * see who booked or to manage the booking.
+ */
+export interface BookingSummaryDto {
+  startsAt: BookingDto['startsAt'];
+  endsAt: BookingDto['endsAt'];
+  tableId: BookingDto['tableId'];
+  kind: BookingDto['kind'];
+  tableLabel: BookingDto['tableLabel'];
+  phase: BookingDto['phase'];
+}
+
 export type SportCardType = 'multisport' | 'medicover' | 'fitprofit';
 
 export interface UserProfileDto {
