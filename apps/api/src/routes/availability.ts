@@ -1,7 +1,7 @@
 import { Type } from 'typebox';
 import type { AvailabilityDto, TableAvailabilityDto } from '@repo/shared';
 import { hoursForDate, isIsoDate, MIN_BOOKING_HOURS } from '@repo/shared';
-import { and, eq, gt, lt } from 'drizzle-orm';
+import { and, eq, gt, gte, lt } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { AVAILABILITY_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
 import { HOUR_MS, warsawInstant } from '../lib/time.ts';
@@ -41,6 +41,10 @@ export function availabilityRoutes(app: AppInstance) {
           .where(
             and(
               eq(bookings.status, 'confirmed'),
+              // Bookings never cross midnight, so nothing starting before the
+              // day's own midnight can reach into it: this lower bound lets the
+              // (status, starts_at) index scan one day instead of all history
+              gte(bookings.startsAt, warsawInstant(date, 0)),
               lt(bookings.startsAt, dayEnd),
               gt(bookings.endsAt, dayStart)
             )

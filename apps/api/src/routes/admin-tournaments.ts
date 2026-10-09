@@ -426,11 +426,21 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
       // standing at the desk with the fee in hand outranks both.
       const status = request.body.status ?? 'confirmed';
       try {
+        // A player whose seat was cancelled is signed up again on that same
+        // row (one row per phone, by the unique index) — the public flow already
+        // works this way; staff used to get already_registered instead
         const [row] = await admin.db
           .insert(tournamentRegistrations)
           .values({ tournamentId: tournament.id, name, phone, status })
+          .onConflictDoUpdate({
+            target: [tournamentRegistrations.tournamentId, tournamentRegistrations.phone],
+            set: { name, status, createdAt: new Date() },
+            setWhere: eq(tournamentRegistrations.status, 'cancelled')
+          })
           .returning();
-        assert(row, 'insert returned no row');
+        // The conflict update only applies over a cancelled seat; a live one
+        // comes back empty and is the duplicate it always was
+        if (!row) return reply.code(409).send({ error: 'already_registered' });
         return reply.code(201).send({
           id: row.id,
           tournamentId: row.tournamentId,

@@ -1,5 +1,5 @@
 import { TZDate } from '@date-fns/tz';
-import { dateParts, VENUE_TIMEZONE, type IsoDate } from '@repo/shared';
+import { addDays, dateParts, VENUE_TIMEZONE, type IsoDate } from '@repo/shared';
 
 /** UTC instant of `hour:00` local Warsaw time on `isoDate`. */
 export function warsawInstant(isoDate: IsoDate, hour: number): Date {
@@ -21,3 +21,12 @@ export function warsawHourOf(instant: Date): number {
 }
 
 export const HOUR_MS = 3_600_000;
+
+/**
+ * [start, end) of a venue-local calendar day as UTC instants: local midnight
+ * to the next local midnight. Not start + 24 h — the two DST days are 23 and
+ * 25 hours long, and a fixed 24 h dropped (or borrowed) an hour at the edge.
+ */
+export function warsawDayRange(isoDate: IsoDate): [start: Date, end: Date] {
+  return [warsawInstant(isoDate, 0), warsawInstant(addDays(isoDate, 1), 0)];
+}

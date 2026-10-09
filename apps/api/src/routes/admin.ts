@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { Type } from 'typebox';
 import {
+  addDays,
   discountGroszFor,
   hourlyRateGrosz,
   hoursForDate,
@@ -66,7 +67,7 @@ import { hasArticleText } from './news.ts';
 import { adminTournamentRoutes } from './admin-tournaments.ts';
 import { adminVenueConfigRoutes } from './admin-venue-config.ts';
 import { slugify } from '../lib/slug.ts';
-import { HOUR_MS, warsawDateOf, warsawHourOf, warsawInstant } from '../lib/time.ts';
+import { HOUR_MS, warsawDateOf, warsawDayRange, warsawHourOf, warsawInstant } from '../lib/time.ts';
 import { normalizePhone } from '@repo/shared/phone';
 import {
   insertOrderItems,
@@ -77,8 +78,6 @@ import {
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import type { Db } from '../db/client.ts';
 import type { AppInstance } from '../app.ts';
-
-const DAY_MS = 24 * HOUR_MS;
 
 /** Wrong admin credentials per IP before /api/admin answers 429 for a while. */
 const ADMIN_FAILURES_PER_WINDOW = 10;
@@ -269,8 +268,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const filters = [];
         if (date !== undefined) {
           if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
-          const dayStart = warsawInstant(date, 0);
-          const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+          const [dayStart, dayEnd] = warsawDayRange(date);
           filters.push(gte(bookings.startsAt, dayStart), lt(bookings.startsAt, dayEnd));
         }
         if (status !== undefined) filters.push(eq(bookings.status, status));
@@ -323,7 +321,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
             cancelledCount: sql<number>`count(*) filter (where ${bookings.status} = 'cancelled')::int`,
             firstSeen: min(bookings.startsAt),
             lastSeen: max(bookings.startsAt),
-            tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${bookings.hourlyRateGrosz}) filter (where ${bookings.status} = 'confirmed'), 0)::int`
+            // Net of sport-card discounts, the same figure /stats and /analytics report
+            tableGrosz: sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${bookings.hourlyRateGrosz} - ${bookings.discountGrosz}) filter (where ${bookings.status} = 'confirmed'), 0)::int`
           })
           .from(bookings)
           .where(phoneFilter)
@@ -380,10 +379,10 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const db = admin.db;
         const now = new Date();
         const today = warsawDateOf(now);
-        const dayStart = warsawInstant(today, 0);
-        const dayEnd = new Date(dayStart.getTime() + DAY_MS);
-        const weekStart = new Date(dayEnd.getTime() - 7 * DAY_MS);
-        const monthStart = new Date(dayEnd.getTime() - 30 * DAY_MS);
+        const [dayStart, dayEnd] = warsawDayRange(today);
+        // Rolling windows that end with today, in whole local days
+        const weekStart = warsawDayRange(addDays(today, -6))[0];
+        const monthStart = warsawDayRange(addDays(today, -29))[0];
 
         const confirmedToday = and(
           eq(bookings.status, 'confirmed'),
@@ -619,7 +618,14 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
           patch.durationHours ??
           Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS);
         const { rates, hours } = await admin.venueConfig.get();
-        if (!isValidBookingWindow(date, startHour, durationHours, hours)) {
+        // Only a change to when the booking runs is judged against today's
+        // hours: correcting a name or phone on a booking that no longer fits
+        // since staff moved closing time must still go through
+        const timeChanged =
+          patch.date !== undefined ||
+          patch.startHour !== undefined ||
+          patch.durationHours !== undefined;
+        if (timeChanged && !isValidBookingWindow(date, startHour, durationHours, hours)) {
           return reply.code(422).send({ error: 'outside_operating_hours' });
         }
 
@@ -823,8 +829,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const db = admin.db;
         const days = request.query.days ?? 30;
         const today = warsawDateOf(new Date());
-        const windowEnd = new Date(warsawInstant(today, 0).getTime() + DAY_MS);
-        const windowStart = new Date(windowEnd.getTime() - days * DAY_MS);
+        const windowEnd = warsawDayRange(today)[1];
+        const windowStart = warsawDayRange(addDays(today, -(days - 1)))[0];
         const confirmedInWindow = and(
           eq(bookings.status, 'confirmed'),
           gte(bookings.startsAt, windowStart),
@@ -879,10 +885,10 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         const daily = [];
         let openHoursTotal = 0;
         for (let i = days - 1; i >= 0; i--) {
-          const dayDate = warsawDateOf(new Date(windowEnd.getTime() - (i + 1) * DAY_MS + HOUR_MS));
+          const dayDate = addDays(today, -i);
           const rental = rentalMap.get(dayDate);
           const { open, close } = hoursForDate(dayDate, hours);
-          openHoursTotal += close - open;
+          openHoursTotal += Math.max(0, close - open);
           daily.push({
             date: dayDate,
             bookings: rental?.bookings ?? 0,

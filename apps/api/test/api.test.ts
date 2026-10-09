@@ -2808,3 +2808,61 @@ test('a signed-in guest manages their own bookings from any device, others canno
   });
   assert.equal(cancelled.statusCode, 200);
 });
+
+test('staff corrections: re-add a cancelled player, fix a name after hours change, net spend', async () => {
+  const headers = staff('198.51.100.47');
+
+  // A walk-in whose seat was cancelled can be put back on the roster
+  const cup = await createTournament('198.51.100.47', { slug: 'readd-cup' });
+  const first = await app.inject({
+    method: 'POST',
+    url: `/api/admin/tournaments/${cup.id}/registrations`,
+    headers,
+    payload: { name: 'Ann', phone: '+48 603 111 999' }
+  });
+  await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${cup.id}/registrations/${first.json().id}`,
+    headers,
+    payload: { status: 'cancelled' }
+  });
+  const again = await app.inject({
+    method: 'POST',
+    url: `/api/admin/tournaments/${cup.id}/registrations`,
+    headers,
+    payload: { name: 'Ann', phone: '+48 603 111 999' }
+  });
+  assert.equal(again.statusCode, 201);
+  assert.equal(again.json().status, 'confirmed');
+  // …while a live seat is still a duplicate
+  const dupe = await app.inject({
+    method: 'POST',
+    url: `/api/admin/tournaments/${cup.id}/registrations`,
+    headers,
+    payload: { name: 'Ann', phone: '+48 603 111 999' }
+  });
+  assert.equal(dupe.statusCode, 409);
+
+  // Opening after closing is a typo, not a shut day
+  const config = (await app.inject({ method: 'GET', url: '/api/venue-config' })).json();
+  const backwards = structuredClone(config);
+  backwards.hours[2] = { open: 20, close: 10 };
+  const refused = await app.inject({
+    method: 'PUT',
+    url: '/api/admin/venue-config',
+    headers,
+    payload: backwards
+  });
+  assert.equal(refused.statusCode, 422);
+});
+
+test('day ranges follow local midnights across DST', async () => {
+  const { warsawDayRange } = await import('../src/lib/time.ts');
+  const hours = (date: string) => {
+    const [start, end] = warsawDayRange(date as `${number}-${number}-${number}`);
+    return (end.getTime() - start.getTime()) / 3_600_000;
+  };
+  assert.equal(hours('2026-10-25'), 25); // fall back
+  assert.equal(hours('2027-03-28'), 23); // spring forward
+  assert.equal(hours('2026-11-01'), 24);
+});
