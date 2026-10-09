@@ -59,6 +59,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        {/* First stop for keyboard users: jump past the header to the page */}
+        <a
+          href="#main"
+          className="sr-only z-50 rounded-lg bg-golden px-4 py-2 font-semibold text-btn-text focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        >
+          {m.skip_to_content()}
+        </a>
         {children}
         {import.meta.env.DEV ? (
           <Suspense fallback={null}>

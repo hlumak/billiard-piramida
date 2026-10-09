@@ -38,7 +38,9 @@ function TournamentShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="tournament" />
-      <main className="mt-8 flex-1">{children}</main>
+      <main id="main" className="mt-8 flex-1">
+        {children}
+      </main>
     </div>
   );
 }

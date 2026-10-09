@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Spinner } from '@heroui/react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -102,6 +102,22 @@ function BookingWizard() {
 
   const index = stepIndex(step);
 
+  // Each step replaces the last one wholesale, taking the focused control with
+  // it: move focus to the new step's heading so keyboard and screen-reader
+  // users land at its start and hear what it asks (not on <body>). The panel
+  // stands in while a lazy step is still loading. Not on the first render.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const shownStep = useRef(step);
+  useEffect(() => {
+    if (shownStep.current === step) return;
+    shownStep.current = step;
+    const target = panelRef.current?.querySelector('h2') ?? panelRef.current;
+    if (target instanceof HTMLElement) {
+      target.tabIndex = -1;
+      target.focus();
+    }
+  }, [step]);
+
   const handleBack = () => {
     const previous = WIZARD_STEPS[index - 1];
     if (previous === undefined) {
@@ -115,7 +131,7 @@ function BookingWizard() {
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="booking" onBack={handleBack} />
       <WizardProgress step={index + 1} total={WIZARD_STEPS.length} />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         {/* Every step shares one sunken panel: the darker ground marks off the
             wizard's working area and gives the club-green-light option buttons
             something to lift from. It is also the clip box — the step slide-in
@@ -124,7 +140,11 @@ function BookingWizard() {
         <div className="overflow-x-clip rounded-3xl bg-club-green-dark p-4 md:p-6">
           {/* key remounts the wrapper per step so the CSS slide-in replays;
               enter-only on purpose — see step-in-* keyframes in styles.css */}
-          <div key={step} className={direction === 1 ? 'anim-step-forward' : 'anim-step-back'}>
+          <div
+            key={step}
+            ref={panelRef}
+            className={`outline-none ${direction === 1 ? 'anim-step-forward' : 'anim-step-back'}`}
+          >
             <CurrentStep state={state} step={step} />
           </div>
         </div>

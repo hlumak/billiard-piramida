@@ -68,7 +68,7 @@ function MyBookingsPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="bookings" />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         <h2 className="mb-4 text-xl font-semibold text-creme">{m.my_bookings_title()}</h2>
         {isLoading ? (
           <div className="flex justify-center py-16">
@@ -92,19 +92,17 @@ function MyBookingsPage() {
           <StaggerGroup>
             <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {bookings.map(booking => (
-                <StaggerItem key={booking.id}>
-                  <li>
-                    <Link
-                      to="/booking/$id"
-                      params={{ id: booking.id }}
-                      className="block rounded-[10px] bg-club-green-light p-4 transition-colors hover:bg-surface-hover"
-                    >
-                      <BookingLine booking={booking} />
-                      <div className="mt-1 text-right text-sm font-semibold text-creme">
-                        {formatPln(booking.totalGrosz, intlTag())}
-                      </div>
-                    </Link>
-                  </li>
+                <StaggerItem key={booking.id} as="li">
+                  <Link
+                    to="/booking/$id"
+                    params={{ id: booking.id }}
+                    className="block rounded-[10px] bg-club-green-light p-4 transition-colors hover:bg-surface-hover"
+                  >
+                    <BookingLine booking={booking} />
+                    <div className="mt-1 text-right text-sm font-semibold text-creme">
+                      {formatPln(booking.totalGrosz, intlTag())}
+                    </div>
+                  </Link>
                 </StaggerItem>
               ))}
             </ul>
@@ -125,7 +123,9 @@ function BookingLine({ booking }: { booking: BookingSummaryDto }) {
         <span className="font-semibold capitalize text-creme">
           {formatDayLong(warsawDate(booking.startsAt))}
         </span>
-        <span className="text-xs font-semibold text-golden">{PHASE_LABELS[booking.phase]()}</span>
+        <span className="text-xs font-semibold text-golden-light">
+          {PHASE_LABELS[booking.phase]()}
+        </span>
       </div>
       <div className="mt-1 text-sm text-grey-cool">
         {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)} ·{' '}

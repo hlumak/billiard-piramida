@@ -86,8 +86,10 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
           <h3 className="mb-2 text-lg font-semibold text-golden">{m.tournament_details()}</h3>
           {/* Staff-authored plain text: blank lines are the paragraph breaks */}
           <div className="flex flex-col gap-3 text-creme/85">
-            {tournament.details.split(/\n{2,}/).map(paragraph => (
-              <p key={paragraph}>{paragraph}</p>
+            {tournament.details.split(/\n{2,}/).map((paragraph, index) => (
+              // Static text split once per render: the position is the identity
+              // oxlint-disable-next-line react/no-array-index-key
+              <p key={index}>{paragraph}</p>
             ))}
           </div>
         </Reveal>

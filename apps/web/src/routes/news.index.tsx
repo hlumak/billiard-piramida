@@ -23,7 +23,7 @@ function NewsIndexPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="news" />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         {isError ? (
           <QueryError onRetry={() => refetch()} />
         ) : isPending || !news ? (
@@ -36,7 +36,7 @@ function NewsIndexPage() {
           <StaggerGroup>
             <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {news.map(item => (
-                <StaggerItem key={item.id}>
+                <StaggerItem key={item.id} as="li">
                   <NewsListItem item={item} />
                 </StaggerItem>
               ))}

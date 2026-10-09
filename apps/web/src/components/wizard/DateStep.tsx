@@ -28,7 +28,7 @@ export function DateStep() {
               {closed ? (
                 <span className="text-xs text-grey-cool">{msg.hours_closed()}</span>
               ) : i <= 1 ? (
-                <span className="text-xs text-golden">
+                <span className="text-xs text-golden-light">
                   {i === 0 ? msg.date_today() : msg.date_tomorrow()}
                 </span>
               ) : null}

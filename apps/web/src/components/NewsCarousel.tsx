@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { isExternalUrl, type NewsItemDto, type TournamentDto } from '@repo/shared';
 import { resolveAssetUrl } from '../lib/api';
 import { newsHref } from '../lib/news';
@@ -118,7 +118,13 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
   const [forward, setForward] = useState(true);
   // Read by the auto-advance timer, which must not restart on every scroll tick
   const activeRef = useRef(0);
-  const [paused, setPaused] = useState(false);
+  // Three independent reasons to hold the rotation (WCAG 2.2.2): pointer over
+  // it, keyboard focus inside it, or the visitor pressed pause. One flag for
+  // all three let leaving with the pointer restart it under a focused control.
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [stopped, setStopped] = useState(false);
+  const paused = hovered || focused || stopped;
 
   const scrollToIndex = useCallback((index: number) => {
     const track = trackRef.current;
@@ -168,6 +174,8 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
   }, [count, paused, scrollToIndex]);
 
   if (count === 0) return null;
+  // A refetch can shrink the list under the current position
+  const current = Math.min(active, count - 1);
 
   // Beside the card, never over it: these are opaque, and a wide short card puts
   // its headline exactly where an inset arrow would land. The hero column is far
@@ -182,15 +190,21 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
       className={className}
       // Hover, touch (pointerenter/leave fire on tap too) and keyboard focus all
       // hold the rotation: nothing should slide away mid-read.
-      onPointerEnter={() => setPaused(true)}
-      onPointerLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={event => {
+        // Only when focus actually leaves the carousel, not when it moves inside
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
     >
       <div className="relative">
         <ul
           ref={trackRef}
           onScroll={handleScroll}
+          // Announce the slide that comes into view only while the visitor is in
+          // control; a self-advancing carousel must not talk over everything
+          aria-live={paused ? 'polite' : 'off'}
           className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {slides.map((slide, index) => (
@@ -230,7 +244,16 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
       </div>
 
       {count > 1 ? (
-        <div className="mt-1 flex justify-center">
+        <div className="mt-1 flex items-center justify-center gap-1">
+          <button
+            type="button"
+            aria-pressed={stopped}
+            aria-label={stopped ? m.news_play() : m.news_pause()}
+            onClick={() => setStopped(value => !value)}
+            className="flex size-[var(--dot-slot)] items-center justify-center text-creme/70 hover:text-golden"
+          >
+            {stopped ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
+          </button>
           <div
             role="group"
             aria-label={m.news_title()}
@@ -238,7 +261,7 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
             style={
               {
                 '--dot-count': count,
-                '--dot-index': active,
+                '--dot-index': current,
                 // Leading edge leaves at once, trailing edge lags behind: the gap
                 // between them is the stretch
                 '--dot-left-delay': forward ? '90ms' : '0ms',
@@ -252,7 +275,7 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
                 key={slide.key}
                 type="button"
                 aria-label={m.news_go_to({ n: index + 1 })}
-                aria-current={index === active}
+                aria-current={index === current}
                 onClick={() => scrollToIndex(index)}
                 // Dots read as 6px but the tap target fills the whole 24px slot
                 className="flex size-[var(--dot-slot)] items-center justify-center"

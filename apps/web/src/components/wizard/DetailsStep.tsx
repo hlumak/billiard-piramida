@@ -141,7 +141,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-6">
         <div className="mb-6 rounded-[10px] bg-club-green-light p-4 md:mb-0">
-          <h3 className="mb-2 font-semibold text-golden">{m.summary_title()}</h3>
+          <h3 className="mb-2 font-semibold text-golden-light">{m.summary_title()}</h3>
           <dl className="flex flex-col gap-1 text-sm text-creme">
             <div className="flex justify-between">
               <dt className="text-grey-cool">{m.summary_date()}</dt>
@@ -211,10 +211,10 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             {discount > 0 ? (
               <div className="flex justify-between text-creme">
                 <span className="text-grey-cool">{m.sport_cards_count({ n: sportCardCount })}</span>
-                <span className="text-golden">−{formatPln(discount, intlTag())}</span>
+                <span className="text-golden-light">−{formatPln(discount, intlTag())}</span>
               </div>
             ) : null}
-            <div className="mt-2 flex justify-between text-base font-bold text-golden">
+            <div className="mt-2 flex justify-between text-base font-bold text-golden-light">
               <span>{m.total()}</span>
               <span>{formatPln(tableTotal + foodTotal - discount, intlTag())}</span>
             </div>

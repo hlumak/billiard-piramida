@@ -9,7 +9,7 @@ import { noindexMeta } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 
 export const Route = createFileRoute('/profile')({
-  head: () => ({ meta: noindexMeta('profile — piramida') }),
+  head: () => ({ meta: noindexMeta(m.seo_title_profile()) }),
   component: ProfilePage
 });
 
@@ -22,7 +22,7 @@ function ProfilePage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="profile" />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         {!ready ? (
           <div className="flex justify-center py-16">
             <Spinner aria-label={m.loading()} />

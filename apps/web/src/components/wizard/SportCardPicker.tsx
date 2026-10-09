@@ -35,7 +35,7 @@ export function SportCardPicker({
           </Button>
           <output
             aria-live="polite"
-            className="min-w-8 text-center text-lg font-bold tabular-nums text-golden"
+            className="min-w-8 text-center text-lg font-bold tabular-nums text-golden-light"
           >
             {count}
           </output>

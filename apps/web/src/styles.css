@@ -12,6 +12,9 @@
 
   --color-golden: #feaa00;
   --color-golden-hover: #ffb732;
+  /* Golden for small text on club-green-light cards: #feaa00 there is 3.4:1,
+     under WCAG AA; this is 4.6:1 on the cards and 6.9:1 on club-green. */
+  --color-golden-light: #ffd36b;
   --color-creme: #f9f9e1;
   --color-deep-cream: #dbdabc;
   --color-club-green: #0b4e31;

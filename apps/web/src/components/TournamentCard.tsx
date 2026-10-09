@@ -38,7 +38,8 @@ export function RosterMeter({ tournament }: { tournament: TournamentDto }) {
           role="progressbar"
           aria-valuemin={0}
           aria-valuemax={target}
-          aria-valuenow={taken}
+          aria-valuenow={Math.min(taken, target)}
+          aria-valuetext={label}
           aria-label={label}
           className="mt-1.5 h-2 w-full overflow-hidden rounded-[3px] bg-deep-cream"
         >
@@ -80,7 +81,7 @@ export function TournamentCardBody({ tournament }: { tournament: TournamentDto }
       ) : null}
       <div className="flex flex-col gap-2 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-golden">
+          <span className="text-xs font-semibold uppercase tracking-wide text-golden-light">
             {m.tournament_badge()}
           </span>
           <TournamentBadge tournament={tournament} />

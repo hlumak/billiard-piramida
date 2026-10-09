@@ -31,7 +31,7 @@ function ContactsPage() {
     // opening times onto a second line. Widening matches /admin's lg step.
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-3xl lg:max-w-5xl">
       <PageHeader title="contacts" />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         <StaggerGroup className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-stretch">
           <StaggerItem className="flex items-center gap-3 rounded-[10px] bg-club-green-light p-4">
             <MapPin className="size-6 shrink-0 text-golden" />
@@ -55,7 +55,7 @@ function ContactsPage() {
           </StaggerItem>
 
           <StaggerItem className="rounded-[10px] bg-club-green-light p-4">
-            <p className="mb-2 font-semibold text-golden">{m.opening_hours()}</p>
+            <p className="mb-2 font-semibold text-golden-light">{m.opening_hours()}</p>
             {/* Rows come from the live config, so an owner who moves a closing
                 time does not leave this card advertising the old one. Adjacent
                 days with matching hours collapse into one range. */}

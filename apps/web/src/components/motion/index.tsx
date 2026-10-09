@@ -38,17 +38,23 @@ export function StaggerGroup({
   return <div className={className}>{children}</div>;
 }
 
-/** Cascades by sibling position (nth-child), so items must be siblings. */
+/**
+ * Cascades by sibling position (nth-child), so items must be siblings. Inside a
+ * <ul>, render it `as="li"`: a <div> between the list and its items hides
+ * the list from screen readers (no item count, no "list of N").
+ */
 export function StaggerItem({
   children,
-  className
+  className,
+  as: Element = 'div'
 }: {
   children: ReactNode;
   className?: string | undefined;
+  as?: 'div' | 'li';
 }) {
   return (
-    <div className={className ? `anim-stagger-item ${className}` : 'anim-stagger-item'}>
+    <Element className={className ? `anim-stagger-item ${className}` : 'anim-stagger-item'}>
       {children}
-    </div>
+    </Element>
   );
 }

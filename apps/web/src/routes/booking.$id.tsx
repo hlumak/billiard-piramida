@@ -36,7 +36,7 @@ function BookingPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="booking" />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         {isPending ? (
           <div className="flex justify-center py-16">
             <Spinner aria-label={m.loading()} />

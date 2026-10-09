@@ -327,5 +327,11 @@
   "err_too_many_bookings": "This phone number already has 3 upcoming bookings. Call us to book more.",
   "find_booking_manage_hint": "To change or cancel one, open it from the link on the booking page you saved, sign in to the account you booked with, or call us.",
   "err_signout_failed": "Couldn't sign out — check your connection and try again.",
-  "admin_disabled": "The admin panel is switched off on this server."
+  "admin_disabled": "The admin panel is switched off on this server.",
+  "news_pause": "Pause the slideshow",
+  "news_play": "Play the slideshow",
+  "nav_profile": "Profile",
+  "nav_home": "Home",
+  "skip_to_content": "Skip to content",
+  "seo_title_profile": "Profile — piramida"
 }

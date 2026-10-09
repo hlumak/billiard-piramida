@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Button } from '@heroui/react';
 import { Minus, Plus } from 'lucide-react';
 import { formatPln, MAX_ORDER_ITEM_QUANTITY, type MenuItemDto } from '@repo/shared';
@@ -32,55 +33,76 @@ export function MenuPicker({
                     {item.description ? (
                       <p className="truncate text-xs text-grey-cool">{item.description}</p>
                     ) : null}
-                    <p className="mt-0.5 text-sm font-semibold text-golden">
+                    <p className="mt-0.5 text-sm font-semibold text-golden-light">
                       {formatPln(item.priceGrosz, intlTag())}
                     </p>
                   </div>
-                  {quantity === 0 ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-golden text-golden"
-                      aria-label={`${m.btn_add()}: ${item.name}`}
-                      onPress={() => onQuantityChange(item.id, 1)}
-                    >
-                      <Plus className="size-4" />
-                      {m.btn_add()}
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="outline"
-                        aria-label={`${m.btn_remove()}: ${item.name}`}
-                        className="border-golden text-golden"
-                        onPress={() => onQuantityChange(item.id, quantity - 1)}
-                      >
-                        <Minus className="size-4" />
-                      </Button>
-                      <span className="w-5 text-center font-semibold text-creme">{quantity}</span>
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="outline"
-                        aria-label={`${m.btn_add()}: ${item.name}`}
-                        className="border-golden text-golden"
-                        isDisabled={quantity >= MAX_ORDER_ITEM_QUANTITY}
-                        onPress={() =>
-                          onQuantityChange(item.id, Math.min(quantity + 1, MAX_ORDER_ITEM_QUANTITY))
-                        }
-                      >
-                        <Plus className="size-4" />
-                      </Button>
-                    </div>
-                  )}
+                  <QuantityStepper
+                    name={item.name}
+                    quantity={quantity}
+                    onChange={next => onQuantityChange(item.id, next)}
+                  />
                 </li>
               );
             })}
           </ul>
         </section>
       ))}
+    </div>
+  );
+}
+
+/**
+ * "Add" and the "+" of the −/qty/+ stepper are one and the same button, so
+ * pressing Add never unmounts the control that has focus (keyboard and
+ * screen-reader users used to land on <body>). Taking the quantity back to 0
+ * removes "−", so focus moves to "+"; the count is announced as it changes.
+ */
+function QuantityStepper({
+  name,
+  quantity,
+  onChange
+}: {
+  name: string;
+  quantity: number;
+  onChange: (quantity: number) => void;
+}) {
+  const addRef = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="flex items-center gap-2">
+      {quantity > 0 ? (
+        <>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="outline"
+            aria-label={`${m.btn_remove()}: ${name}`}
+            className="border-golden text-golden-light"
+            onPress={() => {
+              onChange(quantity - 1);
+              if (quantity === 1) addRef.current?.focus();
+            }}
+          >
+            <Minus className="size-4" />
+          </Button>
+          <output aria-live="polite" className="w-5 text-center font-semibold text-creme">
+            {quantity}
+          </output>
+        </>
+      ) : null}
+      <Button
+        ref={addRef}
+        isIconOnly={quantity > 0}
+        size="sm"
+        variant="outline"
+        aria-label={`${m.btn_add()}: ${name}`}
+        className="border-golden text-golden-light"
+        isDisabled={quantity >= MAX_ORDER_ITEM_QUANTITY}
+        onPress={() => onChange(Math.min(quantity + 1, MAX_ORDER_ITEM_QUANTITY))}
+      >
+        <Plus className="size-4" />
+        {quantity === 0 ? m.btn_add() : null}
+      </Button>
     </div>
   );
 }

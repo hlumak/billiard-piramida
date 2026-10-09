@@ -38,7 +38,7 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
   const deleteBlocked = remove.error instanceof ApiError && remove.error.code === 'has_orders';
 
   return (
-    <li
+    <div
       className={`rounded-[10px] bg-club-green-light p-3 ${item.isAvailable ? '' : 'opacity-60'}`}
     >
       <div className="flex flex-wrap items-center gap-3">
@@ -94,7 +94,7 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
       {deleteBlocked ? (
         <p className="mt-2 text-xs text-danger-soft-foreground">{m.admin_has_orders()}</p>
       ) : null}
-    </li>
+    </div>
   );
 }
 
@@ -118,7 +118,7 @@ export function AdminMenu() {
       <StaggerGroup>
         <ul className="flex flex-col gap-2">
           {items.map(item => (
-            <StaggerItem key={item.id}>
+            <StaggerItem key={item.id} as="li">
               {/* Remount the row when the server price changes so its input re-seeds */}
               <MenuRow key={item.priceGrosz} item={item} />
             </StaggerItem>

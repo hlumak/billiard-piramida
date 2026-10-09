@@ -327,5 +327,11 @@
   "err_too_many_bookings": "Ten numer ma już 3 nadchodzące rezerwacje. Zadzwoń do nas, aby zarezerwować więcej.",
   "find_booking_manage_hint": "Aby zmienić lub anulować rezerwację, otwórz ją z zapisanego linku strony rezerwacji, zaloguj się na konto, z którego rezerwowałeś, albo zadzwoń do nas.",
   "err_signout_failed": "Nie udało się wylogować — sprawdź połączenie i spróbuj ponownie.",
-  "admin_disabled": "Panel administracyjny jest wyłączony na tym serwerze."
+  "admin_disabled": "Panel administracyjny jest wyłączony na tym serwerze.",
+  "news_pause": "Wstrzymaj pokaz slajdów",
+  "news_play": "Wznów pokaz slajdów",
+  "nav_profile": "Profil",
+  "nav_home": "Strona główna",
+  "skip_to_content": "Przejdź do treści",
+  "seo_title_profile": "Profil — piramida"
 }

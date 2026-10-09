@@ -40,8 +40,10 @@ export const Route = createFileRoute('/news/$slug')({
 function ArticleShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="news" />
-      <main className="mt-8 flex-1">{children}</main>
+      <PageHeader title="news" decorative />
+      <main id="main" className="mt-8 flex-1">
+        {children}
+      </main>
     </div>
   );
 }

@@ -33,7 +33,7 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
   });
 
   return (
-    <li
+    <div
       className={`rounded-[10px] bg-club-green-light p-3 ${item.isPublished ? '' : 'opacity-60'}`}
     >
       <div className="flex flex-wrap items-center gap-3">
@@ -100,7 +100,7 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
           </Button>
         </div>
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -151,7 +151,7 @@ export function AdminNews() {
         <StaggerGroup>
           <ul className="flex flex-col gap-2">
             {items.map((item, index) => (
-              <StaggerItem key={item.id}>
+              <StaggerItem key={item.id} as="li">
                 <NewsRow
                   item={item}
                   isFirst={index === 0}

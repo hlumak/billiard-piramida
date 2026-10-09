@@ -37,7 +37,7 @@ export function BookingDetails({
     <StaggerGroup className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
       {justCreated && booking.phase !== 'cancelled' ? (
         <div className="anim-pop rounded-[10px] bg-golden/15 p-4 text-center md:col-span-2">
-          <p className="text-lg font-bold text-golden">{m.success_title()}</p>
+          <p className="text-lg font-bold text-golden-light">{m.success_title()}</p>
           <p className="mt-1 text-sm text-creme/80">{m.success_hint()}</p>
         </div>
       ) : null}
@@ -82,7 +82,7 @@ export function BookingDetails({
       </StaggerItem>
 
       <StaggerItem className="rounded-[10px] bg-club-green-light p-4">
-        <h3 className="mb-2 font-semibold text-golden">{m.order_title()}</h3>
+        <h3 className="mb-2 font-semibold text-golden-light">{m.order_title()}</h3>
         <div className="flex flex-col gap-1 text-sm text-creme">
           <div className="flex justify-between">
             <span className="text-grey-cool">{spotRentalLabel(booking.kind)}</span>
@@ -101,10 +101,12 @@ export function BookingDetails({
               <span className="text-grey-cool">
                 {m.sport_cards_count({ n: booking.sportCardCount })}
               </span>
-              <span className="text-golden">−{formatPln(booking.discountGrosz, intlTag())}</span>
+              <span className="text-golden-light">
+                −{formatPln(booking.discountGrosz, intlTag())}
+              </span>
             </div>
           ) : null}
-          <div className="mt-2 flex justify-between border-t border-deep-cream/30 pt-2 text-base font-bold text-golden">
+          <div className="mt-2 flex justify-between border-t border-deep-cream/30 pt-2 text-base font-bold text-golden-light">
             <span>{m.total()}</span>
             <span>{formatPln(booking.totalGrosz, intlTag())}</span>
           </div>

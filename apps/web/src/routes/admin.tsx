@@ -111,7 +111,7 @@ function AdminPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-6 pb-10 pt-14 lg:max-w-5xl">
       <PageHeader title="admin" />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         {!ready ? (
           <div className="flex justify-center py-16">
             <Spinner aria-label={m.loading()} />

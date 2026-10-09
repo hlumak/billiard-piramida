@@ -28,7 +28,7 @@ function PricesPage() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
       <PageHeader title="prices" />
-      <main className="mt-8 flex-1">
+      <main id="main" className="mt-8 flex-1">
         <Reveal className="flex flex-col gap-2">
           {/* One row per rate tier, not per kind: the 9ft tables in hall 1 and the
               12ft ones in hall 2 are priced apart, and the size is what tells a
@@ -47,11 +47,11 @@ function PricesPage() {
               <div>
                 <p className="font-semibold text-creme">
                   {title}
-                  {size ? <span className="text-golden"> {size}</span> : null}
+                  {size ? <span className="text-golden-light"> {size}</span> : null}
                 </p>
                 <p className="text-xs text-grey-cool">{m.min_booking_note()}</p>
               </div>
-              <p className="text-lg font-bold text-golden">
+              <p className="text-lg font-bold text-golden-light">
                 {formatPln(rates[tier], intlTag())}{' '}
                 <span className="text-sm font-medium text-creme/80">/ {m.per_hour()}</span>
               </p>
@@ -61,7 +61,7 @@ function PricesPage() {
           <div className="rounded-[10px] bg-club-green-light p-4">
             <div className="flex items-center justify-between gap-4">
               <p className="font-semibold text-creme">{m.partner_cards_title()}</p>
-              <p className="shrink-0 text-lg font-bold text-golden">
+              <p className="shrink-0 text-lg font-bold text-golden-light">
                 −{formatPln(SPORT_CARD_DISCOUNT_GROSZ, intlTag())}{' '}
                 <span className="text-sm font-medium text-creme/80">{m.prices_per_card()}</span>
               </p>
@@ -97,7 +97,7 @@ function PricesPage() {
                             <p className="text-xs text-grey-cool">{item.description}</p>
                           ) : null}
                         </div>
-                        <p className="shrink-0 font-semibold text-golden">
+                        <p className="shrink-0 font-semibold text-golden-light">
                           {formatPln(item.priceGrosz, intlTag())}
                         </p>
                       </li>

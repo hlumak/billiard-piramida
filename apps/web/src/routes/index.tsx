@@ -62,18 +62,20 @@ function Home() {
             middle of the hero, the CTA stays pinned near the bottom. The
             carousel styles itself (rather than sitting in a wrapper) so that
             with no news it renders nothing at all and the CTA drops back down. */}
-        <NewsCarousel className="anim-reveal mt-auto w-full self-center pt-8 [animation-delay:100ms] md:max-w-md" />
+        <main id="main" className="flex flex-1 flex-col">
+          <NewsCarousel className="anim-reveal mt-auto w-full self-center pt-8 [animation-delay:100ms] md:max-w-md" />
 
-        <Reveal delay={0.15} className="mt-auto flex flex-col items-center gap-3">
-          <div className="w-full max-w-74">
-            <ButtonLink to="/book">{m.book_now()}</ButtonLink>
-          </div>
-          <p className="text-sm text-creme/80">
-            {isClosedAllDay(today)
-              ? m.closed_today()
-              : m.open_today({ open: formatHour(today.open), close: formatHour(today.close) })}
-          </p>
-        </Reveal>
+          <Reveal delay={0.15} className="mt-auto flex flex-col items-center gap-3">
+            <div className="w-full max-w-74">
+              <ButtonLink to="/book">{m.book_now()}</ButtonLink>
+            </div>
+            <p className="text-sm text-creme/80">
+              {isClosedAllDay(today)
+                ? m.closed_today()
+                : m.open_today({ open: formatHour(today.open), close: formatHour(today.close) })}
+            </p>
+          </Reveal>
+        </main>
       </div>
     </div>
   );

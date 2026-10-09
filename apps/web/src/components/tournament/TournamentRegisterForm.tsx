@@ -71,7 +71,7 @@ export function TournamentRegisterForm({
   if (register.isSuccess) {
     return (
       <div className="rounded-[10px] bg-club-green-light p-4" role="status">
-        <p className="flex items-center gap-2 font-semibold text-golden">
+        <p className="flex items-center gap-2 font-semibold text-golden-light">
           <CheckCircle2 className="size-5 shrink-0" />
           {m.tournament_registered_title()}
         </p>
@@ -89,7 +89,7 @@ export function TournamentRegisterForm({
         form.handleSubmit();
       }}
     >
-      <h3 className="font-semibold text-golden">{m.tournament_register_title()}</h3>
+      <h3 className="font-semibold text-golden-light">{m.tournament_register_title()}</h3>
 
       <form.Field
         name="name"
