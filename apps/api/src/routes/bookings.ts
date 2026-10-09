@@ -17,7 +17,7 @@ import { normalizePhone } from '@repo/shared/phone';
 import { and, asc, eq, gt } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
-import { BILLIARD_GAME, BOOKING_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
+import { BILLIARD_GAME, BOOKING_RESPONSE, ERROR_RESPONSE, INT_ID, UUID } from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
 import {
   insertOrderItems,
@@ -28,18 +28,12 @@ import {
 } from '../services/bookings.ts';
 import type { AppInstance } from '../app.ts';
 
-// Strict UUID shape: a loose 36-char pattern lets malformed ids reach Postgres
-// as a uuid cast and surface as a logged 500 (22P02) instead of a clean 404.
-const BOOKING_ID_PARAM = Type.Object({
-  id: Type.String({
-    pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-  })
-});
+const BOOKING_ID_PARAM = Type.Object({ id: UUID });
 
 const NEW_ITEMS = Type.Array(
   Type.Object(
     {
-      foodItemId: Type.Integer({ minimum: 1 }),
+      foodItemId: INT_ID,
       quantity: Type.Integer({ minimum: 1, maximum: MAX_ORDER_ITEM_QUANTITY })
     },
     { additionalProperties: false }
@@ -79,7 +73,9 @@ export function bookingRoutes(app: AppInstance) {
       }
     },
     async (request, reply) => {
-      const { tableId, date, startHour, durationHours, customerName } = request.body;
+      const { tableId, date, startHour, durationHours } = request.body;
+      const customerName = request.body.customerName.trim();
+      if (customerName === '') return reply.code(422).send({ error: 'invalid_name' });
       const items = request.body.items ?? [];
       const sportCardCount = request.body.sportCardCount ?? 0;
 

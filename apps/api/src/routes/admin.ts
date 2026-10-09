@@ -53,7 +53,10 @@ import {
   BILLIARD_GAME,
   BOOKING_RESPONSE,
   ERROR_RESPONSE,
-  LOCALE_SCHEMA
+  INT_ID,
+  LOCALE_SCHEMA,
+  PG_INT_MAX,
+  UUID
 } from '../lib/schemas.ts';
 import { ADMIN_TOKEN_COOKIE, clearAdminCookies, setAdminCookies } from '../lib/cookies.ts';
 import { EXCLUSION_VIOLATION, FOREIGN_KEY_VIOLATION, pgErrorCode } from '../lib/errors.ts';
@@ -139,12 +142,7 @@ function toAdminMenuItem(item: FoodItemRow, translations: TranslationRow[]) {
   };
 }
 
-/** Strict UUID shape: a loose 36-char pattern lets malformed ids reach Postgres
- *  as a uuid cast and surface as a logged 500 (22P02) instead of a clean 404. */
-const UUID_PATTERN =
-  '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
-
-const BOOKING_ID_PARAMS = Type.Object({ id: Type.String({ pattern: UUID_PATTERN }) });
+const BOOKING_ID_PARAMS = Type.Object({ id: UUID });
 
 /** Either the booking is open for edits, or it is not and the reason maps to a code. */
 type OpenBookingLookup =
@@ -286,7 +284,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
           querystring: Type.Object(
             {
               limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })),
-              offset: Type.Optional(Type.Integer({ minimum: 0 })),
+              offset: Type.Optional(Type.Integer({ minimum: 0, maximum: PG_INT_MAX })),
               phone: Type.Optional(Type.String({ maxLength: 25 }))
             },
             { additionalProperties: false }
@@ -468,7 +466,9 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         }
       },
       async (request, reply) => {
-        const { tableId, date, startHour, durationHours, customerName } = request.body;
+        const { tableId, date, startHour, durationHours } = request.body;
+        const customerName = request.body.customerName.trim();
+        if (customerName === '') return reply.code(422).send({ error: 'invalid_name' });
         if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
         const customerPhone = normalizePhone(request.body.customerPhone);
         if (customerPhone === null) return reply.code(422).send({ error: 'invalid_phone' });
@@ -587,6 +587,9 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       async (request, reply) => {
         const patch = request.body;
         if (Object.keys(patch).length === 0) return reply.code(400).send({ error: 'empty_patch' });
+        if (patch.customerName !== undefined && patch.customerName.trim() === '') {
+          return reply.code(422).send({ error: 'invalid_name' });
+        }
 
         const [booking] = await admin.db
           .select()
@@ -700,7 +703,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
               items: Type.Array(
                 Type.Object(
                   {
-                    foodItemId: Type.Integer({ minimum: 1 }),
+                    foodItemId: INT_ID,
                     quantity: Type.Integer({ minimum: 1, maximum: MAX_ORDER_ITEM_QUANTITY })
                   },
                   { additionalProperties: false }
@@ -730,8 +733,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       {
         schema: {
           params: Type.Object({
-            id: Type.String({ pattern: UUID_PATTERN }),
-            itemId: Type.String({ pattern: UUID_PATTERN })
+            id: UUID,
+            itemId: UUID
           }),
           body: Type.Object(
             { quantity: Type.Integer({ minimum: 1, maximum: MAX_ORDER_ITEM_QUANTITY }) },
@@ -768,8 +771,8 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       {
         schema: {
           params: Type.Object({
-            id: Type.String({ pattern: UUID_PATTERN }),
-            itemId: Type.String({ pattern: UUID_PATTERN })
+            id: UUID,
+            itemId: UUID
           }),
           response: { 200: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
         }
@@ -988,7 +991,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       '/api/admin/menu/:id',
       {
         schema: {
-          params: Type.Object({ id: Type.Integer({ minimum: 1 }) }),
+          params: Type.Object({ id: INT_ID }),
           body: Type.Object(
             {
               isAvailable: Type.Optional(Type.Boolean()),
@@ -1010,16 +1013,22 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       },
       async (request, reply) => {
         const { isAvailable, priceGrosz, category, translations } = request.body;
+        const patch = {
+          ...(isAvailable !== undefined ? { isAvailable } : {}),
+          ...(priceGrosz !== undefined ? { priceGrosz } : {}),
+          ...(category !== undefined ? { category } : {})
+        };
         const updated = await admin.db.transaction(async tx => {
-          const [item] = await tx
-            .update(foodItems)
-            .set({
-              ...(isAvailable !== undefined ? { isAvailable } : {}),
-              ...(priceGrosz !== undefined ? { priceGrosz } : {}),
-              ...(category !== undefined ? { category } : {})
-            })
-            .where(eq(foodItems.id, request.params.id))
-            .returning();
+          // A translations-only PATCH touches no food_items column; Drizzle refuses
+          // an empty `set`, so read the row instead of updating it (as with news).
+          const [item] =
+            Object.keys(patch).length > 0
+              ? await tx
+                  .update(foodItems)
+                  .set(patch)
+                  .where(eq(foodItems.id, request.params.id))
+                  .returning()
+              : await tx.select().from(foodItems).where(eq(foodItems.id, request.params.id));
           if (!item) return null;
           if (translations !== undefined && translations.length > 0) {
             // One statement for all the locales sent: `excluded` is the row
@@ -1056,7 +1065,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       '/api/admin/menu/:id',
       {
         schema: {
-          params: Type.Object({ id: Type.Integer({ minimum: 1 }) }),
+          params: Type.Object({ id: INT_ID }),
           response: { 200: Type.Object({ deleted: Type.Boolean() }), '4xx': ERROR_RESPONSE }
         }
       },
@@ -1201,7 +1210,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       '/api/admin/news/:id',
       {
         schema: {
-          params: Type.Object({ id: Type.Integer({ minimum: 1 }) }),
+          params: Type.Object({ id: INT_ID }),
           body: Type.Object(
             {
               imageUrl: NEWS_URL,
@@ -1280,7 +1289,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       '/api/admin/news/:id',
       {
         schema: {
-          params: Type.Object({ id: Type.Integer({ minimum: 1 }) }),
+          params: Type.Object({ id: INT_ID }),
           response: { 200: Type.Object({ deleted: Type.Boolean() }), '4xx': ERROR_RESPONSE }
         }
       },

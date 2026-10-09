@@ -30,6 +30,18 @@ import type {
  * compile error — see the guards at the bottom of this file.
  */
 
+/** Largest Postgres `integer`: anything above reaches the database as a 22003 → 500. */
+export const PG_INT_MAX = 2_147_483_647;
+
+/** Serial/identity id of an `integer` column, bounded so the cast can't overflow. */
+export const INT_ID = Type.Integer({ minimum: 1, maximum: PG_INT_MAX });
+
+/** Strict UUID shape: a loose pattern lets malformed ids reach Postgres as a
+ *  uuid cast and surface as a logged 500 (22P02) instead of a clean 404. */
+export const UUID = Type.String({
+  pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+});
+
 /** JSON Schema stays a plain string pattern; the static type is IsoDate. */
 export const ISO_DATE = Type.Unsafe<IsoDate>(Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }));
 

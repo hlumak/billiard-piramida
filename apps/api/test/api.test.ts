@@ -1273,9 +1273,78 @@ test('lookup is rate limited to 10 requests per minute', async () => {
       url: '/api/bookings/lookup?phone=500500500',
       headers: ip
     });
-    if (res.statusCode === 429) limited = true;
+    if (res.statusCode === 429) {
+      limited = true;
+      // Distinguishable from bad input, so the client can say "slow down"
+      assert.equal(res.json().error, 'rate_limited');
+    }
   }
   assert.ok(limited, 'expected a 429 within 11 rapid lookups');
+});
+
+test('out-of-range input is a clean 4xx, never a 500', async () => {
+  const headers = staff('198.51.100.31');
+
+  // Beyond Postgres `integer` on a public endpoint: rejected by the schema
+  const overflow = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 1,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: 'Overflow',
+      customerPhone: '+48 601 000 111',
+      items: [{ foodItemId: 3_000_000_000, quantity: 1 }]
+    }
+  });
+  assert.equal(overflow.statusCode, 400);
+
+  // Right shape, impossible calendar date
+  const feb31 = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers,
+    payload: { startsOn: '2027-02-31', translations: [{ locale: 'en', title: 'Feb cup' }] }
+  });
+  assert.equal(feb31.statusCode, 422);
+  assert.equal(feb31.json().error, 'invalid_date');
+
+  const minAboveMax = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers,
+    payload: { minPlayers: 20, maxPlayers: 8, translations: [{ locale: 'en', title: 'Odd cup' }] }
+  });
+  assert.equal(minAboveMax.statusCode, 422);
+  assert.equal(minAboveMax.json().error, 'min_above_max');
+
+  // A translations-only menu edit touches no food_items column
+  const renamed = await app.inject({
+    method: 'PATCH',
+    url: '/api/admin/menu/1',
+    headers,
+    payload: { translations: [{ locale: 'en', name: 'Fries, renamed' }] }
+  });
+  assert.equal(renamed.statusCode, 200);
+  assert.ok(renamed.json().translations.some((t: { name: string }) => t.name === 'Fries, renamed'));
+
+  // Whitespace is not a name
+  const blank = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 2,
+      date: SATURDAY,
+      startHour: 16,
+      durationHours: 1,
+      customerName: '   ',
+      customerPhone: '+48 601 000 112'
+    }
+  });
+  assert.equal(blank.statusCode, 422);
+  assert.equal(blank.json().error, 'invalid_name');
 });
 
 test('failed create with an unknown food item leaves no phantom booking', async () => {

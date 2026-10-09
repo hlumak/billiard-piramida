@@ -46,6 +46,18 @@ declare module 'fastify' {
   }
 }
 
+/** Machine-readable codes for errors Fastify and its plugins raise themselves,
+ *  so a client can tell "slow down" or "too big" apart from bad input. */
+const FRAMEWORK_ERROR_CODES: Record<number, string> = {
+  401: 'unauthorized',
+  404: 'not_found',
+  405: 'method_not_allowed',
+  406: 'not_acceptable',
+  413: 'payload_too_large',
+  415: 'unsupported_media_type',
+  429: 'rate_limited'
+};
+
 export interface AppOptions {
   databaseUrl: string;
   logger?: boolean | { level: string };
@@ -188,7 +200,9 @@ export async function buildApp({
       return reply.code(500).send({ error: 'internal_error' });
     }
     request.log.info({ err: error }, 'request rejected');
-    return reply.code(statusCode).send({ error: 'bad_request' });
+    return reply
+      .code(statusCode)
+      .send({ error: FRAMEWORK_ERROR_CODES[statusCode] ?? 'bad_request' });
   });
 
   app.get(

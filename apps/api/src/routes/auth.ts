@@ -181,15 +181,19 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
       if (!user) return reply.code(401).send({ error: 'unauthorized' });
 
       const { name, sportCardType, sportCardNumber } = request.body;
+      if (name !== undefined && name.trim() === '') {
+        return reply.code(422).send({ error: 'invalid_name' });
+      }
+      const patch = {
+        ...(name !== undefined ? { name: name.trim() } : {}),
+        ...(sportCardType !== undefined ? { sportCardType } : {}),
+        ...(sportCardNumber !== undefined ? { sportCardNumber: blankToNull(sportCardNumber) } : {})
+      };
+      // Nothing to change is not an error — and Drizzle refuses an empty `set`
+      if (Object.keys(patch).length === 0) return toProfile(user);
       const [updated] = await app.db
         .update(users)
-        .set({
-          ...(name !== undefined ? { name: name.trim() } : {}),
-          ...(sportCardType !== undefined ? { sportCardType } : {}),
-          ...(sportCardNumber !== undefined
-            ? { sportCardNumber: blankToNull(sportCardNumber) }
-            : {})
-        })
+        .set(patch)
         .where(eq(users.id, user.id))
         .returning();
       if (!updated) return reply.code(404).send({ error: 'not_found' });

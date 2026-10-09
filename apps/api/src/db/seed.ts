@@ -327,7 +327,7 @@ export async function seed(url: string) {
 }
 
 // import.meta.main, not argv vs URL pathname: that comparison never matches on
-// Windows (/D:/… vs D:…) or for paths that percent-encode (spaces), and the
+// Windows (/D:/… vs D:\…) or for paths that percent-encode (spaces), and the
 // seed then exited silently, leaving an empty database.
 if (import.meta.main) {
   await seed(databaseUrl);
