@@ -13,7 +13,7 @@ import { adminApi } from '../../lib/admin-api';
 import { isDraftChanged } from './draft';
 import { ApiError } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
-import { AdminImageField } from './AdminImageField';
+import { AdminImageField, uploadErrorMessage } from './AdminImageField';
 
 const REQUIRED_LOCALE: Locale = 'pl';
 /** Mirrors the API's cap on a single picture. */
@@ -47,14 +47,6 @@ function draftFrom(item: AdminNewsItemDto | null): NewsDraft {
     bodies,
     contents
   };
-}
-
-function uploadErrorMessage(err: unknown): string {
-  if (err instanceof ApiError) {
-    if (err.code === 'file_too_large') return m.admin_image_too_large();
-    if (err.code === 'unsupported_image') return m.admin_unsupported_image();
-  }
-  return m.admin_upload_failed();
 }
 
 /**

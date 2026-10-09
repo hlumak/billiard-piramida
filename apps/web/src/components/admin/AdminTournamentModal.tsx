@@ -1,155 +1,40 @@
 import { useState } from 'react';
 import { Button, Input, Label, Modal, TextField } from '@heroui/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  MAX_TOURNAMENT_PLAYERS,
-  TOURNAMENT_STATUSES,
-  isIsoDate,
-  isSafeUrl,
-  type AdminTournamentDto,
-  type IsoDate,
-  SUPPORTED_LOCALES,
-  type Locale,
-  type TournamentStatus,
-  type TournamentTranslationDto
-} from '@repo/shared';
-import { adminApi, type AdminTournamentInput } from '../../lib/admin-api';
+import { SUPPORTED_LOCALES, TOURNAMENT_STATUSES, type AdminTournamentDto } from '@repo/shared';
+import { adminApi } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
-import { parseZloty } from '../../lib/money';
 import { adminStatusLabel } from '../../lib/tournaments';
 import { isDraftChanged } from './draft';
+import {
+  checkTournamentDraft,
+  tournamentDraftFrom,
+  type TournamentDraft
+} from './tournament-draft';
 import { m } from '../../paraglide/messages.js';
-
-interface TournamentDraft {
-  status: TournamentStatus;
-  startsOn: string;
-  startHour: string;
-  registrationDeadline: string;
-  /** Entered in złoty; converted to grosze on submit */
-  entryFee: string;
-  minPlayers: string;
-  maxPlayers: string;
-  imageUrl: string;
-  titles: Record<Locale, string>;
-  summaries: Record<Locale, string>;
-  details: Record<Locale, string>;
-}
-
-function draftFrom(item: AdminTournamentDto | null): TournamentDraft {
-  const titles = { uk: '', pl: '', en: '' };
-  const summaries = { uk: '', pl: '', en: '' };
-  const details = { uk: '', pl: '', en: '' };
-  for (const t of item?.translations ?? []) {
-    titles[t.locale] = t.title;
-    summaries[t.locale] = t.summary ?? '';
-    details[t.locale] = t.details ?? '';
-  }
-  return {
-    status: item?.status ?? 'draft',
-    startsOn: item?.startsOn ?? '',
-    startHour: item?.startHour === null || item === null ? '' : String(item.startHour),
-    registrationDeadline: item?.registrationDeadline ?? '',
-    entryFee: item?.entryFeeGrosz != null ? String(item.entryFeeGrosz / 100) : '',
-    minPlayers: String(item?.minPlayers ?? 0),
-    maxPlayers: item?.maxPlayers != null ? String(item.maxPlayers) : '',
-    imageUrl: item?.imageUrl ?? '',
-    titles,
-    summaries,
-    details
-  };
-}
-
-/** "" clears the column; anything else must parse as a calendar date. */
-function parseDate(value: string): IsoDate | null | undefined {
-  const trimmed = value.trim();
-  if (trimmed === '') return null;
-  return isIsoDate(trimmed) ? trimmed : undefined;
-}
-
-/** "" clears; otherwise an integer within [min, max], or undefined when unusable. */
-function parseCount(value: string, min: number, max: number): number | null | undefined {
-  const trimmed = value.trim();
-  if (trimmed === '') return null;
-  const parsed = Number(trimmed);
-  return Number.isInteger(parsed) && parsed >= min && parsed <= max ? parsed : undefined;
-}
 
 /** Create (item === null) or edit a tournament: schedule, roster limits, copy. */
 export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null }) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
-  const [draft, setDraft] = useState<TournamentDraft>(() => draftFrom(item));
+  const [draft, setDraft] = useState<TournamentDraft>(() => tournamentDraftFrom(item));
 
-  const isChanged = isOpen && isDraftChanged(draft, draftFrom(item));
+  const isChanged = isOpen && isDraftChanged(draft, tournamentDraftFrom(item));
 
   const open = () => {
-    setDraft(draftFrom(item));
+    setDraft(tournamentDraftFrom(item));
     setOpen(true);
   };
 
-  const startsOn = parseDate(draft.startsOn);
-  const registrationDeadline = parseDate(draft.registrationDeadline);
-  const startHour = parseCount(draft.startHour, 0, 23);
-  const maxPlayers = parseCount(draft.maxPlayers, 2, MAX_TOURNAMENT_PLAYERS);
-  const minPlayers = parseCount(draft.minPlayers, 0, MAX_TOURNAMENT_PLAYERS) ?? undefined;
-  // Blank means "not priced yet" (null); anything typed must be a valid amount
-  const feeBlank = draft.entryFee.trim() === '';
-  const entryFeeGrosz = feeBlank ? null : parseZloty(draft.entryFee);
-  const imageUrl = draft.imageUrl.trim() || null;
-
-  const translations: TournamentTranslationDto[] = SUPPORTED_LOCALES.flatMap(locale => {
-    const title = draft.titles[locale].trim();
-    if (title === '') return [];
-    return [
-      {
-        locale,
-        title,
-        summary: draft.summaries[locale].trim() || null,
-        details: draft.details[locale].trim() || null
-      }
-    ];
-  });
-
-  // The server re-checks all of it; catching it here spares a round trip
-  const urlOk = imageUrl === null || isSafeUrl(imageUrl);
-  const feeOk = feeBlank || entryFeeGrosz !== null;
-  const playersOk = minPlayers === undefined || maxPlayers == null || minPlayers <= maxPlayers;
-  const datesOk =
-    startsOn !== undefined &&
-    registrationDeadline !== undefined &&
-    startHour !== undefined &&
-    maxPlayers !== undefined &&
-    minPlayers !== undefined;
-  // `== null` on purpose: an unparseable date is undefined here, and it is
-  // `datesOk` that reports it — this check only owns the ordering.
-  const orderOk =
-    startsOn == null || registrationDeadline == null || registrationDeadline <= startsOn;
-  const canSubmit =
-    urlOk &&
-    feeOk &&
-    datesOk &&
-    orderOk &&
-    playersOk &&
-    translations.length === SUPPORTED_LOCALES.length;
+  const check = checkTournamentDraft(draft);
 
   const save = useMutation({
     mutationFn: () => {
-      // Guarded by canSubmit; narrowing here keeps the input type honest
-      if (!datesOk || minPlayers === undefined) throw new Error('invalid draft');
-      const input: AdminTournamentInput = {
-        status: draft.status,
-        startsOn,
-        startHour,
-        registrationDeadline,
-        entryFeeGrosz,
-        minPlayers,
-        maxPlayers,
-        imageUrl,
-        translations
-      };
+      // Save is disabled until the check passes; this keeps the input type honest
+      if (!check.ok) throw new Error('invalid draft');
       return item === null
-        ? adminApi.createTournament(input)
-        : adminApi.updateTournament(item.id, input);
+        ? adminApi.createTournament(check.input)
+        : adminApi.updateTournament(item.id, check.input);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tournaments'] });
@@ -160,14 +45,15 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
   });
 
   const rejected = save.error instanceof ApiError ? save.error.code : null;
+  const problem = check.ok ? null : check.problem;
   const errorText =
-    !urlOk || rejected === 'invalid_url'
+    problem === 'invalid_url' || rejected === 'invalid_url'
       ? m.admin_invalid_url()
-      : !orderOk || rejected === 'deadline_after_start'
+      : problem === 'deadline_after_start' || rejected === 'deadline_after_start'
         ? m.admin_tournament_deadline_after_start()
-        : !playersOk || rejected === 'min_above_max'
+        : problem === 'min_above_max' || rejected === 'min_above_max'
           ? m.admin_tournament_min_above_max()
-          : !feeOk
+          : problem === 'invalid_fee'
             ? m.admin_invalid_price()
             : save.isError
               ? m.err_generic()
@@ -335,7 +221,7 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
             <Modal.Footer>
               <Button
                 className="w-full font-bold"
-                isDisabled={!canSubmit}
+                isDisabled={!check.ok}
                 isPending={save.isPending}
                 onPress={() => save.mutate()}
               >

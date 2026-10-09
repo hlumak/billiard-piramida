@@ -9,10 +9,7 @@ import {
   gamesFor,
   MAX_SPORT_CARDS_PER_BOOKING,
   sizeOf,
-  spotPriceGrosz,
-  type ActivityKind,
-  type BilliardGame,
-  type IsoDate
+  spotPriceGrosz
 } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
 import { m } from '../../paraglide/messages.js';
@@ -29,24 +26,18 @@ import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib
 import { SportCardPicker } from './SportCardPicker';
 import { mutationErrorText } from '../booking/phase';
 import {
+  bookingRequestFrom,
+  needsNewTime,
+  orderLinesFrom,
+  type BookingDraft
+} from './booking-request';
+import {
   goToStep,
   resetWizard,
   selectGame,
   setSportCardCount,
   wizardStore
 } from '../../store/booking-wizard';
-
-/** All picks made in earlier steps — non-null by construction (see book.tsx). */
-export interface BookingDraft {
-  date: IsoDate;
-  startHour: number;
-  durationHours: number;
-  tableId: number;
-  kind: ActivityKind;
-  tableLabel: string;
-  /** Null on a dartboard — nothing to rack, nothing to ask */
-  game: BilliardGame | null;
-}
 
 export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const navigate = useNavigate();
@@ -56,12 +47,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const { data: menu } = useQuery(menuQuery(getLocale()));
   const { data: profile } = useQuery(profileQuery());
 
-  const orderLines = Object.entries(items)
-    .map(([foodItemId, quantity]) => {
-      const item = menu?.find(entry => entry.id === Number(foodItemId));
-      return item ? { item, quantity } : null;
-    })
-    .filter(line => line != null);
+  const orderLines = orderLinesFrom(items, menu);
 
   const spot = { id: draft.tableId, kind: draft.kind };
   const tableSize = sizeOf(draft.tableId);
@@ -102,30 +88,12 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const form = useForm({
     defaultValues: { customerName: profile?.name ?? '', customerPhone: profile?.phone ?? '' },
     onSubmit: ({ value }) => {
-      const { game, ...picks } = draft;
-      createBooking.mutate({
-        ...picks,
-        // Omitted rather than sent as null: on a dartboard the API refuses the
-        // key outright, and omitting it is also what "no preference" means
-        ...(game === null ? {} : { game }),
-        customerName: value.customerName.trim(),
-        customerPhone: value.customerPhone.trim(),
-        sportCardCount,
-        // Exactly the lines the guest sees and pays for: a dish that has left
-        // the menu since it was picked drops out here just as it does from the
-        // total, instead of failing the whole booking with unknown_food_item
-        items: orderLines.map(line => ({ foodItemId: line.item.id, quantity: line.quantity }))
-      });
+      createBooking.mutate(bookingRequestFrom(draft, value, sportCardCount, orderLines));
     }
   });
 
-  // Errors the user can only fix by returning to the time step and re-picking
   const err = createBooking.error;
-  const isTimeError =
-    err instanceof ApiError &&
-    (err.code === 'slot_taken' ||
-      err.code === 'start_in_past' ||
-      err.code === 'outside_operating_hours');
+  const isTimeError = needsNewTime(err);
   const errorMessage = err ? mutationErrorText(err) : null;
   // With food in the order the menu must be known, or the lines can't be priced
   const menuPending = Object.keys(items).length > 0 && menu === undefined;

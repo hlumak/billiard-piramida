@@ -11,7 +11,7 @@ import { m } from '../../paraglide/messages.js';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = 'image/jpeg,image/png,image/webp,image/gif';
 
-function uploadErrorMessage(err: unknown): string {
+export function uploadErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.code === 'file_too_large') return m.admin_image_too_large();
     if (err.code === 'unsupported_image') return m.admin_unsupported_image();
