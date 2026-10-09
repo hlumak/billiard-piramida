@@ -1,8 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react';
 
-/** id of the tab button and of the panel it controls, for `aria-labelledby`. */
-export const tabId = (idBase: string, id: string) => `${idBase}-tab-${id}`;
-export const tabPanelId = (idBase: string) => `${idBase}-panel`;
+import { tabId, tabPanelId } from './tab-ids';
 
 const MOVES: Record<string, (index: number, count: number) => number> = {
   ArrowRight: (index, count) => (index + 1) % count,

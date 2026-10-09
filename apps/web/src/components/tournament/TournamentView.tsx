@@ -9,6 +9,19 @@ import { formatDayLong, intlTag } from '../../lib/format';
 import { stateLabel, whenLabel } from '../../lib/tournaments';
 import { m } from '../../paraglide/messages.js';
 
+/**
+ * Staff-authored plain text, split on blank lines. A paragraph's text is its
+ * identity; a repeated one (a "—" divider) also gets its occurrence number.
+ */
+function keyedParagraphs(details: string): { key: string; text: string }[] {
+  const seen = new Map<string, number>();
+  return details.split(/\n{2,}/).map(text => {
+    const occurrence = (seen.get(text) ?? 0) + 1;
+    seen.set(text, occurrence);
+    return { key: `${occurrence}:${text}`, text };
+  });
+}
+
 /** One labelled line of the fact block: when, sign-up deadline, entry fee. */
 function Fact({
   icon: Icon,
@@ -86,10 +99,8 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
           <h3 className="mb-2 text-lg font-semibold text-golden">{m.tournament_details()}</h3>
           {/* Staff-authored plain text: blank lines are the paragraph breaks */}
           <div className="flex flex-col gap-3 text-creme/85">
-            {tournament.details.split(/\n{2,}/).map((paragraph, index) => (
-              // Static text split once per render: the position is the identity
-              // oxlint-disable-next-line react/no-array-index-key
-              <p key={index}>{paragraph}</p>
+            {keyedParagraphs(tournament.details).map(({ key, text }) => (
+              <p key={key}>{text}</p>
             ))}
           </div>
         </Reveal>

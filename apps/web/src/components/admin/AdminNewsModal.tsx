@@ -14,7 +14,8 @@ import { isDraftChanged } from './draft';
 import { ApiError } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
 import { localizeHref } from '../../paraglide/runtime.js';
-import { AdminImageField, uploadErrorMessage } from './AdminImageField';
+import { AdminImageField } from './AdminImageField';
+import { uploadErrorMessage } from './upload-errors';
 
 const REQUIRED_LOCALE: Locale = 'pl';
 /** Mirrors the API's cap on a single picture. */

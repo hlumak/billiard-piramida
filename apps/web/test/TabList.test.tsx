@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, expect, test } from 'vitest';
-import { TabList, tabId, tabPanelId } from '../src/components/TabList';
+import { TabList } from '../src/components/TabList';
+import { tabId, tabPanelId } from '../src/components/tab-ids';
 
 const TABS = [
   { id: 'a', label: 'Alpha' },
