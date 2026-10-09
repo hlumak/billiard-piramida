@@ -3,7 +3,6 @@ import { Button, FieldError, Input, Label, Spinner, TextField } from '@heroui/re
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { formatPln, type BookingDto, type BookingSummaryDto } from '@repo/shared';
-import { isValidPhone } from '@repo/shared/phone';
 import { PageHeader } from '../components/AppHeader';
 import { PHASE_LABELS, mutationErrorText } from '../components/booking/phase';
 import { StaggerGroup, StaggerItem } from '../components/motion';
@@ -161,8 +160,10 @@ function LookupSection() {
       <p className="mb-4 text-sm text-grey-cool">{m.find_booking_hint()}</p>
       <form
         className="flex w-full flex-col gap-3 text-left md:max-w-sm"
-        onSubmit={event => {
+        onSubmit={async event => {
           event.preventDefault();
+          // The phone metadata is only needed here, on submit: load it then
+          const { isValidPhone } = await import('@repo/shared/phone');
           if (!isValidPhone(phone)) {
             setPhoneError(m.err_phone_invalid());
             return;

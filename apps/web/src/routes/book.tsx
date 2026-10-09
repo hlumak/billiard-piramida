@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
+import { Spinner } from '@heroui/react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
@@ -10,7 +11,14 @@ import { DateStep } from '../components/wizard/DateStep';
 import { TimeStep } from '../components/wizard/TimeStep';
 import { TableStep } from '../components/wizard/TableStep';
 import { FoodStep } from '../components/wizard/FoodStep';
-import { DetailsStep } from '../components/wizard/DetailsStep';
+
+/**
+ * The last step carries the phone field and libphonenumber's metadata — about
+ * 60 kB gzip that only step 5 uses. Loaded on demand (and prefetched as soon
+ * as the guest reaches the table step) instead of with step 1.
+ */
+const loadDetailsStep = () => import('../components/wizard/DetailsStep');
+const DetailsStep = lazy(() => loadDetailsStep().then(module => ({ default: module.DetailsStep })));
 import {
   WIZARD_STEPS,
   goToStep,
@@ -54,7 +62,15 @@ function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) 
   }
   if (step === 'food') return <FoodStep />;
   return (
-    <DetailsStep draft={{ date, startHour, durationHours, tableId, kind, tableLabel, game }} />
+    <Suspense
+      fallback={
+        <div className="flex justify-center py-16">
+          <Spinner aria-label={msg.loading()} />
+        </div>
+      }
+    >
+      <DetailsStep draft={{ date, startHour, durationHours, tableId, kind, tableLabel, game }} />
+    </Suspense>
   );
 }
 
@@ -78,6 +94,11 @@ function BookingWizard() {
   useEffect(() => {
     if (step !== state.step) goToStep(step);
   }, [step, state.step]);
+
+  // Two steps ahead of needing it: by the details step the chunk is in cache
+  useEffect(() => {
+    if (step === 'table' || step === 'food') void loadDetailsStep();
+  }, [step]);
 
   const index = stepIndex(step);
 
