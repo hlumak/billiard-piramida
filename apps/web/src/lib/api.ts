@@ -22,28 +22,23 @@ import { manageTokenFor } from './recent-bookings';
 /**
  * API origin.
  *
- * Browser: call our own public origin (VITE_API_URL — same-origin in prod) so
- * the HttpOnly session cookie rides along.
+ * Browser: VITE_API_URL, or — when unset, as in production — the page's own
+ * origin (relative /api/… URLs through the reverse proxy), so the HttpOnly
+ * session cookie rides along and no build ever bakes in a localhost URL.
  *
- * SSR: the web server must NOT fetch that public hostname. The request would
- * hairpin back through nginx to this same host and hang, 504-ing every route
- * with an SSR loader (/prices, /booking/$id). Reach the API directly over
- * loopback instead. API_PORT rides in the same .env the prod server loads
- * (--env-file), so this needs no extra config; INTERNAL_API_URL is an explicit
- * override for other topologies. In dev (`vite dev`, no --env-file) neither is
- * set, so SSR falls back to the public URL and behaves as before.
+ * SSR: the web server must NOT fetch the public hostname — the request would
+ * hairpin back through the proxy and hang. It reaches the API directly:
+ * INTERNAL_API_URL (e.g. http://api:3001 between containers), else loopback
+ * on API_PORT (default 3001).
  */
-const PUBLIC_API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+export const PUBLIC_API_URL: string = import.meta.env.VITE_API_URL ?? '';
 
 function resolveApiUrl(): string {
-  const publicUrl = PUBLIC_API_URL;
-  if (!import.meta.env.SSR) return publicUrl;
+  if (!import.meta.env.SSR) return PUBLIC_API_URL;
 
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
-  const internalUrl =
-    env?.INTERNAL_API_URL ?? (env?.API_PORT ? `http://127.0.0.1:${env.API_PORT}` : undefined);
-  return internalUrl ?? publicUrl;
+  return env?.INTERNAL_API_URL || `http://127.0.0.1:${env?.API_PORT || 3001}`;
 }
 
 const API_URL: string = resolveApiUrl();

@@ -1,10 +1,14 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { IsoDate } from '@repo/shared';
+import { PUBLIC_API_URL } from './api';
 import { availabilityQuery } from './queries';
 
-const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
-const WS_URL = `${API_URL.replace(/^http/, 'ws')}/api/ws`;
+/** ws(s) twin of the API origin; same-origin (the page's host) when that is unset. */
+function wsUrl(): string {
+  const base = PUBLIC_API_URL || window.location.origin;
+  return `${base.replace(/^http/, 'ws')}/api/ws`;
+}
 
 const INITIAL_RETRY_MS = 1_000;
 const MAX_RETRY_MS = 30_000;
@@ -48,7 +52,7 @@ class AvailabilityLive {
     if (typeof WebSocket === 'undefined') return; // SSR
     if (this.socket !== null) return;
 
-    const socket = new WebSocket(WS_URL);
+    const socket = new WebSocket(wsUrl());
     this.socket = socket;
 
     socket.addEventListener('open', () => {
