@@ -29,6 +29,9 @@ const config = defineConfig(({ mode }) => {
   checkSiteUrl(mode);
   return {
     envDir: ENV_DIR,
+    // Production SSR bundles its dependencies: the runtime image then needs
+    // only srvx, not ~340 MB of node_modules (much of it build tooling)
+    ...(mode === 'production' ? { ssr: { noExternal: true } } : {}),
     resolve: { tsconfigPaths: true },
     plugins: [
       devtools(),
