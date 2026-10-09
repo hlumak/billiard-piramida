@@ -1,4 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
+// Type-only: brings in Start's route augmentation (`server.handlers`) without
+// adding anything to the bundle
+import type {} from '@tanstack/react-start';
 import { DEFAULT_LOCALE } from '@repo/shared';
 import { api } from '../lib/api';
 import { SITE_URL } from '../lib/seo';

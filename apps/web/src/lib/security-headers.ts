@@ -3,9 +3,6 @@
  * API; HTML used to go out with no security headers at all.
  */
 
-/** Request header carrying the per-request CSP nonce from the server entry to the router. */
-export const CSP_NONCE_HEADER = 'x-piramida-csp-nonce';
-
 /** A fresh nonce: 128 random bits, base64. */
 export function createNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));

@@ -15,9 +15,8 @@ import type {
   VenueConfigDto
 } from '@repo/shared';
 import { notFound } from '@tanstack/react-router';
-import { createIsomorphicFn } from '@tanstack/react-start';
-import { getRequestHeader, getRequestIP } from '@tanstack/react-start/server';
 import { manageTokenFor } from './recent-bookings';
+import { currentRequestContext } from './request-context';
 
 /**
  * API origin.
@@ -46,19 +45,11 @@ const API_URL: string = resolveApiUrl();
 /**
  * SSR calls reach the API from loopback, so without this every visitor's
  * page render would share the single rate-limit bucket keyed on 127.0.0.1.
- * Pass on the chain nginx built plus the hop that reached this server; the
- * API trusts loopback/private peers and walks the chain back to the visitor.
+ * The server entry records the chain nginx built plus the hop that reached
+ * this server; the API trusts loopback/private peers and walks it back to the
+ * visitor. Always undefined in the browser.
  */
-const forwardedFor = createIsomorphicFn()
-  .server((): string | undefined => {
-    try {
-      const chain = [getRequestHeader('x-forwarded-for'), getRequestIP()].filter(Boolean);
-      return chain.length > 0 ? chain.join(', ') : undefined;
-    } catch {
-      return undefined; // outside a request (build-time prerender)
-    }
-  })
-  .client((): string | undefined => undefined);
+const forwardedFor = (): string | undefined => currentRequestContext()?.forwardedFor;
 
 /** A render must not wait on a hung API for longer than nginx would. */
 const REQUEST_TIMEOUT_MS = import.meta.env.SSR ? 3_000 : 15_000;
