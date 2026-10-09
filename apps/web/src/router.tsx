@@ -4,6 +4,7 @@ import { routeTree } from './routeTree.gen';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 import { getContext } from './integrations/tanstack-query/root-provider';
 import { NotFound } from './components/NotFound';
+import { RouteError } from './components/RouteError';
 
 export function getRouter() {
   const context = getContext();
@@ -15,7 +16,9 @@ export function getRouter() {
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
     // Unknown URLs get the localized 404 instead of the unstyled English default
-    defaultNotFoundComponent: NotFound
+    defaultNotFoundComponent: NotFound,
+    // …and a failed loader the localized error page with a retry
+    defaultErrorComponent: RouteError
   });
 
   setupRouterSsrQueryIntegration({ router, queryClient: context.queryClient });

@@ -12,6 +12,8 @@ import type {
   TournamentRegistrationResultDto,
   VenueConfigDto
 } from '@repo/shared';
+import { createIsomorphicFn } from '@tanstack/react-start';
+import { getRequestHeader, getRequestIP } from '@tanstack/react-start/server';
 
 /**
  * API origin.
@@ -41,6 +43,31 @@ function resolveApiUrl(): string {
 }
 
 const API_URL: string = resolveApiUrl();
+
+/**
+ * SSR calls reach the API from loopback, so without this every visitor's
+ * page render would share the single rate-limit bucket keyed on 127.0.0.1.
+ * Pass on the chain nginx built plus the hop that reached this server; the
+ * API trusts loopback/private peers and walks the chain back to the visitor.
+ */
+const forwardedFor = createIsomorphicFn()
+  .server((): string | undefined => {
+    try {
+      const chain = [getRequestHeader('x-forwarded-for'), getRequestIP()].filter(Boolean);
+      return chain.length > 0 ? chain.join(', ') : undefined;
+    } catch {
+      return undefined; // outside a request (build-time prerender)
+    }
+  })
+  .client((): string | undefined => undefined);
+
+/** A render must not wait on a hung API for longer than nginx would. */
+const REQUEST_TIMEOUT_MS = import.meta.env.SSR ? 3_000 : 15_000;
+
+function withTimeout(signal: AbortSignal | undefined): AbortSignal {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
 
 /**
  * Staff-uploaded pictures are stored as `/api/uploads/…` and served by the API.
@@ -98,13 +125,15 @@ export async function request<T>(
   path: string,
   { method, body, headers, signal }: RequestOptions = {}
 ): Promise<T> {
+  const forwarded = forwardedFor();
   const response = await fetch(`${API_URL}${path}`, {
     ...(method !== undefined ? { method } : {}),
-    signal: signal ?? null,
+    signal: withTimeout(signal),
     // Send the HttpOnly session cookie (same-origin in prod, same-site in dev)
     credentials: 'include',
     headers: {
       ...headers,
+      ...(forwarded !== undefined ? { 'x-forwarded-for': forwarded } : {}),
       // Fastify rejects an application/json content-type with an empty body
       ...(body !== undefined ? { 'content-type': 'application/json' } : {})
     },
@@ -117,6 +146,7 @@ export async function request<T>(
 export async function upload<T>(path: string, form: FormData): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     method: 'POST',
+    // Uploads are the slow path (5 MB on a phone connection): no short timeout
     credentials: 'include',
     body: form
   });
