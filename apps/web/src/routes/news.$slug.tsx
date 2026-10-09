@@ -61,7 +61,9 @@ function NewsArticlePage() {
             <img
               src={resolveAssetUrl(article.imageUrl)}
               alt=""
-              className="max-h-96 w-full rounded-[10px] object-cover"
+              // The box is reserved before the picture arrives (no text jump);
+              // at the article width 16:9 is the old max-h-96 landscape crop
+              className="aspect-video w-full rounded-[10px] object-cover"
             />
           </Reveal>
         ) : null}

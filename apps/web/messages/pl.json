@@ -247,7 +247,18 @@
   "tournament_pending_n": "Czeka na wpisowe: {n}",
   "tournament_deadline": "Zapisy do {date}",
   "tournament_when": "Kiedy",
-  "tournament_date_tbd": "Termin ustalimy, gdy zbierze się {n} graczy",
+  "tournament_date_tbd": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "Termin ustalimy, gdy zapisze się {n} gracz",
+        "nPlural=few": "Termin ustalimy, gdy zbierze się {n} graczy",
+        "nPlural=many": "Termin ustalimy, gdy zbierze się {n} graczy",
+        "nPlural=other": "Termin ustalimy, gdy zbierze się {n} graczy"
+      }
+    }
+  ],
   "tournament_fee": "Wpisowe",
   "tournament_fee_free": "Bezpłatnie",
   "tournament_fee_hint": "Wpisowe wpłacasz osobiście w recepcji klubu",
@@ -334,5 +345,7 @@
   "nav_home": "Strona główna",
   "skip_to_content": "Przejdź do treści",
   "seo_title_profile": "Profil — piramida",
-  "admin_bookings_capped": "Pokazano pierwsze {n} rezerwacji. Zawęź wyszukiwanie datą lub telefonem, aby zobaczyć resztę."
+  "admin_bookings_capped": "Pokazano pierwsze {n} rezerwacji. Zawęź wyszukiwanie datą lub telefonem, aby zobaczyć resztę.",
+  "app_name": "piramida — klub bilardowy",
+  "app_description": "Rezerwacja stołów bilardowych"
 }

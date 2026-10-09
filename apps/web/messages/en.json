@@ -242,12 +242,30 @@
   "tournament_state_completed": "Finished",
   "tournament_state_cancelled": "Cancelled",
   "tournament_players": "{n} of {total} players",
-  "tournament_players_open": "{n} players signed up",
+  "tournament_players_open": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} player signed up",
+        "nPlural=other": "{n} players signed up"
+      }
+    }
+  ],
   "tournament_confirmed_n": "{n} confirmed",
   "tournament_pending_n": "{n} awaiting the fee",
   "tournament_deadline": "Sign-ups until {date}",
   "tournament_when": "When",
-  "tournament_date_tbd": "The date is set once {n} players are in",
+  "tournament_date_tbd": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "The date is set once {n} player is in",
+        "nPlural=other": "The date is set once {n} players are in"
+      }
+    }
+  ],
   "tournament_fee": "Entry fee",
   "tournament_fee_free": "Free",
   "tournament_fee_hint": "The fee is paid in person at the club reception",
@@ -334,5 +352,7 @@
   "nav_home": "Home",
   "skip_to_content": "Skip to content",
   "seo_title_profile": "Profile — piramida",
-  "admin_bookings_capped": "Showing the first {n} bookings. Narrow the search by date or phone to see the rest."
+  "admin_bookings_capped": "Showing the first {n} bookings. Narrow the search by date or phone to see the rest.",
+  "app_name": "piramida — billiard club",
+  "app_description": "Billiard table booking"
 }

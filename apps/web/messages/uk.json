@@ -242,12 +242,45 @@
   "tournament_state_completed": "Завершено",
   "tournament_state_cancelled": "Скасовано",
   "tournament_players": "{n} з {total} гравців",
-  "tournament_players_open": "{n} гравців записалося",
+  "tournament_players_open": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} гравець записався",
+        "nPlural=few": "{n} гравці записалися",
+        "nPlural=many": "{n} гравців записалося",
+        "nPlural=other": "{n} гравця записалося"
+      }
+    }
+  ],
   "tournament_confirmed_n": "{n} підтверджено",
-  "tournament_pending_n": "{n} очікують внеску",
+  "tournament_pending_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} очікує внеску",
+        "nPlural=few": "{n} очікують внеску",
+        "nPlural=many": "{n} очікують внеску",
+        "nPlural=other": "{n} очікують внеску"
+      }
+    }
+  ],
   "tournament_deadline": "Реєстрація до {date}",
   "tournament_when": "Коли",
-  "tournament_date_tbd": "Дата визначиться, щойно набереться {n} гравців",
+  "tournament_date_tbd": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "Дата визначиться, щойно набереться {n} гравець",
+        "nPlural=few": "Дата визначиться, щойно наберуться {n} гравці",
+        "nPlural=many": "Дата визначиться, щойно набереться {n} гравців",
+        "nPlural=other": "Дата визначиться, щойно набереться {n} гравця"
+      }
+    }
+  ],
   "tournament_fee": "Турнірний внесок",
   "tournament_fee_free": "Безкоштовно",
   "tournament_fee_hint": "Внесок сплачується особисто на рецепції клубу",
@@ -334,5 +367,7 @@
   "nav_home": "Головна",
   "skip_to_content": "Перейти до вмісту",
   "seo_title_profile": "Профіль — piramida",
-  "admin_bookings_capped": "Показано перші {n} бронювань. Звузьте пошук за датою чи телефоном, щоб побачити решту."
+  "admin_bookings_capped": "Показано перші {n} бронювань. Звузьте пошук за датою чи телефоном, щоб побачити решту.",
+  "app_name": "piramida — більярдний клуб",
+  "app_description": "Бронювання більярдних столів"
 }
