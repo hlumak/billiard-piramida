@@ -63,6 +63,16 @@ ENV RELEASE_BUILD=1 \
   VITE_SITE_URL=${VITE_SITE_URL} \
   VITE_API_URL=
 RUN pnpm --filter @repo/web build
+# Every client asset the server-rendered HTML names must exist in the client
+# build. When they diverged (two different stylesheets), every page painted
+# unstyled until hydration; fail the image build instead of shipping that.
+RUN cd apps/web/dist \
+  && refs=$(grep -rhoE '"/assets/[A-Za-z0-9_.-]+\.(css|js)"' server | tr -d '"' | sort -u) \
+  && echo "$refs" | grep -q '\.css$' \
+  && missing=$(for f in $refs; do [ -f "client$f" ] || echo "$f"; done) \
+  && if [ -n "$missing" ]; then \
+       echo "SSR references assets the client build did not emit:" "$missing"; exit 1; \
+     fi
 # The production SSR bundle includes its dependencies (ssr.noExternal), so the
 # runtime needs only the build output, the server entry and srvx (which has no
 # dependencies of its own) — not ~340 MB of node_modules.

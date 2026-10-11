@@ -1,5 +1,11 @@
 @import './fonts.css';
-@import 'tailwindcss';
+/* Class names are collected from src/ only, not by Tailwind's automatic
+   detection: that scans the whole app and skips only what .gitignore lists,
+   and the Docker build context has no .gitignore. There the server build
+   then also scanned the client build's fresh dist/ output, produced a
+   different stylesheet, and the HTML linked a file the client build never
+   emitted: every page painted unstyled until hydration. */
+@import 'tailwindcss' source('.');
 @import './heroui.css';
 /* Imported here rather than from PhoneField.tsx so the club's overrides below
    always come after the library's own rules. */
