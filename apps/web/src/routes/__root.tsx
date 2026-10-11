@@ -14,15 +14,14 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { Locale } from '@repo/shared';
 
 /**
- * Body text (Montserrat 400) in the subsets this locale's copy needs, fetched
- * alongside the stylesheet rather than after it is parsed — the difference
- * between the first paint in the fallback face and in the real one. Weights
- * and faces used less widely still load on demand.
+ * Montserrat (every weight: it is a variable font) in the subsets this
+ * locale's copy needs, fetched alongside the stylesheet rather than after it
+ * is parsed. The script and alternate faces still load on demand.
  */
 const FONT_PRELOADS: Record<Locale, string[]> = {
-  pl: ['montserrat-400-latin', 'montserrat-400-latin-ext'],
-  uk: ['montserrat-400-latin', 'montserrat-400-cyrillic'],
-  en: ['montserrat-400-latin']
+  pl: ['montserrat-latin', 'montserrat-latin-ext'],
+  uk: ['montserrat-latin', 'montserrat-cyrillic'],
+  en: ['montserrat-latin']
 };
 
 interface MyRouterContext {
