@@ -250,7 +250,8 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
             aria-pressed={stopped}
             aria-label={stopped ? m.news_play() : m.news_pause()}
             onClick={() => setStopped(value => !value)}
-            className="flex size-[var(--dot-slot)] items-center justify-center text-creme/70 hover:text-golden"
+            // A 24px tap target like the dots' (--dot-slot is scoped to .carousel-dots)
+            className="flex size-6 items-center justify-center text-creme/70 hover:text-golden"
           >
             {stopped ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
           </button>
