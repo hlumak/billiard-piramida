@@ -48,7 +48,7 @@ function MenuPage() {
       <div className="relative mx-auto flex h-dvh w-full max-w-md flex-col overflow-y-auto px-10 pb-10 pt-16">
         <Reveal className="flex shrink-0 justify-center">
           <Link to="/">
-            <BrandLogo className="w-44" />
+            <BrandLogo priority className="w-44" />
           </Link>
         </Reveal>
 

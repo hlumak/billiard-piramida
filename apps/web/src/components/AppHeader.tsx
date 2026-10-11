@@ -15,7 +15,7 @@ export function HomeHeader() {
       </Link>
       <h1>
         <Link to="/">
-          <BrandLogo className="w-36 md:w-44" />
+          <BrandLogo priority className="w-36 md:w-44" />
         </Link>
       </h1>
       <Link
