@@ -7,10 +7,11 @@ import type {
   TournamentStatus
 } from './tournaments.ts';
 
-export type BookingStatus = 'confirmed' | 'cancelled';
+/** no_show: booked, never came — marked by staff once the start has passed. */
+export type BookingStatus = 'confirmed' | 'cancelled' | 'no_show';
 
 /** Derived from status + current time; never stored. */
-export type BookingPhase = 'upcoming' | 'active' | 'finished' | 'cancelled';
+export type BookingPhase = 'upcoming' | 'active' | 'finished' | 'cancelled' | 'no_show';
 
 /** What a spot is booked for — picks the hourly rate and how it's labelled. */
 export type ActivityKind = 'billiard' | 'darts';
@@ -164,10 +165,28 @@ export interface AdminCustomerDto {
   name: BookingDto['customerName'];
   bookingsCount: number;
   cancelledCount: number;
+  /** Bookings staff marked as "didn't come" */
+  noShowCount: number;
+  /** On the black list: cannot book online */
+  blacklisted: boolean;
   firstSeen: string;
   lastSeen: string;
   /** Table rental + food across confirmed bookings */
   totalSpentGrosz: number;
+}
+
+/** A number on the black list. Name and counts come from its bookings. */
+export interface AdminBlacklistEntryDto {
+  phone: BookingDto['customerPhone'];
+  reason: 'no_show' | 'manual';
+  note: string | null;
+  createdAt: string;
+  /** The no-show booking that put it here; null for a manual entry */
+  bookingId: BookingDto['id'] | null;
+  /** Name from the most recent booking with this number, if any */
+  name: BookingDto['customerName'] | null;
+  noShowCount: number;
+  lastNoShowAt: string | null;
 }
 
 export interface AdminTopItemDto {

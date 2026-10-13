@@ -125,12 +125,17 @@ export const BOOKING_RESPONSE = Type.Object({
   customerPhone: Type.String(),
   startsAt: Type.String(),
   endsAt: Type.String(),
-  status: Type.Union([Type.Literal('confirmed'), Type.Literal('cancelled')]),
+  status: Type.Union([
+    Type.Literal('confirmed'),
+    Type.Literal('cancelled'),
+    Type.Literal('no_show')
+  ]),
   phase: Type.Union([
     Type.Literal('upcoming'),
     Type.Literal('active'),
     Type.Literal('finished'),
-    Type.Literal('cancelled')
+    Type.Literal('cancelled'),
+    Type.Literal('no_show')
   ]),
   items: Type.Array(
     Type.Object({
@@ -341,9 +346,22 @@ export const ADMIN_CUSTOMER_RESPONSE = Type.Object({
   name: Type.String(),
   bookingsCount: Type.Integer(),
   cancelledCount: Type.Integer(),
+  noShowCount: Type.Integer(),
+  blacklisted: Type.Boolean(),
   firstSeen: Type.String(),
   lastSeen: Type.String(),
   totalSpentGrosz: Type.Integer()
+});
+
+export const ADMIN_BLACKLIST_ENTRY_RESPONSE = Type.Object({
+  phone: Type.String(),
+  reason: Type.Union([Type.Literal('no_show'), Type.Literal('manual')]),
+  note: Type.Union([Type.String(), Type.Null()]),
+  createdAt: Type.String(),
+  bookingId: Type.Union([Type.String(), Type.Null()]),
+  name: Type.Union([Type.String(), Type.Null()]),
+  noShowCount: Type.Integer(),
+  lastNoShowAt: Type.Union([Type.String(), Type.Null()])
 });
 
 export const ADMIN_STATS_RESPONSE = Type.Object({

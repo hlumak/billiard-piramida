@@ -15,7 +15,12 @@ import {
 } from 'drizzle-orm/pg-core';
 import { TOURNAMENT_REGISTRATION_STATUSES, TOURNAMENT_STATUSES } from '@repo/shared';
 
-export const bookingStatusEnum = pgEnum('booking_status', ['confirmed', 'cancelled']);
+/** no_show: the client booked and never came. Staff mark it once the start
+ *  has passed; the slot frees up and the number goes on the black list. */
+export const bookingStatusEnum = pgEnum('booking_status', ['confirmed', 'cancelled', 'no_show']);
+
+/** How a number got on the black list: a no-show, or staff adding it by hand. */
+export const blacklistReasonEnum = pgEnum('blacklist_reason', ['no_show', 'manual']);
 
 export const sportCardTypeEnum = pgEnum('sport_card_type', [
   'multisport',
@@ -111,6 +116,21 @@ export const bookings = pgTable(
     check('bookings_discount_non_negative', sql`${t.discountGrosz} >= 0`)
   ]
 );
+
+/**
+ * Phone numbers (E.164, as bookings store them) that may not book online:
+ * guests booked and did not come. The desk can still book for them. One row
+ * per number; removing it is how staff forgive.
+ */
+export const blacklist = pgTable('blacklist', {
+  phone: text('phone').primaryKey(),
+  reason: blacklistReasonEnum('reason').notNull(),
+  /** The no-show that put the number here. Restoring that booking ("came
+   *  after all") removes the entry; null for a manual entry. */
+  bookingId: uuid('booking_id').references(() => bookings.id, { onDelete: 'set null' }),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+});
 
 /**
  * Hourly rate per tier, staff-editable. Three rows, keyed by the shared

@@ -18,7 +18,7 @@ import {
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, count, eq, gt, sql } from 'drizzle-orm';
-import { bookings, tables } from '../db/schema.ts';
+import { blacklist, bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BILLIARD_GAME } from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
@@ -64,7 +64,7 @@ export type BookingPolicy = { kind: 'guest'; userId: string | null } | { kind: '
 
 export type CreateBookingResult =
   | { ok: true; booking: BookingDto; manageToken: string | null }
-  | { ok: false; status: 400 | 409 | 422; error: string };
+  | { ok: false; status: 400 | 403 | 409 | 422; error: string };
 
 /** Allow bookings that start at most 5 minutes ago ("book the table right now"). */
 const START_GRACE_MS = 5 * 60_000;
@@ -78,7 +78,7 @@ class BookingRefused extends Error {
   }
 }
 
-const refuse = (status: 400 | 409 | 422, error: string): CreateBookingResult => ({
+const refuse = (status: 400 | 403 | 409 | 422, error: string): CreateBookingResult => ({
   ok: false,
   status,
   error
@@ -100,6 +100,15 @@ export async function createBooking(
   if (!isIsoDate(date)) return refuse(400, 'invalid_date');
   const customerPhone = normalizePhone(input.customerPhone);
   if (customerPhone === null) return refuse(422, 'invalid_phone');
+  // Clients who booked and did not come book by phone now; the desk can
+  // still book for them
+  if (policy.kind === 'guest') {
+    const [blocked] = await app.db
+      .select({ phone: blacklist.phone })
+      .from(blacklist)
+      .where(eq(blacklist.phone, customerPhone));
+    if (blocked) return refuse(403, 'phone_blocked');
+  }
 
   const today = warsawDateOf(new Date());
   // The wizard only offers the next BOOKING_DAYS_AHEAD days; the API holds the

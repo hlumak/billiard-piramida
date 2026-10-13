@@ -10,6 +10,7 @@ import {
 } from '@repo/shared';
 import {
   adminApi,
+  adminBlacklistQuery,
   adminBookingsQuery,
   ADMIN_BOOKINGS_LIMIT,
   normalizePhoneSearch,
@@ -32,7 +33,8 @@ import { useVenueConfig } from '../../lib/venue-config';
 const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[] = [
   { value: undefined, label: m.admin_all_statuses },
   { value: 'confirmed', label: m.phase_upcoming },
-  { value: 'cancelled', label: m.phase_cancelled }
+  { value: 'cancelled', label: m.phase_cancelled },
+  { value: 'no_show', label: m.phase_no_show }
 ];
 
 function RowActions({ booking }: { booking: BookingDto }) {
@@ -61,19 +63,25 @@ function RowActions({ booking }: { booking: BookingDto }) {
     mutationFn: () => adminApi.updateBooking(booking.id, { status: 'confirmed' }),
     onSuccess: invalidate
   });
+  const noShow = useMutation({
+    mutationFn: () => adminApi.markNoShow(booking.id),
+    onSuccess: invalidate
+  });
 
   const live = booking.phase === 'upcoming' || booking.phase === 'active';
   // Hide +1h when it would run past closing time (the API would reject it)
   const closeHour = hoursForDate(warsawDate(booking.startsAt), venueHours).close;
   const canExtend = live && bookingHours(booking).end < closeHour;
-  const actionError = extend.error ?? cancel.error ?? restore.error;
+  // Once the start has passed a confirmed booking can turn out a no-show
+  const started = booking.phase === 'active' || booking.phase === 'finished';
+  const actionError = extend.error ?? cancel.error ?? restore.error ?? noShow.error;
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex flex-wrap justify-end gap-1.5">
         {/* Editable in every phase: a finished booking still gets its record
             corrected, and a cancelled one is restored from the same modal. */}
         <AdminEditBooking booking={booking} />
-        {booking.phase !== 'cancelled' ? <AdminBookingOrder booking={booking} /> : null}
+        {booking.status === 'confirmed' ? <AdminBookingOrder booking={booking} /> : null}
         {canExtend ? (
           <Button
             size="sm"
@@ -95,9 +103,21 @@ function RowActions({ booking }: { booking: BookingDto }) {
             {m.phase_cancelled()}
           </Button>
         ) : null}
-        {booking.phase === 'cancelled' ? (
+        {started ? (
+          <Button
+            size="sm"
+            variant="danger-soft"
+            isPending={noShow.isPending}
+            onPress={() => {
+              if (window.confirm(m.admin_no_show_confirm())) noShow.mutate();
+            }}
+          >
+            {m.admin_no_show_btn()}
+          </Button>
+        ) : null}
+        {booking.phase === 'cancelled' || booking.phase === 'no_show' ? (
           <Button size="sm" isPending={restore.isPending} onPress={() => restore.mutate()}>
-            {m.admin_restore_btn()}
+            {booking.phase === 'no_show' ? m.admin_came_after_all() : m.admin_restore_btn()}
           </Button>
         ) : null}
       </div>
@@ -131,6 +151,9 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
   // Localized dish names for the order summary (items carry only a slug)
   const { data: menu } = useQuery(menuQuery(getLocale()));
   const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
+  // Flag numbers that did not come before, right where staff read the booking
+  const { data: blacklist } = useQuery(adminBlacklistQuery());
+  const blacklisted = new Set(blacklist?.map(entry => entry.phone));
 
   return (
     <div className="flex flex-col gap-4">
@@ -225,6 +248,11 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
                     >
                       {formatPhone(booking.customerPhone)}
                     </a>
+                    {blacklisted.has(booking.customerPhone) ? (
+                      <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-soft-foreground">
+                        {m.admin_blacklisted()}
+                      </span>
+                    ) : null}
                     {booking.items.length > 0 ? (
                       <span className="ml-2 text-xs text-grey-cool">
                         {booking.items

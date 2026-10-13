@@ -2917,3 +2917,212 @@ test('one client cannot hold unlimited live-availability sockets', async () => {
   assert.equal(opened, true);
   again.close();
 });
+
+const WEDNESDAY = nextDate(3);
+
+test('black list: a no-show blocks online booking, frees the slot, staff can forgive', async () => {
+  const headers = staff('198.51.100.90');
+  const guestHeaders = { 'x-forwarded-for': '198.51.100.91' };
+  const phone = '+48512971971';
+  const HOUR = 3_600_000;
+
+  // Bookings written straight to the table: the API refuses starts in the
+  // past. Hour-aligned, like everything the API writes.
+  const hourStart = Math.floor(Date.now() / HOUR) * HOUR - HOUR;
+  const { db, pool } = createDb(TEST_URL);
+  const [played] = await db
+    .insert(bookings)
+    .values({
+      tableId: 5,
+      customerName: 'Ghost Guest',
+      customerPhone: phone,
+      startsAt: new Date(hourStart),
+      endsAt: new Date(hourStart + 2 * HOUR),
+      hourlyRateGrosz: BILLIARD_HOUR
+    })
+    .returning({ id: bookings.id });
+  const [notYet] = await db
+    .insert(bookings)
+    .values({
+      tableId: 5,
+      customerName: 'Ghost Guest',
+      customerPhone: phone,
+      startsAt: new Date(hourStart + 3 * 24 * HOUR),
+      endsAt: new Date(hourStart + 3 * 24 * HOUR + HOUR),
+      hourlyRateGrosz: BILLIARD_HOUR
+    })
+    .returning({ id: bookings.id });
+  assert.ok(played && notYet);
+
+  // Before the start it is just a late arrival
+  const early = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${notYet.id}/no-show`,
+    headers
+  });
+  assert.equal(early.statusCode, 409);
+  assert.equal(early.json().error, 'booking_not_started');
+
+  const marked = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${played.id}/no-show`,
+    headers
+  });
+  assert.equal(marked.statusCode, 200);
+  assert.equal(marked.json().status, 'no_show');
+  assert.equal(marked.json().phase, 'no_show');
+  const twice = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${played.id}/no-show`,
+    headers
+  });
+  assert.equal(twice.json().error, 'booking_no_show');
+
+  // The number is on the black list, with its history
+  const list = await app.inject({ method: 'GET', url: '/api/admin/blacklist', headers });
+  assert.equal(list.statusCode, 200);
+  const entry = list.json().find((e: { phone: string }) => e.phone === phone);
+  assert.ok(entry);
+  assert.equal(entry.reason, 'no_show');
+  assert.equal(entry.bookingId, played.id);
+  assert.equal(entry.name, 'Ghost Guest');
+  assert.equal(entry.noShowCount, 1);
+
+  // Online booking is refused; the desk can still book for them
+  const booking = {
+    tableId: 3,
+    date: WEDNESDAY,
+    startHour: 17,
+    durationHours: 1,
+    customerName: 'Ghost Guest',
+    customerPhone: '+48 512 971 971'
+  };
+  const guest = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: guestHeaders,
+    payload: booking
+  });
+  assert.equal(guest.statusCode, 403);
+  assert.equal(guest.json().error, 'phone_blocked');
+  const desk = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: booking
+  });
+  assert.equal(desk.statusCode, 201);
+
+  // Customers show it
+  const customers = await app.inject({
+    method: 'GET',
+    url: '/api/admin/customers?phone=512971971',
+    headers
+  });
+  const customer = customers.json()[0];
+  assert.equal(customer.blacklisted, true);
+  assert.equal(customer.noShowCount, 1);
+
+  // The no-show no longer holds its table: a walk-in takes it
+  const [walkIn] = await db
+    .insert(bookings)
+    .values({
+      tableId: 5,
+      customerName: 'Walk In',
+      customerPhone: '+48512971972',
+      startsAt: new Date(hourStart),
+      endsAt: new Date(hourStart + 2 * HOUR),
+      hourlyRateGrosz: BILLIARD_HOUR
+    })
+    .returning({ id: bookings.id });
+  assert.ok(walkIn);
+
+  // "Came after all" cannot restore onto the walk-in's slot…
+  const clash = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${played.id}`,
+    headers,
+    payload: { status: 'confirmed' }
+  });
+  assert.equal(clash.statusCode, 409);
+  assert.equal(clash.json().error, 'slot_taken');
+  const stillListed = await app.inject({ method: 'GET', url: '/api/admin/blacklist', headers });
+  assert.ok(stillListed.json().some((e: { phone: string }) => e.phone === phone));
+
+  // …but once that is gone it can, and the black-list entry it made goes too
+  await db.delete(bookings).where(eq(bookings.id, walkIn.id));
+  await pool.end();
+  const restored = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${played.id}`,
+    headers,
+    payload: { status: 'confirmed' }
+  });
+  assert.equal(restored.statusCode, 200);
+  assert.equal(restored.json().status, 'confirmed');
+  assert.equal(restored.json().startsAt, new Date(hourStart).toISOString());
+  const afterRestore = await app.inject({ method: 'GET', url: '/api/admin/blacklist', headers });
+  assert.equal(
+    afterRestore.json().some((e: { phone: string }) => e.phone === phone),
+    false
+  );
+  // Off the list it books online again (once under the 3-upcoming cap)
+  await app.inject({ method: 'POST', url: `/api/admin/bookings/${notYet.id}/cancel`, headers });
+  const again = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: guestHeaders,
+    payload: { ...booking, startHour: 19 }
+  });
+  assert.equal(again.statusCode, 201, again.body);
+});
+
+test('black list: staff add and remove numbers by hand', async () => {
+  const headers = staff('198.51.100.92');
+
+  const added = await app.inject({
+    method: 'POST',
+    url: '/api/admin/blacklist',
+    headers,
+    payload: { phone: '+48 601 234 777', note: '  rude to staff  ' }
+  });
+  assert.equal(added.statusCode, 201);
+  assert.equal(added.json().phone, '+48601234777');
+  assert.equal(added.json().reason, 'manual');
+  assert.equal(added.json().note, 'rude to staff');
+  assert.equal(added.json().bookingId, null);
+  assert.equal(added.json().name, null);
+
+  const duplicate = await app.inject({
+    method: 'POST',
+    url: '/api/admin/blacklist',
+    headers,
+    payload: { phone: '601 234 777' }
+  });
+  assert.equal(duplicate.statusCode, 409);
+  assert.equal(duplicate.json().error, 'already_blacklisted');
+
+  const invalid = await app.inject({
+    method: 'POST',
+    url: '/api/admin/blacklist',
+    headers,
+    payload: { phone: '12345' }
+  });
+  assert.equal(invalid.statusCode, 422);
+
+  const anonymous = await app.inject({ method: 'GET', url: '/api/admin/blacklist' });
+  assert.equal(anonymous.statusCode, 401);
+
+  const removed = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/blacklist/${encodeURIComponent('+48601234777')}`,
+    headers
+  });
+  assert.equal(removed.statusCode, 200);
+  const gone = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/blacklist/${encodeURIComponent('+48601234777')}`,
+    headers
+  });
+  assert.equal(gone.statusCode, 404);
+});

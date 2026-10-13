@@ -14,7 +14,7 @@ import {
   type BilliardGame
 } from '@repo/shared';
 import { and, desc, eq, gte, ilike, lt } from 'drizzle-orm';
-import { bookings, orderItems, tables } from '../db/schema.ts';
+import { blacklist, bookings, orderItems, tables } from '../db/schema.ts';
 import { BILLIARD_GAME, BOOKING_RESPONSE, ERROR_RESPONSE, INT_ID, UUID } from '../lib/schemas.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
@@ -46,7 +46,13 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
       schema: {
         querystring: Type.Object({
           date: Type.Optional(Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' })),
-          status: Type.Optional(Type.Union([Type.Literal('confirmed'), Type.Literal('cancelled')])),
+          status: Type.Optional(
+            Type.Union([
+              Type.Literal('confirmed'),
+              Type.Literal('cancelled'),
+              Type.Literal('no_show')
+            ])
+          ),
           phone: Type.Optional(Type.String({ maxLength: 25 })),
           limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 }))
         }),
@@ -112,13 +118,52 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         .where(eq(bookings.id, request.params.id));
       if (!booking) return reply.code(404).send({ error: 'not_found' });
       const phase = phaseOf(booking.status, booking.startsAt, booking.endsAt, new Date());
-      if (phase === 'cancelled' || phase === 'finished') {
+      if (phase !== 'upcoming' && phase !== 'active') {
         return reply.code(409).send({ error: `booking_${phase}` });
       }
       await admin.db
         .update(bookings)
         .set({ status: 'cancelled' })
         .where(eq(bookings.id, booking.id));
+      admin.availabilityHub.notify(warsawDateOf(booking.startsAt));
+      return mustLoadBookingDto(admin.db, booking.id);
+    }
+  );
+
+  /**
+   * The client booked and never came. Only once the start has passed (before
+   * that it is merely a late arrival). The booking stops holding its slot, so
+   * a walk-in can take the table, and the number goes on the black list; an
+   * entry already there is kept as it is. Undone by restoring the booking to
+   * confirmed (PATCH below), which also removes the entry this created.
+   */
+  admin.post(
+    '/api/admin/bookings/:id/no-show',
+    {
+      schema: {
+        params: BOOKING_ID_PARAMS,
+        response: { 200: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
+      }
+    },
+    async (request, reply) => {
+      const [booking] = await admin.db
+        .select()
+        .from(bookings)
+        .where(eq(bookings.id, request.params.id));
+      if (!booking) return reply.code(404).send({ error: 'not_found' });
+      if (booking.status !== 'confirmed') {
+        return reply.code(409).send({ error: `booking_${booking.status}` });
+      }
+      if (booking.startsAt.getTime() > Date.now()) {
+        return reply.code(409).send({ error: 'booking_not_started' });
+      }
+      await admin.db.transaction(async tx => {
+        await tx.update(bookings).set({ status: 'no_show' }).where(eq(bookings.id, booking.id));
+        await tx
+          .insert(blacklist)
+          .values({ phone: booking.customerPhone, reason: 'no_show', bookingId: booking.id })
+          .onConflictDoNothing();
+      });
       admin.availabilityHub.notify(warsawDateOf(booking.startsAt));
       return mustLoadBookingDto(admin.db, booking.id);
     }
@@ -232,23 +277,30 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
       const discountGrosz = discountGroszFor(sportCardCount, hourlyRate * durationHours);
 
       try {
-        await admin.db
-          .update(bookings)
-          .set({
-            tableId,
-            game,
-            startsAt,
-            endsAt,
-            sportCardCount,
-            hourlyRateGrosz: hourlyRate,
-            discountGrosz,
-            ...(patch.customerName !== undefined
-              ? { customerName: patch.customerName.trim() }
-              : {}),
-            ...(customerPhone !== undefined ? { customerPhone } : {}),
-            ...(patch.status !== undefined ? { status: patch.status } : {})
-          })
-          .where(eq(bookings.id, booking.id));
+        await admin.db.transaction(async tx => {
+          await tx
+            .update(bookings)
+            .set({
+              tableId,
+              game,
+              startsAt,
+              endsAt,
+              sportCardCount,
+              hourlyRateGrosz: hourlyRate,
+              discountGrosz,
+              ...(patch.customerName !== undefined
+                ? { customerName: patch.customerName.trim() }
+                : {}),
+              ...(customerPhone !== undefined ? { customerPhone } : {}),
+              ...(patch.status !== undefined ? { status: patch.status } : {})
+            })
+            .where(eq(bookings.id, booking.id));
+          // "Came after all": a restored no-show takes its black-list entry
+          // with it (only the one it created; an older entry stays)
+          if (booking.status === 'no_show' && patch.status === 'confirmed') {
+            await tx.delete(blacklist).where(eq(blacklist.bookingId, booking.id));
+          }
+        });
       } catch (err) {
         // The EXCLUDE guard covers updates too: moving onto a taken slot, or
         // un-cancelling into one, lands here rather than double-booking.
@@ -273,7 +325,9 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
   const loadOpenBooking = async (id: string): Promise<OpenBookingLookup> => {
     const [booking] = await admin.db.select().from(bookings).where(eq(bookings.id, id));
     if (!booking) return { error: 'not_found', status: 404 };
-    if (booking.status === 'cancelled') return { error: 'booking_cancelled', status: 409 };
+    if (booking.status !== 'confirmed') {
+      return { error: `booking_${booking.status}`, status: 409 };
+    }
     return { booking };
   };
 

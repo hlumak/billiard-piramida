@@ -4,6 +4,7 @@ import { ADMIN_TOKEN_COOKIE, clearAdminCookies, setAdminCookies } from '../lib/c
 import { issueAdminSession, secretsMatch, verifyAdminSession } from '../lib/admin-session.ts';
 import { FailureLimiter } from '../lib/failure-limiter.ts';
 import { adminImageRoutes } from './admin-images.ts';
+import { adminBlacklistRoutes } from './admin-blacklist.ts';
 import { adminBookingRoutes } from './admin-bookings.ts';
 import { adminCustomerRoutes } from './admin-customers.ts';
 import { adminMenuRoutes } from './admin-menu.ts';
@@ -89,6 +90,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
     // is only the session endpoints and that guard.
     await admin.register(adminBookingRoutes);
     await admin.register(adminCustomerRoutes);
+    await admin.register(adminBlacklistRoutes);
     await admin.register(adminStatsRoutes);
     await admin.register(adminMenuRoutes);
     await admin.register(adminNewsRoutes);

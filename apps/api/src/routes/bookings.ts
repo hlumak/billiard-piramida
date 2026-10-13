@@ -214,7 +214,7 @@ export function bookingRoutes(
 
       const now = new Date();
       const phase = phaseOf(booking.status, booking.startsAt, booking.endsAt, now);
-      if (phase === 'cancelled' || phase === 'finished') {
+      if (phase !== 'upcoming' && phase !== 'active') {
         return reply.code(409).send({ error: `booking_${phase}` });
       }
 
@@ -275,7 +275,7 @@ export function bookingRoutes(
       if (!booking) return reply.code(404).send({ error: 'not_found' });
 
       const phase = phaseOf(booking.status, booking.startsAt, booking.endsAt, new Date());
-      if (phase === 'cancelled' || phase === 'finished') {
+      if (phase !== 'upcoming' && phase !== 'active') {
         return reply.code(409).send({ error: `booking_${phase}` });
       }
 

@@ -75,7 +75,14 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
               className="h-full rounded-[10px] bg-club-green-light p-3"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-semibold text-creme">{customer.name}</span>
+                <span className="font-semibold text-creme">
+                  {customer.name}
+                  {customer.blacklisted ? (
+                    <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-soft-foreground">
+                      {m.admin_blacklisted()}
+                    </span>
+                  ) : null}
+                </span>
                 <span className="flex items-center gap-2">
                   <a
                     href={`tel:${customer.phone.replaceAll(' ', '')}`}
@@ -100,6 +107,12 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
                     <span>
                       {' '}
                       ({m.phase_cancelled()}: {customer.cancelledCount})
+                    </span>
+                  ) : null}
+                  {customer.noShowCount > 0 ? (
+                    <span className="text-danger-soft-foreground">
+                      {' '}
+                      ({m.admin_no_shows({ n: customer.noShowCount })})
                     </span>
                   ) : null}
                 </span>

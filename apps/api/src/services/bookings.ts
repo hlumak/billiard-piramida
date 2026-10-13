@@ -30,6 +30,7 @@ export function phaseOf(
   now: Date
 ): BookingPhase {
   if (status === 'cancelled') return 'cancelled';
+  if (status === 'no_show') return 'no_show';
   if (now < startsAt) return 'upcoming';
   if (now < endsAt) return 'active';
   return 'finished';

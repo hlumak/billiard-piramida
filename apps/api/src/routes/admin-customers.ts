@@ -1,7 +1,7 @@
 import { Type } from 'typebox';
 import { type AdminCustomerDto } from '@repo/shared';
 import { and, count, desc, eq, ilike, inArray, max, min, sql } from 'drizzle-orm';
-import { bookings, orderItems } from '../db/schema.ts';
+import { blacklist, bookings, orderItems } from '../db/schema.ts';
 import { ADMIN_CUSTOMER_RESPONSE, PG_INT_MAX } from '../lib/schemas.ts';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 
@@ -42,6 +42,7 @@ export const adminCustomerRoutes: FastifyPluginAsyncTypebox = async admin => {
           phone: bookings.customerPhone,
           bookingsCount: count(),
           cancelledCount: sql<number>`count(*) filter (where ${bookings.status} = 'cancelled')::int`,
+          noShowCount: sql<number>`count(*) filter (where ${bookings.status} = 'no_show')::int`,
           firstSeen: min(bookings.startsAt),
           lastSeen: max(bookings.startsAt),
           // Net of sport-card discounts, the same figure /stats and /analytics report
@@ -55,9 +56,9 @@ export const adminCustomerRoutes: FastifyPluginAsyncTypebox = async admin => {
         .offset(offset);
 
       const phones = aggregates.map(a => a.phone);
-      const [foodByPhone, latestNames] =
+      const [foodByPhone, latestNames, blocked] =
         phones.length === 0
-          ? [[], []]
+          ? [[], [], []]
           : await Promise.all([
               db
                 .select({
@@ -77,17 +78,24 @@ export const adminCustomerRoutes: FastifyPluginAsyncTypebox = async admin => {
                 })
                 .from(bookings)
                 .where(inArray(bookings.customerPhone, phones))
-                .orderBy(bookings.customerPhone, desc(bookings.startsAt))
+                .orderBy(bookings.customerPhone, desc(bookings.startsAt)),
+              db
+                .select({ phone: blacklist.phone })
+                .from(blacklist)
+                .where(inArray(blacklist.phone, phones))
             ]);
 
       const foodMap = new Map(foodByPhone.map(f => [f.phone, f.foodGrosz]));
       const nameMap = new Map(latestNames.map(n => [n.phone, n.name]));
+      const blockedPhones = new Set(blocked.map(b => b.phone));
 
       return aggregates.map(agg => ({
         phone: agg.phone,
         name: nameMap.get(agg.phone) ?? '',
         bookingsCount: agg.bookingsCount,
         cancelledCount: agg.cancelledCount,
+        noShowCount: agg.noShowCount,
+        blacklisted: blockedPhones.has(agg.phone),
         firstSeen: agg.firstSeen?.toISOString() ?? '',
         lastSeen: agg.lastSeen?.toISOString() ?? '',
         totalSpentGrosz: agg.tableGrosz + (foodMap.get(agg.phone) ?? 0)

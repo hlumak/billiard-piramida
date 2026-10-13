@@ -6,14 +6,16 @@ export const PHASE_LABELS: Record<BookingPhase, () => string> = {
   upcoming: m.phase_upcoming,
   active: m.phase_active,
   finished: m.phase_finished,
-  cancelled: m.phase_cancelled
+  cancelled: m.phase_cancelled,
+  no_show: m.phase_no_show
 };
 
 export const PHASE_STYLES: Record<BookingPhase, string> = {
   upcoming: 'bg-golden/15 text-golden',
   active: 'bg-golden text-btn-text',
   finished: 'bg-deep-cream/20 text-deep-cream',
-  cancelled: 'bg-danger-soft text-danger-soft-foreground'
+  cancelled: 'bg-danger-soft text-danger-soft-foreground',
+  no_show: 'bg-danger-soft text-danger-soft-foreground'
 };
 
 /** Booking API error codes → localized copy; anything unknown is generic. */
@@ -26,6 +28,9 @@ const BOOKING_ERRORS: Record<string, () => string> = {
   booking_too_long: m.err_booking_too_long,
   booking_finished: m.err_booking_changed,
   booking_cancelled: m.err_booking_changed,
+  booking_no_show: m.err_booking_changed,
+  booking_not_started: m.err_booking_not_started,
+  phone_blocked: m.err_phone_blocked,
   only_upcoming_can_be_cancelled: m.err_booking_changed,
   invalid_phone: m.err_phone_invalid,
   invalid_name: m.err_name_required,

@@ -15,7 +15,7 @@ import {
   type TableAvailabilityDto
 } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
-import { adminApi } from '../../lib/admin-api';
+import { adminApi, adminBlacklistQuery } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { bookingHours, formatHour, warsawDate, warsawHour, warsawToday } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
@@ -236,6 +236,9 @@ export function AdminBookingModal({
   const { date, startHour, duration, tableId, name, phone, sportCards, game } = form;
 
   const { data: availability } = useQuery({ ...availabilityQuery(date), enabled: isOpen });
+  // The desk may book a black-listed number; it should know it is doing so
+  const { data: blacklist } = useQuery({ ...adminBlacklistQuery(), enabled: isOpen });
+  const phoneBlacklisted = blacklist?.some(entry => entry.phone === phone) ?? false;
   const { hours: venueHours } = useVenueConfig();
 
   // Bounded by closing time rather than a fixed list: a 15:00 start on a day
@@ -414,6 +417,11 @@ export function AdminBookingModal({
                   value={phone}
                   onChange={value => dispatch({ type: 'phone', phone: value })}
                 />
+                {phoneBlacklisted ? (
+                  <p role="status" className="text-sm text-danger-soft-foreground">
+                    {m.admin_blacklisted_warning()}
+                  </p>
+                ) : null}
 
                 {create.error ? (
                   <p className="text-sm text-danger-soft-foreground">

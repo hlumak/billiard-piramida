@@ -1,5 +1,6 @@
 import type {
   AdminAnalyticsDto,
+  AdminBlacklistEntryDto,
   AdminCustomerDto,
   AdminMenuItemDto,
   AdminNewsItemDto,
@@ -48,7 +49,8 @@ export interface AdminBookingPatch {
   customerPhone?: string;
   sportCardCount?: number;
   game?: BilliardGame;
-  status?: BookingStatus;
+  /** Restore ("came after all") or cancel; a no-show is marked by its own call */
+  status?: Extract<BookingStatus, 'confirmed' | 'cancelled'>;
 }
 
 /** The admin token is an HttpOnly cookie; this readable flag cookie tells the
@@ -133,6 +135,20 @@ export const adminApi = {
     request<BookingDto>('/api/admin/bookings', { method: 'POST', body: input }),
   cancelBooking: (id: string) =>
     request<BookingDto>(`/api/admin/bookings/${id}/cancel`, { method: 'POST' }),
+  /** The client did not come: frees the slot and black-lists the number */
+  markNoShow: (id: string) =>
+    request<BookingDto>(`/api/admin/bookings/${id}/no-show`, { method: 'POST' }),
+  blacklist: (signal?: AbortSignal) =>
+    request<AdminBlacklistEntryDto[]>('/api/admin/blacklist', { signal }),
+  addToBlacklist: (phone: string, note: string | null) =>
+    request<AdminBlacklistEntryDto>('/api/admin/blacklist', {
+      method: 'POST',
+      body: { phone, note }
+    }),
+  removeFromBlacklist: (phone: string) =>
+    request<{ deleted: boolean }>(`/api/admin/blacklist/${encodeURIComponent(phone)}`, {
+      method: 'DELETE'
+    }),
   updateBooking: (id: string, patch: AdminBookingPatch) =>
     request<BookingDto>(`/api/admin/bookings/${id}`, { method: 'PATCH', body: patch }),
   addBookingItems: (id: string, items: NewOrderItem[]) =>
@@ -232,6 +248,12 @@ export const adminMenuQuery = () =>
   queryOptions({
     queryKey: ['admin', 'menu'],
     queryFn: ({ signal }) => adminApi.menu(signal)
+  });
+
+export const adminBlacklistQuery = () =>
+  queryOptions({
+    queryKey: ['admin', 'blacklist'],
+    queryFn: ({ signal }) => adminApi.blacklist(signal)
   });
 
 export const adminNewsQuery = () =>

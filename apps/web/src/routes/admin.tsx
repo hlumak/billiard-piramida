@@ -8,6 +8,7 @@ import { tabId, tabPanelId } from '../components/tab-ids';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { AdminBookings } from '../components/admin/AdminBookings';
 import { AdminCustomers } from '../components/admin/AdminCustomers';
+import { AdminBlacklist } from '../components/admin/AdminBlacklist';
 import { AdminLogin } from '../components/admin/AdminLogin';
 import { AdminMenu } from '../components/admin/AdminMenu';
 import { AdminNews } from '../components/admin/AdminNews';
@@ -33,6 +34,7 @@ const TABS = [
   { id: 'stats', label: m.admin_tab_stats },
   { id: 'bookings', label: m.admin_tab_bookings },
   { id: 'customers', label: m.admin_tab_customers },
+  { id: 'blacklist', label: m.admin_tab_blacklist },
   { id: 'menu', label: m.admin_tab_menu },
   { id: 'news', label: m.admin_tab_news },
   { id: 'tournaments', label: m.admin_tab_tournaments },
@@ -171,6 +173,7 @@ function AdminPage() {
               {tab === 'customers' ? (
                 <AdminCustomers onShowBookings={showCustomerBookings} />
               ) : null}
+              {tab === 'blacklist' ? <AdminBlacklist /> : null}
               {tab === 'menu' ? <AdminMenu /> : null}
               {tab === 'news' ? <AdminNews /> : null}
               {tab === 'tournaments' ? <AdminTournaments /> : null}
