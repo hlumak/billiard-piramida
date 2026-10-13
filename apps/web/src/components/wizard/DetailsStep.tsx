@@ -29,7 +29,8 @@ import {
   bookingRequestFrom,
   needsNewTime,
   orderLinesFrom,
-  type BookingDraft
+  type BookingDraft,
+  type OrderLine
 } from './booking-request';
 import {
   goToStep,
@@ -48,14 +49,6 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const { data: profile } = useQuery(profileQuery());
 
   const orderLines = orderLinesFrom(items, menu);
-
-  const spot = { id: draft.tableId, kind: draft.kind };
-  const tableSize = sizeOf(draft.tableId);
-  const games = gamesFor(draft.tableId);
-  const tableTotal = spotPriceGrosz(spot, draft.durationHours, useVenueConfig().rates);
-  const foodTotal = orderLines.reduce((sum, line) => sum + line.item.priceGrosz * line.quantity, 0);
-  // Preview only — the server recomputes and locks the discount in
-  const discount = discountGroszFor(sportCardCount, tableTotal);
 
   const createBooking = useMutation({
     mutationFn: api.createBooking,
@@ -108,86 +101,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
       ) : null}
 
       <div className="md:grid md:grid-cols-2 md:items-start md:gap-6">
-        <div className="mb-6 rounded-[10px] bg-club-green-light p-4 md:mb-0">
-          <h3 className="mb-2 font-semibold text-golden-light">{m.summary_title()}</h3>
-          <dl className="flex flex-col gap-1 text-sm text-creme">
-            <div className="flex justify-between">
-              <dt className="text-grey-cool">{m.summary_date()}</dt>
-              <dd className="capitalize">{formatDayLong(draft.date)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-grey-cool">{m.summary_time()}</dt>
-              <dd>
-                {formatHour(draft.startHour)}–{formatHour(draft.startHour + draft.durationHours)}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-grey-cool">{spotSummaryLabel(draft.kind)}</dt>
-              {/* The size is what the rate hangs off, so it reads next to the name */}
-              <dd>
-                {spotName(draft.kind, draft.tableLabel)}
-                {tableSize ? <span className="text-grey-cool"> · {tableSize}</span> : null}
-              </dd>
-            </div>
-            {/* Only tables offer a game, and only hall 1 offers a choice of one
-                — elsewhere this reads as the plain fact that it is pyramid. */}
-            {games.length > 0 ? (
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-grey-cool">{m.game_label()}</dt>
-                <dd>
-                  {games.length > 1 ? (
-                    <div role="group" aria-label={m.game_label()} className="flex gap-1.5">
-                      {games.map(option => (
-                        <button
-                          key={option}
-                          type="button"
-                          aria-pressed={draft.game === option}
-                          onClick={() => selectGame(option)}
-                          className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-colors ${
-                            draft.game === option
-                              ? 'bg-golden text-btn-text'
-                              : 'bg-club-green text-creme hover:bg-surface-hover'
-                          }`}
-                        >
-                          {gameName(option)}
-                        </button>
-                      ))}
-                    </div>
-                  ) : draft.game ? (
-                    gameName(draft.game)
-                  ) : null}
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-
-          <div className="mt-3 border-t border-deep-cream/30 pt-3 text-sm">
-            <div className="flex justify-between text-creme">
-              <span className="text-grey-cool">
-                {spotRentalLabel(draft.kind)} · {m.hours_n({ n: draft.durationHours })}
-              </span>
-              <span>{formatPln(tableTotal, intlTag())}</span>
-            </div>
-            {orderLines.map(line => (
-              <div key={line.item.id} className="flex justify-between text-creme">
-                <span className="text-grey-cool">
-                  {line.item.name} × {line.quantity}
-                </span>
-                <span>{formatPln(line.item.priceGrosz * line.quantity, intlTag())}</span>
-              </div>
-            ))}
-            {discount > 0 ? (
-              <div className="flex justify-between text-creme">
-                <span className="text-grey-cool">{m.sport_cards_count({ n: sportCardCount })}</span>
-                <span className="text-golden-light">−{formatPln(discount, intlTag())}</span>
-              </div>
-            ) : null}
-            <div className="mt-2 flex justify-between text-base font-bold text-golden-light">
-              <span>{m.total()}</span>
-              <span>{formatPln(tableTotal + foodTotal - discount, intlTag())}</span>
-            </div>
-          </div>
-        </div>
+        <BookingSummary draft={draft} orderLines={orderLines} sportCardCount={sportCardCount} />
 
         <form
           className="flex flex-col gap-4"
@@ -273,5 +187,110 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
         </form>
       </div>
     </section>
+  );
+}
+
+/**
+ * What the guest is about to book and what it will cost: the picks so far, the
+ * game choice where the table offers one, and the price lines. A preview — the
+ * server prices the booking itself and locks the discount in.
+ */
+function BookingSummary({
+  draft,
+  orderLines,
+  sportCardCount
+}: {
+  draft: BookingDraft;
+  orderLines: OrderLine[];
+  sportCardCount: number;
+}) {
+  const spot = { id: draft.tableId, kind: draft.kind };
+  const tableSize = sizeOf(draft.tableId);
+  const games = gamesFor(draft.tableId);
+  const tableTotal = spotPriceGrosz(spot, draft.durationHours, useVenueConfig().rates);
+  const foodTotal = orderLines.reduce((sum, line) => sum + line.item.priceGrosz * line.quantity, 0);
+  const discount = discountGroszFor(sportCardCount, tableTotal);
+
+  return (
+    <div className="mb-6 rounded-[10px] bg-club-green-light p-4 md:mb-0">
+      <h3 className="mb-2 font-semibold text-golden-light">{m.summary_title()}</h3>
+      <dl className="flex flex-col gap-1 text-sm text-creme">
+        <div className="flex justify-between">
+          <dt className="text-grey-cool">{m.summary_date()}</dt>
+          <dd className="capitalize">{formatDayLong(draft.date)}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-grey-cool">{m.summary_time()}</dt>
+          <dd>
+            {formatHour(draft.startHour)}–{formatHour(draft.startHour + draft.durationHours)}
+          </dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-grey-cool">{spotSummaryLabel(draft.kind)}</dt>
+          {/* The size is what the rate hangs off, so it reads next to the name */}
+          <dd>
+            {spotName(draft.kind, draft.tableLabel)}
+            {tableSize ? <span className="text-grey-cool"> · {tableSize}</span> : null}
+          </dd>
+        </div>
+        {/* Only tables offer a game, and only hall 1 offers a choice of one
+            — elsewhere this reads as the plain fact that it is pyramid. */}
+        {games.length > 0 ? (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-grey-cool">{m.game_label()}</dt>
+            <dd>
+              {games.length > 1 ? (
+                <div role="group" aria-label={m.game_label()} className="flex gap-1.5">
+                  {games.map(option => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={draft.game === option}
+                      onClick={() => selectGame(option)}
+                      className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-colors ${
+                        draft.game === option
+                          ? 'bg-golden text-btn-text'
+                          : 'bg-club-green text-creme hover:bg-surface-hover'
+                      }`}
+                    >
+                      {gameName(option)}
+                    </button>
+                  ))}
+                </div>
+              ) : draft.game ? (
+                gameName(draft.game)
+              ) : null}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+
+      <div className="mt-3 border-t border-deep-cream/30 pt-3 text-sm">
+        <div className="flex justify-between text-creme">
+          <span className="text-grey-cool">
+            {spotRentalLabel(draft.kind)} · {m.hours_n({ n: draft.durationHours })}
+          </span>
+          <span>{formatPln(tableTotal, intlTag())}</span>
+        </div>
+        {orderLines.map(line => (
+          <div key={line.item.id} className="flex justify-between text-creme">
+            <span className="text-grey-cool">
+              {line.item.name} × {line.quantity}
+            </span>
+            <span>{formatPln(line.item.priceGrosz * line.quantity, intlTag())}</span>
+          </div>
+        ))}
+        {discount > 0 ? (
+          <div className="flex justify-between text-creme">
+            <span className="text-grey-cool">{m.sport_cards_count({ n: sportCardCount })}</span>
+            <span className="text-golden-light">−{formatPln(discount, intlTag())}</span>
+          </div>
+        ) : null}
+        <div className="mt-2 flex justify-between text-base font-bold text-golden-light">
+          <span>{m.total()}</span>
+          <span>{formatPln(tableTotal + foodTotal - discount, intlTag())}</span>
+        </div>
+      </div>
+    </div>
   );
 }

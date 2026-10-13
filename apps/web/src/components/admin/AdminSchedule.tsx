@@ -37,6 +37,67 @@ function occupancyOf(bookings: BookingDto[]): Map<string, BookingDto> {
   return map;
 }
 
+/** A booking as one block spanning its hours; clicking it pulls the booking up. */
+function BookingCell({
+  booking,
+  startHour,
+  endHour,
+  span,
+  active,
+  past,
+  onShowBooking
+}: {
+  booking: BookingDto;
+  startHour: number;
+  endHour: number;
+  /** Grid columns covered, clamped to the grid's closing hour */
+  span: number;
+  /** Being played right now (the grid re-renders every minute) */
+  active: boolean;
+  past: boolean;
+  onShowBooking: (phone: string) => void;
+}) {
+  const time = `${formatHour(startHour)}–${formatHour(endHour)}`;
+  return (
+    <button
+      type="button"
+      style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
+      onClick={() => onShowBooking(booking.customerPhone)}
+      title={`${booking.customerName} · ${formatPhone(booking.customerPhone)} · ${time}`}
+      // Figma: a game in progress is solid golden, any other booking a
+      // #ffb732 fill at half strength. Figma also fades that label to half,
+      // which leaves creme at ~3.8:1; black at full strength keeps it
+      // readable (5.3:1). Hover only brightens the fill a step.
+      className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] px-2 text-left text-btn-text-hover transition-colors ${
+        active ? 'bg-golden hover:bg-golden-hover' : 'bg-golden-hover/50 hover:bg-golden-hover/70'
+      } ${past ? 'opacity-50' : ''}`}
+    >
+      <span className="w-full truncate text-sm font-semibold">
+        {booking.customerName}
+        {/* The colour alone says "playing now" only to those who see it */}
+        {active ? <span className="sr-only">, {PHASE_LABELS.active()}</span> : null}
+      </span>
+      <span className="text-xs">{time}</span>
+    </button>
+  );
+}
+
+/** A free hour: a button that seeds a new booking at that hour. Past free
+ *  hours stay clickable so staff can log a game that already started today
+ *  (the admin create endpoint allows past-today starts). */
+function FreeCell({ label, past, onPick }: { label: string; past: boolean; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onPick}
+      className={`h-12 rounded-[10px] border transition-colors hover:bg-surface-hover ${
+        past ? 'border-black opacity-40' : 'border-golden/60'
+      }`}
+    />
+  );
+}
+
 /** One table's row of grid cells: free hours are buttons that seed a new
  *  booking; a booking renders as a single block spanning all its hours. */
 function TableRow({
@@ -68,52 +129,30 @@ function TableRow({
     const booking = occupancy.get(`${tableId}:${hour}`);
     if (booking) {
       const endHour = bookingHours(booking).end;
-      // A booking can outlast the grid when staff have since moved closing time
-      // earlier: clamp, or it would push every following row out of place
-      const span = Math.min(endHour, close) - hour;
-      const time = `${formatHour(hour)}–${formatHour(endHour)}`;
-      // Being played right now (the grid re-renders every minute)
-      const active = nowHour !== null && hour <= nowHour && nowHour < endHour;
       cells.push(
-        <button
+        <BookingCell
           key={hour}
-          type="button"
-          style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
-          onClick={() => onShowBooking(booking.customerPhone)}
-          title={`${booking.customerName} · ${formatPhone(booking.customerPhone)} · ${time}`}
-          // Figma: a game in progress is solid golden, any other booking a
-          // #ffb732 fill at half strength. Figma also fades that label to half,
-          // which leaves creme at ~3.8:1; black at full strength keeps it
-          // readable (5.3:1). Hover only brightens the fill a step.
-          className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] px-2 text-left text-btn-text-hover transition-colors ${
-            active
-              ? 'bg-golden hover:bg-golden-hover'
-              : 'bg-golden-hover/50 hover:bg-golden-hover/70'
-          } ${isPastHour(endHour - 1) ? 'opacity-50' : ''}`}
-        >
-          <span className="w-full truncate text-sm font-semibold">
-            {booking.customerName}
-            {/* The colour alone says "playing now" only to those who see it */}
-            {active ? <span className="sr-only">, {PHASE_LABELS.active()}</span> : null}
-          </span>
-          <span className="text-xs">{time}</span>
-        </button>
+          booking={booking}
+          startHour={hour}
+          endHour={endHour}
+          // A booking can outlast the grid when staff have since moved closing
+          // time earlier: clamp, or it would push every following row out of place
+          span={Math.min(endHour, close) - hour}
+          active={nowHour !== null && hour <= nowHour && nowHour < endHour}
+          past={isPastHour(endHour - 1)}
+          onShowBooking={onShowBooking}
+        />
       );
       hour = endHour;
     } else {
       // The loop mutates `hour`, so the click closure must capture a copy
       const slotHour = hour;
-      // Past free hours stay clickable so staff can log a game that already
-      // started today (the admin create endpoint allows past-today starts).
       cells.push(
-        <button
+        <FreeCell
           key={slotHour}
-          type="button"
-          aria-label={`${name}, ${formatHour(slotHour)} — ${m.admin_free()}`}
-          onClick={() => onPickSlot(slotHour)}
-          className={`h-12 rounded-[10px] border transition-colors hover:bg-surface-hover ${
-            isPastHour(slotHour) ? 'border-black opacity-40' : 'border-golden/60'
-          }`}
+          label={`${name}, ${formatHour(slotHour)} — ${m.admin_free()}`}
+          past={isPastHour(slotHour)}
+          onPick={() => onPickSlot(slotHour)}
         />
       );
       hour++;

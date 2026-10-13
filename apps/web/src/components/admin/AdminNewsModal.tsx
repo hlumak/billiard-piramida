@@ -2,13 +2,7 @@ import { useRef, useState } from 'react';
 import { Button, Input, Label, Modal, TextArea, TextField } from '@heroui/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ImagePlus } from 'lucide-react';
-import {
-  isSafeUrl,
-  type AdminNewsItemDto,
-  SUPPORTED_LOCALES,
-  type Locale,
-  type NewsTranslationDto
-} from '@repo/shared';
+import { SUPPORTED_LOCALES, type AdminNewsItemDto, type Locale } from '@repo/shared';
 import { adminApi } from '../../lib/admin-api';
 import { isDraftChanged } from './draft';
 import { ApiError } from '../../lib/api';
@@ -16,40 +10,10 @@ import { m } from '../../paraglide/messages.js';
 import { localizeHref } from '../../paraglide/runtime.js';
 import { AdminImageField } from './AdminImageField';
 import { uploadErrorMessage } from './upload-errors';
+import { REQUIRED_LOCALE, checkNewsDraft, newsDraftFrom, type NewsDraft } from './news-draft';
 
-const REQUIRED_LOCALE: Locale = 'pl';
 /** Mirrors the API's cap on a single picture. */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-interface NewsDraft {
-  slug: string;
-  imageUrl: string;
-  linkUrl: string;
-  sortOrder: string;
-  titles: Record<Locale, string>;
-  bodies: Record<Locale, string>;
-  contents: Record<Locale, string>;
-}
-
-function draftFrom(item: AdminNewsItemDto | null): NewsDraft {
-  const titles = { uk: '', pl: '', en: '' };
-  const bodies = { uk: '', pl: '', en: '' };
-  const contents = { uk: '', pl: '', en: '' };
-  for (const t of item?.translations ?? []) {
-    titles[t.locale] = t.title;
-    bodies[t.locale] = t.body ?? '';
-    contents[t.locale] = t.content ?? '';
-  }
-  return {
-    slug: item?.slug ?? '',
-    imageUrl: item?.imageUrl ?? '',
-    linkUrl: item?.linkUrl ?? '',
-    sortOrder: String(item?.sortOrder ?? 0),
-    titles,
-    bodies,
-    contents
-  };
-}
 
 /**
  * Create (item === null) or edit a news card: cover, link, order, and per
@@ -60,53 +24,30 @@ function draftFrom(item: AdminNewsItemDto | null): NewsDraft {
 export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
-  const [draft, setDraft] = useState<NewsDraft>(() => draftFrom(item));
+  const [draft, setDraft] = useState<NewsDraft>(() => newsDraftFrom(item));
   const [insertError, setInsertError] = useState<string | null>(null);
   // One hidden file input serves all three article fields; this says which
   // one asked for the picture
   const fileInput = useRef<HTMLInputElement>(null);
   const insertTarget = useRef<Locale>('pl');
 
-  const isChanged = isOpen && isDraftChanged(draft, draftFrom(item));
+  const isChanged = isOpen && isDraftChanged(draft, newsDraftFrom(item));
 
   const open = () => {
-    setDraft(draftFrom(item));
+    setDraft(newsDraftFrom(item));
     setInsertError(null);
     setOpen(true);
   };
 
-  const imageUrl = draft.imageUrl.trim() || null;
-  const linkUrl = draft.linkUrl.trim() || null;
-  const slug = draft.slug.trim();
-  const sortOrder = Number(draft.sortOrder);
-  const translations: NewsTranslationDto[] = SUPPORTED_LOCALES.flatMap(locale => {
-    const title = draft.titles[locale].trim();
-    return title === ''
-      ? []
-      : [
-          {
-            locale,
-            title,
-            body: draft.bodies[locale].trim() || null,
-            content: draft.contents[locale].trim() || null
-          }
-        ];
-  });
-  // The server re-checks both URLs; catching them here spares a round trip
-  const urlsOk = [imageUrl, linkUrl].every(url => url === null || isSafeUrl(url));
-  // Polish is the only required copy — the storefront falls back to it for
-  // visitors whose locale has no translation yet (see /api/news).
-  const canSubmit =
-    urlsOk &&
-    Number.isInteger(sortOrder) &&
-    sortOrder >= 0 &&
-    translations.some(t => t.locale === REQUIRED_LOCALE);
+  const check = checkNewsDraft(draft);
 
   const save = useMutation({
     mutationFn: () => {
-      const input = { imageUrl, linkUrl, sortOrder, translations };
+      // Save is disabled until the check passes; this keeps the input type honest
+      if (!check.ok) throw new Error('invalid draft');
+      const { input, slug } = check;
       return item === null
-        ? adminApi.createNewsItem(slug === '' ? input : { ...input, slug })
+        ? adminApi.createNewsItem(slug === null ? input : { ...input, slug })
         : adminApi.updateNewsItem(item.id, input);
     },
     onSuccess: () => {
@@ -149,6 +90,10 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   };
 
   const rejectedUrl = save.error instanceof ApiError && save.error.code === 'invalid_url';
+  const urlProblem = (!check.ok && check.problem === 'invalid_url') || rejectedUrl;
+  const errorText = urlProblem
+    ? m.admin_invalid_url()
+    : (insertError ?? (save.isError ? m.err_generic() : null));
 
   return (
     <Modal isOpen={isOpen} onOpenChange={setOpen}>
@@ -289,19 +234,15 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
                   </div>
                 ))}
 
-                {!urlsOk || rejectedUrl ? (
-                  <p className="text-sm text-danger-soft-foreground">{m.admin_invalid_url()}</p>
-                ) : insertError ? (
-                  <p className="text-sm text-danger-soft-foreground">{insertError}</p>
-                ) : save.isError ? (
-                  <p className="text-sm text-danger-soft-foreground">{m.err_generic()}</p>
+                {errorText ? (
+                  <p className="text-sm text-danger-soft-foreground">{errorText}</p>
                 ) : null}
               </div>
             </Modal.Body>
             <Modal.Footer>
               <Button
                 className="w-full font-bold"
-                isDisabled={!canSubmit}
+                isDisabled={!check.ok}
                 isPending={save.isPending}
                 onPress={() => save.mutate()}
               >

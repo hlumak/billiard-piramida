@@ -9,6 +9,7 @@ import { isDraftChanged } from './draft';
 import {
   checkTournamentDraft,
   tournamentDraftFrom,
+  tournamentErrorText,
   type TournamentDraft
 } from './tournament-draft';
 import { m } from '../../paraglide/messages.js';
@@ -45,19 +46,7 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
   });
 
   const rejected = save.error instanceof ApiError ? save.error.code : null;
-  const problem = check.ok ? null : check.problem;
-  const errorText =
-    problem === 'invalid_url' || rejected === 'invalid_url'
-      ? m.admin_invalid_url()
-      : problem === 'deadline_after_start' || rejected === 'deadline_after_start'
-        ? m.admin_tournament_deadline_after_start()
-        : problem === 'min_above_max' || rejected === 'min_above_max'
-          ? m.admin_tournament_min_above_max()
-          : problem === 'invalid_fee'
-            ? m.admin_invalid_price()
-            : save.isError
-              ? m.err_generic()
-              : null;
+  const errorText = tournamentErrorText(check.ok ? null : check.problem, rejected, save.isError);
 
   return (
     <Modal isOpen={isOpen} onOpenChange={setOpen}>

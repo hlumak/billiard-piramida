@@ -10,6 +10,7 @@ import { ACTIVITY_KINDS, activityName, spotName } from '../../lib/spots';
 import { QueryError } from '../QueryError';
 import { goToStep, selectTable } from '../../store/booking-wizard';
 import { FloorPlan } from './FloorPlan';
+import { freeSpotIds } from './free-spots';
 
 const KIND_ICON: Record<ActivityKind, string> = { billiard: '🎱', darts: '🎯' };
 
@@ -35,20 +36,7 @@ export function TableStep({
     );
   }
 
-  // Free = every hour of the chosen window is available on that spot
-  const freeTableIds = new Set<number>();
-  for (const table of availability.tables) {
-    const free = new Set<number>();
-    for (const slot of table.slots) if (slot.available) free.add(slot.hour);
-    let wholeWindowFree = true;
-    for (let hour = startHour; hour < startHour + durationHours; hour++) {
-      if (!free.has(hour)) {
-        wholeWindowFree = false;
-        break;
-      }
-    }
-    if (wholeWindowFree) freeTableIds.add(table.tableId);
-  }
+  const freeTableIds = freeSpotIds(availability.tables, startHour, durationHours);
 
   const spots = availability.tables.map(t => ({ id: t.tableId, label: t.label, kind: t.kind }));
   const ofKind = availability.tables.filter(table => table.kind === kind);

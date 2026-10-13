@@ -22,7 +22,13 @@ export const Route = createFileRoute('/bookings')({
   component: MyBookingsPage
 });
 
-function MyBookingsPage() {
+/**
+ * The guest's bookings: those this browser holds the link to, plus — when
+ * signed in — what their account booked on any device. A stored booking the
+ * API no longer shows is forgotten. Rendered as they arrive: one slow booking
+ * does not hold up the whole list.
+ */
+function useMyBookings() {
   // localStorage is browser-only: null through SSR and hydration
   const stored = useRecentBookings();
   const signedIn = useFlagCookie(userAuthFlag);
@@ -48,7 +54,6 @@ function MyBookingsPage() {
     for (const id of goneKey.split(',')) if (id) forgetBooking(id);
   }, [goneKey]);
 
-  // Rendered as they arrive: one slow booking no longer holds the whole list
   const byId = new Map<string, BookingDto>();
   for (const booking of [...results.map(result => result.data), ...(mine.data ?? [])]) {
     if (booking) byId.set(booking.id, booking);
@@ -64,6 +69,16 @@ function MyBookingsPage() {
     results.some(
       result => result.error && !(result.error instanceof ApiError && result.error.status === 404)
     ) || mine.isError;
+  const retry = () => {
+    results.forEach(result => void result.refetch());
+    if (signedIn) void mine.refetch();
+  };
+
+  return { bookings, isLoading, hardFailure, retry };
+}
+
+function MyBookingsPage() {
+  const { bookings, isLoading, hardFailure, retry } = useMyBookings();
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
@@ -75,12 +90,7 @@ function MyBookingsPage() {
             <Spinner aria-label={m.loading()} />
           </div>
         ) : hardFailure && bookings.length === 0 ? (
-          <QueryError
-            onRetry={() => {
-              results.forEach(result => void result.refetch());
-              if (signedIn) void mine.refetch();
-            }}
-          />
+          <QueryError onRetry={retry} />
         ) : bookings.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-12">
             <p className="text-grey-cool">{m.no_bookings()}</p>
@@ -144,6 +154,8 @@ function LookupSection() {
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
+  // A read, kept as a mutation because it runs on submit: its result is shown
+  // from `lookup.data` and no cached query holds it, so nothing to invalidate
   const lookup = useMutation({
     mutationFn: (value: string) => api.lookupBookings(value)
   });
@@ -160,6 +172,8 @@ function LookupSection() {
       <p className="mb-4 text-sm text-grey-cool">{m.find_booking_hint()}</p>
       <form
         className="flex w-full flex-col gap-3 text-left md:max-w-sm"
+        // A client-side submission on purpose: the phone check loads its
+        // metadata lazily, and the lookup goes to the separate API service
         onSubmit={async event => {
           event.preventDefault();
           // The phone metadata is only needed here, on submit: load it then

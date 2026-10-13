@@ -3,8 +3,10 @@ import type { AdminTournamentDto } from '@repo/shared';
 import {
   checkTournamentDraft,
   tournamentDraftFrom,
+  tournamentErrorText,
   type TournamentDraft
 } from '../src/components/admin/tournament-draft';
+import { m } from '../src/paraglide/messages.js';
 
 /** A complete, valid draft; each test breaks one thing. */
 function draft(overrides: Partial<TournamentDraft> = {}): TournamentDraft {
@@ -112,4 +114,19 @@ test('an existing tournament round-trips through the draft unchanged', () => {
     imageUrl: '/uploads/cup.webp',
     translations: item.translations
   });
+});
+
+test('the editor says the most specific problem, and echoes the server', () => {
+  expect(tournamentErrorText('invalid_url', null, false)).toBe(m.admin_invalid_url());
+  // The server refusing the same thing reads the same as the form catching it
+  expect(tournamentErrorText(null, 'min_above_max', true)).toBe(m.admin_tournament_min_above_max());
+  // A problem the form has wins over a different refusal from an older save
+  expect(tournamentErrorText('deadline_after_start', 'invalid_url', true)).toBe(
+    m.admin_invalid_url()
+  );
+  // Only the form parses the fee: a server code of that name means nothing here
+  expect(tournamentErrorText(null, 'invalid_fee', false)).toBeNull();
+  // Incomplete fields say nothing (Save stays disabled); a failed save does
+  expect(tournamentErrorText('incomplete', null, false)).toBeNull();
+  expect(tournamentErrorText('incomplete', 'internal_error', true)).toBe(m.err_generic());
 });

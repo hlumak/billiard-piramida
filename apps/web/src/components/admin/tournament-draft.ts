@@ -10,6 +10,7 @@ import {
   type TournamentTranslationDto
 } from '@repo/shared';
 import type { AdminTournamentInput } from '../../lib/admin-api';
+import { m } from '../../paraglide/messages.js';
 import { parseZloty } from '../../lib/money';
 
 /** The tournament editor's form state: every field as typed. */
@@ -143,4 +144,28 @@ export function checkTournamentDraft(draft: TournamentDraft): TournamentDraftChe
       translations
     }
   };
+}
+
+/** The problems with a message of their own, most specific first. */
+const PROBLEM_MESSAGES = [
+  ['invalid_url', m.admin_invalid_url],
+  ['deadline_after_start', m.admin_tournament_deadline_after_start],
+  ['min_above_max', m.admin_tournament_min_above_max],
+  ['invalid_fee', m.admin_invalid_price]
+] as const;
+
+/**
+ * What the editor says under the fields: the draft's own problem, or the same
+ * refusal from the server (it re-checks everything but the fee, which only
+ * the form parses), else a generic failure once a save has failed.
+ */
+export function tournamentErrorText(
+  problem: TournamentDraftProblem | null,
+  rejectedCode: string | null,
+  saveFailed: boolean
+): string | null {
+  for (const [code, message] of PROBLEM_MESSAGES) {
+    if (problem === code || (code !== 'invalid_fee' && rejectedCode === code)) return message();
+  }
+  return saveFailed ? m.err_generic() : null;
 }

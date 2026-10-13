@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Button, Spinner } from '@heroui/react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
@@ -42,6 +42,29 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
+
+/** What the panes need from the page: the customers → bookings hand-off. */
+interface PaneContext {
+  bookingsPhone: string;
+  showCustomerBookings: (phone: string) => void;
+}
+
+/** What each tab shows. A Record over TabId: a tab without a pane fails to compile. */
+const TAB_PANES: Record<TabId, (context: PaneContext) => ReactNode> = {
+  overview: () => <AdminOverview />,
+  schedule: ({ showCustomerBookings }) => <AdminSchedule onShowBooking={showCustomerBookings} />,
+  stats: () => <AdminStats />,
+  // Keyed by the phone handed over, so a new hand-off starts a fresh search
+  bookings: ({ bookingsPhone }) => (
+    <AdminBookings key={bookingsPhone} initialPhone={bookingsPhone} />
+  ),
+  customers: ({ showCustomerBookings }) => <AdminCustomers onShowBookings={showCustomerBookings} />,
+  blacklist: () => <AdminBlacklist />,
+  menu: () => <AdminMenu />,
+  news: () => <AdminNews />,
+  tournaments: () => <AdminTournaments />,
+  settings: () => <AdminVenueConfig />
+};
 
 /**
  * Staff session lifecycle: an explicit logout waits for the server (only it
@@ -164,20 +187,7 @@ function AdminPage() {
               aria-labelledby={tabId(idBase, tab)}
               className="anim-stagger-item"
             >
-              {tab === 'overview' ? <AdminOverview /> : null}
-              {tab === 'schedule' ? <AdminSchedule onShowBooking={showCustomerBookings} /> : null}
-              {tab === 'stats' ? <AdminStats /> : null}
-              {tab === 'bookings' ? (
-                <AdminBookings key={bookingsPhone} initialPhone={bookingsPhone} />
-              ) : null}
-              {tab === 'customers' ? (
-                <AdminCustomers onShowBookings={showCustomerBookings} />
-              ) : null}
-              {tab === 'blacklist' ? <AdminBlacklist /> : null}
-              {tab === 'menu' ? <AdminMenu /> : null}
-              {tab === 'news' ? <AdminNews /> : null}
-              {tab === 'tournaments' ? <AdminTournaments /> : null}
-              {tab === 'settings' ? <AdminVenueConfig /> : null}
+              {TAB_PANES[tab]({ bookingsPhone, showCustomerBookings })}
             </div>
           </div>
         )}
