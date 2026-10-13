@@ -15,7 +15,7 @@ export const Route = createFileRoute('/manifest.webmanifest')({
         const locale = isLocale(requested) ? requested : baseLocale;
         const manifest = {
           name: m.app_name({}, { locale }),
-          short_name: 'piramida',
+          short_name: 'Piramida',
           description: m.app_description({}, { locale }),
           lang: locale,
           // An installed app opens in the language it was installed from

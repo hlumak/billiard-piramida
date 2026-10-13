@@ -187,6 +187,9 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
     <section
       aria-roledescription="carousel"
       aria-label={m.news_title()}
+      // Changing news, not what the club is: keep it out of search snippets
+      // (Google quoted it, and its dates, instead of the meta description)
+      data-nosnippet=""
       className={className}
       // Hover, touch (pointerenter/leave fire on tap too) and keyboard focus all
       // hold the rotation: nothing should slide away mid-read.

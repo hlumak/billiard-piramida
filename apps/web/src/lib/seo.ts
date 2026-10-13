@@ -73,6 +73,21 @@ export function noindexMeta(title: string) {
   return [{ title }, { name: 'robots', content: 'noindex' }];
 }
 
+/**
+ * WebSite structured data for the home page: the name Google shows above the
+ * result instead of the bare domain (its "site name"), with the alternates it
+ * may fall back to.
+ */
+export function websiteJsonLd(): string {
+  return JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: VENUE.name,
+    alternateName: [m.app_title(), 'billiard-piramida.pl'],
+    url: `${SITE_URL}/`
+  });
+}
+
 /** schema.org day names, indexed by JS weekday (0 = Sunday). */
 const SCHEMA_DAYS = [
   'Sunday',

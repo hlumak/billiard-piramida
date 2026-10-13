@@ -2,7 +2,7 @@ import type { Locale } from '@repo/shared';
 
 /** Single source for real-world venue facts (contacts page, SEO, JSON-LD). */
 export const VENUE = {
-  name: 'piramida',
+  name: 'Piramida',
   /** The club is upstairs — guests who do not know that walk past the door. */
   street: 'ul. Tatrzańska 42/44, 1 piętro',
   postalCode: '93-219',

@@ -40,7 +40,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { name: 'theme-color', content: '#0b4e31' },
       { title: m.app_title() },
-      { property: 'og:site_name', content: 'piramida' },
+      { property: 'og:site_name', content: 'Piramida' },
       { property: 'og:type', content: 'website' },
       { property: 'og:image', content: `${SITE_URL}/og-image.jpg` },
       { property: 'og:image:width', content: '1200' },
