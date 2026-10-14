@@ -265,6 +265,16 @@ body,
  * reproduced on Windows. A staff-only 6px tab-switch jump is not worth a
  * visible seam on the first screen every customer sees. */
 
+/* Tailwind v4's preflight leaves buttons on the default arrow; here anything
+   that can be pressed shows the hand, like a link does. In the base layer, so
+   a disabled state's `not-allowed` (and any utility) still wins. */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
