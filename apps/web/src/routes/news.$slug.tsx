@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { PageHeader } from '../components/AppHeader';
+import { PageLayout } from '../components/site/PageLayout';
 import { ArticleBody } from '../components/ArticleBody';
 import { Reveal } from '../components/motion';
 import { notFoundOn404, resolveAssetUrl } from '../lib/api';
@@ -39,12 +39,9 @@ export const Route = createFileRoute('/news/$slug')({
 
 function ArticleShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="news" decorative />
-      <main id="main" className="mt-8 flex-1">
-        {children}
-      </main>
-    </div>
+    <PageLayout script="news" title={m.news_title()} decorativeTitle>
+      {children}
+    </PageLayout>
   );
 }
 

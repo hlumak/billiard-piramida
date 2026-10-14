@@ -365,5 +365,112 @@
   "admin_blacklisted_warning": "Ten numer jest na czarnej liście (wcześniej nie przyszedł). Rezerwacja online jest dla niego zablokowana.",
   "err_phone_blocked": "Nie możemy przyjąć rezerwacji online dla tego numeru. Zadzwoń do nas, aby zarezerwować.",
   "err_booking_not_started": "Gra jeszcze się nie zaczęła.",
-  "seo_title_home": "Piramida — klub bilardowy w Łodzi | Rezerwacja online"
+  "seo_title_home": "Piramida — klub bilardowy w Łodzi | Rezerwacja online",
+  "nav_contacts": "Kontakt",
+  "nav_main": "Menu główne",
+  "nav_close_menu": "Zamknij menu",
+  "call_us": "Zadzwoń",
+  "footer_tagline": "Klub bilardowy w Łodzi: pool, piramida, dart i bar.",
+  "footer_players": "Dla graczy",
+  "footer_club": "Klub",
+  "page_booking": "Rezerwacja stołu",
+  "page_admin": "Panel obsługi",
+  "page_error": "Coś poszło nie tak",
+  "hours_today": "dziś",
+  "hall_n": "Sala {n}",
+  "per_hour_short": "/ godz.",
+  "tables_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} stół",
+        "nPlural=few": "{n} stoły",
+        "nPlural=many": "{n} stołów",
+        "nPlural=other": "{n} stołu"
+      }
+    }
+  ],
+  "dartboards_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} tarcza",
+        "nPlural=few": "{n} tarcze",
+        "nPlural=many": "{n} tarcz",
+        "nPlural=other": "{n} tarczy"
+      }
+    }
+  ],
+  "free_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} wolny",
+        "nPlural=few": "{n} wolne",
+        "nPlural=many": "{n} wolnych",
+        "nPlural=other": "{n} wolnego"
+      }
+    }
+  ],
+  "home_title": "Klub bilardowy w Łodzi",
+  "home_lead": "Stoły 9 i 12 stóp do poola i piramidy, dart i bar. Zarezerwuj stół online w minutę.",
+  "home_cta_book": "Zarezerwuj stół",
+  "home_cta_prices": "Cennik i bar",
+  "home_fact_halls": "w dwóch salach",
+  "home_fact_sizes_hint": "pool i piramida",
+  "home_fact_darts_hint": "do darta",
+  "home_fact_cards_hint": "z kartą sportową",
+  "home_whats_on": "Co w klubie",
+  "home_prices_title": "Stoły i ceny",
+  "home_all_prices": "Pełny cennik i bar",
+  "home_find_us": "Jak nas znaleźć",
+  "home_spotlight": "Najbliższy turniej",
+  "tournament_seats_left": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "Zostało {n} miejsce",
+        "nPlural=few": "Zostały {n} miejsca",
+        "nPlural=many": "Zostało {n} miejsc",
+        "nPlural=other": "Zostało {n} miejsca"
+      }
+    }
+  ],
+  "home_free_today": "Wolne stoły dziś",
+  "home_free_tomorrow": "Wolne stoły jutro",
+  "home_free_hint": "Wybierz godzinę, potem stół na planie",
+  "home_free_none": "Wszystko zajęte — sprawdź inne dni",
+  "home_free_more": "Inne dni",
+  "home_free_book_at": "Rezerwuj na {time}",
+  "price_9ft_desc": "Pool lub piramida — do wyboru",
+  "price_12ft_desc": "Turniejowy rozmiar do piramidy",
+  "price_darts_desc": "Na ścianie między salami",
+  "step_when": "Kiedy",
+  "step_spot": "Stół",
+  "step_bar": "Bar",
+  "step_contacts": "Kontakt",
+  "step_when_title": "Kiedy gramy?",
+  "date_label": "Data",
+  "booking_steps": "Etapy rezerwacji",
+  "summary_pick_later": "wybierzesz dalej",
+  "summary_estimate": "Szacunkowo",
+  "summary_from": "od {price}",
+  "next_to_table": "Dalej: stół",
+  "next_to_bar": "Dalej: bar",
+  "next_to_contacts": "Dalej: kontakt",
+  "change_time": "Zmień godzinę",
+  "manage_note": "Przedłużysz lub odwołasz ją w „Moich rezerwacjach”.",
+  "contacts_lead": "Po tym numerze znajdziemy Twoją rezerwację.",
+  "auth_benefit_autofill": "Imię i telefon wpiszą się same przy rezerwacji",
+  "auth_benefit_devices": "Twoje rezerwacje na każdym urządzeniu",
+  "bookings_upcoming": "Nadchodzące",
+  "bookings_past": "Minione",
+  "find_booking_signin": "Po zalogowaniu widzisz rezerwacje ze wszystkich urządzeń.",
+  "tournaments_upcoming": "Nadchodzące",
+  "tournaments_past": "Minione",
+  "back_to_top": "Do góry"
 }

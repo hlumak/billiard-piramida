@@ -5,7 +5,7 @@ import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 import { warsawToday } from '../lib/format';
-import { PageHeader } from '../components/AppHeader';
+import { PageLayout } from '../components/site/PageLayout';
 import { WizardProgress } from '../components/WizardProgress';
 import { DateStep } from '../components/wizard/DateStep';
 import { TimeStep } from '../components/wizard/TimeStep';
@@ -142,27 +142,27 @@ function BookingWizard() {
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="booking" onBack={handleBack} />
+    <PageLayout script="booking" title={msg.page_booking()} footer={false}>
+      <button type="button" onClick={handleBack} className="btn-outline mb-4 h-10 px-4 text-sm">
+        ← {msg.nav_back()}
+      </button>
       <WizardProgress step={index + 1} total={WIZARD_STEPS.length} />
-      <main id="main" className="mt-8 flex-1">
-        {/* Every step shares one sunken panel: the darker ground marks off the
+      {/* Every step shares one sunken panel: the darker ground marks off the
             wizard's working area and gives the club-green-light option buttons
             something to lift from. It is also the clip box — the step slide-in
             is contained by the panel rather than by the viewport — and its own
             padding keeps input focus rings well clear of that clipped edge. */}
-        <div className="overflow-x-clip rounded-3xl bg-club-green-dark p-4 md:p-6">
-          {/* key remounts the wrapper per step so the CSS slide-in replays;
+      <div className="overflow-x-clip rounded-3xl bg-club-green-dark p-4 md:p-6">
+        {/* key remounts the wrapper per step so the CSS slide-in replays;
               enter-only on purpose — see step-in-* keyframes in styles.css */}
-          <div
-            key={step}
-            ref={panelRef}
-            className={`outline-none ${direction === 1 ? 'anim-step-forward' : 'anim-step-back'}`}
-          >
-            <CurrentStep state={state} step={step} />
-          </div>
+        <div
+          key={step}
+          ref={panelRef}
+          className={`outline-none ${direction === 1 ? 'anim-step-forward' : 'anim-step-back'}`}
+        >
+          <CurrentStep state={state} step={step} />
         </div>
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 }

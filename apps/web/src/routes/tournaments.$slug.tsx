@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { PageHeader } from '../components/AppHeader';
+import { PageLayout } from '../components/site/PageLayout';
 import { TournamentView } from '../components/tournament/TournamentView';
 import { notFoundOn404 } from '../lib/api';
 import { tournamentQuery } from '../lib/queries';
@@ -36,12 +36,9 @@ export const Route = createFileRoute('/tournaments/$slug')({
 
 function TournamentShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="tournament" />
-      <main id="main" className="mt-8 flex-1">
-        {children}
-      </main>
-    </div>
+    <PageLayout script="tournament" title={m.tournament_badge()}>
+      {children}
+    </PageLayout>
   );
 }
 

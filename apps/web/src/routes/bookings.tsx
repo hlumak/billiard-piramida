@@ -3,7 +3,7 @@ import { Button, FieldError, Input, Label, Spinner, TextField } from '@heroui/re
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { formatPln, type BookingDto, type BookingSummaryDto } from '@repo/shared';
-import { PageHeader } from '../components/AppHeader';
+import { PageLayout } from '../components/site/PageLayout';
 import { PHASE_LABELS, mutationErrorText } from '../components/booking/phase';
 import { StaggerGroup, StaggerItem } from '../components/motion';
 import { formatDayLong, intlTag, warsawDate, warsawTime } from '../lib/format';
@@ -81,47 +81,44 @@ function MyBookingsPage() {
   const { bookings, isLoading, hardFailure, retry } = useMyBookings();
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="bookings" />
-      <main id="main" className="mt-8 flex-1">
-        <h2 className="mb-4 text-xl font-semibold text-creme">{m.my_bookings_title()}</h2>
-        {isLoading ? (
-          <div className="flex justify-center py-16">
-            <Spinner aria-label={m.loading()} />
-          </div>
-        ) : hardFailure && bookings.length === 0 ? (
-          <QueryError onRetry={retry} />
-        ) : bookings.length === 0 ? (
-          <div className="flex flex-col items-center gap-4 py-12">
-            <p className="text-grey-cool">{m.no_bookings()}</p>
-            <Link to="/book" className="font-semibold text-golden">
-              {m.menu_booking()}
-            </Link>
-          </div>
-        ) : (
-          <StaggerGroup>
-            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {bookings.map(booking => (
-                <StaggerItem key={booking.id} as="li">
-                  <Link
-                    to="/booking/$id"
-                    params={{ id: booking.id }}
-                    className="block rounded-[10px] bg-club-green-light p-4 transition-colors hover:bg-surface-hover"
-                  >
-                    <BookingLine booking={booking} />
-                    <div className="mt-1 text-right text-sm font-semibold text-creme">
-                      {formatPln(booking.totalGrosz, intlTag())}
-                    </div>
-                  </Link>
-                </StaggerItem>
-              ))}
-            </ul>
-          </StaggerGroup>
-        )}
+    <PageLayout script="bookings" title={m.nav_my_bookings()} width="medium">
+      <h2 className="mb-4 text-xl font-semibold text-creme">{m.my_bookings_title()}</h2>
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Spinner aria-label={m.loading()} />
+        </div>
+      ) : hardFailure && bookings.length === 0 ? (
+        <QueryError onRetry={retry} />
+      ) : bookings.length === 0 ? (
+        <div className="flex flex-col items-center gap-4 py-12">
+          <p className="text-grey-cool">{m.no_bookings()}</p>
+          <Link to="/book" className="font-semibold text-golden">
+            {m.menu_booking()}
+          </Link>
+        </div>
+      ) : (
+        <StaggerGroup>
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {bookings.map(booking => (
+              <StaggerItem key={booking.id} as="li">
+                <Link
+                  to="/booking/$id"
+                  params={{ id: booking.id }}
+                  className="block rounded-[10px] bg-club-green-light p-4 transition-colors hover:bg-surface-hover"
+                >
+                  <BookingLine booking={booking} />
+                  <div className="mt-1 text-right text-sm font-semibold text-creme">
+                    {formatPln(booking.totalGrosz, intlTag())}
+                  </div>
+                </Link>
+              </StaggerItem>
+            ))}
+          </ul>
+        </StaggerGroup>
+      )}
 
-        <LookupSection />
-      </main>
-    </div>
+      <LookupSection />
+    </PageLayout>
   );
 }
 

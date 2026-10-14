@@ -1,6 +1,6 @@
 import { Spinner } from '@heroui/react';
 import { createFileRoute } from '@tanstack/react-router';
-import { PageHeader } from '../components/AppHeader';
+import { PageLayout } from '../components/site/PageLayout';
 import { AuthForms } from '../components/profile/AuthForms';
 import { ProfileView } from '../components/profile/ProfileView';
 import { userAuthFlag } from '../lib/auth';
@@ -20,19 +20,16 @@ function ProfilePage() {
   const hasToken = useFlagCookie(userAuthFlag);
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="profile" />
-      <main id="main" className="mt-8 flex-1">
-        {!ready ? (
-          <div className="flex justify-center py-16">
-            <Spinner aria-label={m.loading()} />
-          </div>
-        ) : hasToken ? (
-          <ProfileView onSignedOut={() => userAuthFlag.clear()} />
-        ) : (
-          <AuthForms onSignedIn={() => userAuthFlag.refresh()} />
-        )}
-      </main>
-    </div>
+    <PageLayout script="profile" title={m.nav_profile()} width="narrow">
+      {!ready ? (
+        <div className="flex justify-center py-16">
+          <Spinner aria-label={m.loading()} />
+        </div>
+      ) : hasToken ? (
+        <ProfileView onSignedOut={() => userAuthFlag.clear()} />
+      ) : (
+        <AuthForms onSignedIn={() => userAuthFlag.refresh()} />
+      )}
+    </PageLayout>
   );
 }

@@ -372,5 +372,104 @@
   "admin_blacklisted_warning": "This number is on the black list (didn't come before). Online booking is blocked for it.",
   "err_phone_blocked": "We can't take an online booking for this number. Please call us to book.",
   "err_booking_not_started": "The game hasn't started yet.",
-  "seo_title_home": "Piramida — billiard club in Łódź | Book a table online"
+  "seo_title_home": "Piramida — billiard club in Łódź | Book a table online",
+  "nav_contacts": "Contacts",
+  "nav_main": "Main menu",
+  "nav_close_menu": "Close menu",
+  "call_us": "Call us",
+  "footer_tagline": "Billiard club in Łódź: pool, pyramid, darts and a bar.",
+  "footer_players": "For players",
+  "footer_club": "The club",
+  "page_booking": "Book a table",
+  "page_admin": "Staff panel",
+  "page_error": "Something went wrong",
+  "hours_today": "today",
+  "hall_n": "Hall {n}",
+  "per_hour_short": "/ h",
+  "tables_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} table",
+        "nPlural=other": "{n} tables"
+      }
+    }
+  ],
+  "dartboards_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} dartboard",
+        "nPlural=other": "{n} dartboards"
+      }
+    }
+  ],
+  "free_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} free",
+        "nPlural=other": "{n} free"
+      }
+    }
+  ],
+  "home_title": "Billiard club in Łódź",
+  "home_lead": "9 ft and 12 ft tables for pool and pyramid, darts and a bar. Book a table online in a minute.",
+  "home_cta_book": "Book a table",
+  "home_cta_prices": "Prices & bar",
+  "home_fact_halls": "in two halls",
+  "home_fact_sizes_hint": "pool and pyramid",
+  "home_fact_darts_hint": "for darts",
+  "home_fact_cards_hint": "with a sport card",
+  "home_whats_on": "What's on at the club",
+  "home_prices_title": "Tables & prices",
+  "home_all_prices": "All prices & bar",
+  "home_find_us": "How to find us",
+  "home_spotlight": "Next tournament",
+  "tournament_seats_left": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} place left",
+        "nPlural=other": "{n} places left"
+      }
+    }
+  ],
+  "home_free_today": "Free tables today",
+  "home_free_tomorrow": "Free tables tomorrow",
+  "home_free_hint": "Pick an hour, then your table",
+  "home_free_none": "Fully booked — check the other days",
+  "home_free_more": "Other days",
+  "home_free_book_at": "Book for {time}",
+  "price_9ft_desc": "Pool or pyramid — your pick",
+  "price_12ft_desc": "Tournament size for pyramid",
+  "price_darts_desc": "On the wall between the halls",
+  "step_when": "When",
+  "step_spot": "Table",
+  "step_bar": "Bar",
+  "step_contacts": "Contacts",
+  "step_when_title": "When are you playing?",
+  "date_label": "Date",
+  "booking_steps": "Booking steps",
+  "summary_pick_later": "picked next",
+  "summary_estimate": "Estimated",
+  "summary_from": "from {price}",
+  "next_to_table": "Next: table",
+  "next_to_bar": "Next: bar",
+  "next_to_contacts": "Next: contacts",
+  "change_time": "Change time",
+  "manage_note": "You can extend or cancel it in My bookings.",
+  "contacts_lead": "This is the number we'll find your booking by.",
+  "auth_benefit_autofill": "Your name and phone fill in by themselves when you book",
+  "auth_benefit_devices": "Your bookings on any device",
+  "bookings_upcoming": "Upcoming",
+  "bookings_past": "Past",
+  "find_booking_signin": "Signed in, you see the bookings from every device.",
+  "tournaments_upcoming": "Coming up",
+  "tournaments_past": "Past",
+  "back_to_top": "Back to top"
 }

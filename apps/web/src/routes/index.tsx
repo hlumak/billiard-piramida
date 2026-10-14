@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { hoursForDate, isClosedAllDay } from '@repo/shared';
-import { HomeHeader } from '../components/AppHeader';
+import { SiteHeader } from '../components/site/SiteHeader';
 import { NewsCarousel } from '../components/NewsCarousel';
 import { Reveal } from '../components/motion';
 import { ButtonLink } from '../components/ButtonLink';
@@ -58,7 +58,7 @@ function Home() {
 
       <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-[18dvh] pt-14 md:max-w-3xl md:pt-16">
         <Reveal>
-          <HomeHeader />
+          <SiteHeader overlay />
         </Reveal>
 
         {/* Two `mt-auto` siblings split the free space: the news sits in the

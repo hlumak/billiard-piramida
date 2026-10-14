@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Button, Spinner } from '@heroui/react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { PageHeader } from '../components/AppHeader';
+import { PageLayout } from '../components/site/PageLayout';
 import { TabList } from '../components/TabList';
 import { tabId, tabPanelId } from '../components/tab-ids';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
@@ -137,61 +137,58 @@ function AdminPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-6 pb-10 pt-14 lg:max-w-5xl">
-      <PageHeader title="admin" />
-      <main id="main" className="mt-8 flex-1">
-        {!ready ? (
-          <div className="flex justify-center py-16">
-            <Spinner aria-label={m.loading()} />
+    <PageLayout script="admin" title={m.page_admin()} footer={false}>
+      {!ready ? (
+        <div className="flex justify-center py-16">
+          <Spinner aria-label={m.loading()} />
+        </div>
+      ) : !signedIn ? (
+        <>
+          <AdminLogin onSuccess={session.signedIn} />
+          <div className="mt-8">
+            <LocaleSwitcher />
           </div>
-        ) : !signedIn ? (
-          <>
-            <AdminLogin onSuccess={session.signedIn} />
-            <div className="mt-8">
+        </>
+      ) : (
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <TabList
+              idBase={idBase}
+              tabs={TABS.map(entry => ({ id: entry.id, label: entry.label() }))}
+              selected={tab}
+              onSelect={setTab}
+              className="flex flex-wrap gap-2"
+            />
+            <div className="flex items-center gap-3">
               <LocaleSwitcher />
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <TabList
-                idBase={idBase}
-                tabs={TABS.map(entry => ({ id: entry.id, label: entry.label() }))}
-                selected={tab}
-                onSelect={setTab}
-                className="flex flex-wrap gap-2"
-              />
-              <div className="flex items-center gap-3">
-                <LocaleSwitcher />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  isPending={session.isLoggingOut}
-                  onPress={session.logout}
-                >
-                  {m.admin_logout()}
-                </Button>
-              </div>
-            </div>
-            {session.logoutFailed ? (
-              <p role="alert" className="text-sm text-danger-soft-foreground">
-                {m.err_signout_failed()}
-              </p>
-            ) : null}
-
-            {/* key remounts the pane so the CSS entrance replays per tab */}
-            <div
-              key={tab}
-              id={tabPanelId(idBase)}
-              role="tabpanel"
-              aria-labelledby={tabId(idBase, tab)}
-              className="anim-stagger-item"
-            >
-              {TAB_PANES[tab]({ bookingsPhone, showCustomerBookings })}
+              <Button
+                variant="ghost"
+                size="sm"
+                isPending={session.isLoggingOut}
+                onPress={session.logout}
+              >
+                {m.admin_logout()}
+              </Button>
             </div>
           </div>
-        )}
-      </main>
-    </div>
+          {session.logoutFailed ? (
+            <p role="alert" className="text-sm text-danger-soft-foreground">
+              {m.err_signout_failed()}
+            </p>
+          ) : null}
+
+          {/* key remounts the pane so the CSS entrance replays per tab */}
+          <div
+            key={tab}
+            id={tabPanelId(idBase)}
+            role="tabpanel"
+            aria-labelledby={tabId(idBase, tab)}
+            className="anim-stagger-item"
+          >
+            {TAB_PANES[tab]({ bookingsPhone, showCustomerBookings })}
+          </div>
+        </div>
+      )}
+    </PageLayout>
   );
 }

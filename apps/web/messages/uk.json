@@ -387,5 +387,112 @@
   "admin_blacklisted_warning": "Цей номер у чорному списку (раніше не прийшов). Онлайн-бронювання для нього заблоковане.",
   "err_phone_blocked": "Ми не можемо прийняти онлайн-бронювання для цього номера. Зателефонуйте нам, щоб забронювати.",
   "err_booking_not_started": "Гра ще не почалася.",
-  "seo_title_home": "Piramida — більярдний клуб у Лодзі | Онлайн-бронювання"
+  "seo_title_home": "Piramida — більярдний клуб у Лодзі | Онлайн-бронювання",
+  "nav_contacts": "Контакти",
+  "nav_main": "Головне меню",
+  "nav_close_menu": "Закрити меню",
+  "call_us": "Зателефонувати",
+  "footer_tagline": "Більярдний клуб у Лодзі: пул, піраміда, дартс і бар.",
+  "footer_players": "Гравцям",
+  "footer_club": "Клуб",
+  "page_booking": "Бронювання столу",
+  "page_admin": "Панель персоналу",
+  "page_error": "Щось пішло не так",
+  "hours_today": "сьогодні",
+  "hall_n": "Зала {n}",
+  "per_hour_short": "/ год",
+  "tables_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} стіл",
+        "nPlural=few": "{n} столи",
+        "nPlural=many": "{n} столів",
+        "nPlural=other": "{n} столу"
+      }
+    }
+  ],
+  "dartboards_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} мішень",
+        "nPlural=few": "{n} мішені",
+        "nPlural=many": "{n} мішеней",
+        "nPlural=other": "{n} мішені"
+      }
+    }
+  ],
+  "free_n": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} вільний",
+        "nPlural=few": "{n} вільні",
+        "nPlural=many": "{n} вільних",
+        "nPlural=other": "{n} вільного"
+      }
+    }
+  ],
+  "home_title": "Більярдний клуб у Лодзі",
+  "home_lead": "Столи 9 і 12 футів для пулу й піраміди, дартс і бар. Забронюйте стіл онлайн за хвилину.",
+  "home_cta_book": "Забронювати стіл",
+  "home_cta_prices": "Ціни й бар",
+  "home_fact_halls": "у двох залах",
+  "home_fact_sizes_hint": "пул і піраміда",
+  "home_fact_darts_hint": "для дартсу",
+  "home_fact_cards_hint": "зі спортивною карткою",
+  "home_whats_on": "Найближче в клубі",
+  "home_prices_title": "Столи та ціни",
+  "home_all_prices": "Усі ціни й бар",
+  "home_find_us": "Як нас знайти",
+  "home_spotlight": "Найближчий турнір",
+  "tournament_seats_left": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "Залишилось {n} місце",
+        "nPlural=few": "Залишилось {n} місця",
+        "nPlural=many": "Залишилось {n} місць",
+        "nPlural=other": "Залишилось {n} місця"
+      }
+    }
+  ],
+  "home_free_today": "Вільні столи сьогодні",
+  "home_free_tomorrow": "Вільні столи завтра",
+  "home_free_hint": "Оберіть годину — далі стіл на плані",
+  "home_free_none": "Усе зайнято — подивіться інші дні",
+  "home_free_more": "Інші дні",
+  "home_free_book_at": "Забронювати на {time}",
+  "price_9ft_desc": "Пул або піраміда — на ваш вибір",
+  "price_12ft_desc": "Турнірний розмір для піраміди",
+  "price_darts_desc": "На стіні між залами",
+  "step_when": "Коли",
+  "step_spot": "Стіл",
+  "step_bar": "Бар",
+  "step_contacts": "Контакти",
+  "step_when_title": "Коли граємо?",
+  "date_label": "Дата",
+  "booking_steps": "Кроки бронювання",
+  "summary_pick_later": "оберете далі",
+  "summary_estimate": "Орієнтовно",
+  "summary_from": "від {price}",
+  "next_to_table": "Далі: стіл",
+  "next_to_bar": "Далі: бар",
+  "next_to_contacts": "Далі: контакти",
+  "change_time": "Змінити час",
+  "manage_note": "Продовжити чи скасувати можна в «Мої бронювання».",
+  "contacts_lead": "За цим номером ми знайдемо ваше бронювання.",
+  "auth_benefit_autofill": "Ім'я і телефон підставляються в бронювання самі",
+  "auth_benefit_devices": "Ваші бронювання — на будь-якому пристрої",
+  "bookings_upcoming": "Найближчі",
+  "bookings_past": "Минулі",
+  "find_booking_signin": "Увійшовши, ви бачите бронювання з усіх пристроїв.",
+  "tournaments_upcoming": "Найближчі",
+  "tournaments_past": "Минулі",
+  "back_to_top": "Наверх"
 }
