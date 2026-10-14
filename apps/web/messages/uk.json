@@ -537,5 +537,7 @@
   "cta_ready_title": "Готові зіграти?",
   "cta_ready_text": "Оберіть час і стіл на плані — бронювання займає хвилину.",
   "tournament_players_label": "Учасники",
-  "tournament_until": "до {date}"
+  "tournament_until": "до {date}",
+  "auth_benefits_title": "Навіщо акаунт",
+  "auth_benefit_optional": "Бронювати можна й без акаунта — з ним просто зручніше."
 }

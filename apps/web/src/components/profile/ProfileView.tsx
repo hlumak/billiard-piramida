@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Button, Spinner } from '@heroui/react';
+import { Spinner } from '@heroui/react';
+import { ChevronRight, LoaderCircle } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { formatPhone } from '@repo/shared/phone';
 import { CardFields, type CardsState } from './CardFields';
-import { Reveal } from '../motion';
 import { QueryError } from '../QueryError';
 import { ApiError } from '../../lib/api';
 import { authApi, clearSession, dropSessionData, profileQuery } from '../../lib/auth';
@@ -66,42 +66,49 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
   }
 
   return (
-    <Reveal className="mx-auto w-full max-w-sm md:max-w-md">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-creme">
+    <div className="anim-reveal mx-auto flex w-full max-w-[640px] flex-col gap-4">
+      <section className="card flex items-center gap-4 p-5 md:p-6">
+        <span
+          aria-hidden
+          className="flex size-14 flex-none items-center justify-center rounded-full bg-golden text-2xl font-bold text-btn-text"
+        >
+          {profile.name.trim().charAt(0).toLocaleUpperCase()}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-xl font-bold">
             {m.profile_welcome({ name: profile.name })}
           </h2>
-          <p className="text-sm text-grey-cool">{formatPhone(profile.phone)}</p>
+          <p className="mt-0.5 text-sm text-grey-cool">{formatPhone(profile.phone)}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          isPending={signOut.isPending}
-          onPress={() => signOut.mutate()}
+        <button
+          type="button"
+          disabled={signOut.isPending}
+          onClick={() => signOut.mutate()}
+          className="btn-outline h-10 flex-none px-4 text-sm"
         >
           {m.admin_logout()}
-        </Button>
-      </div>
+        </button>
+      </section>
       {signOut.isError ? (
-        <p role="alert" className="-mt-4 mb-4 text-sm text-danger-soft-foreground">
+        <p role="alert" className="text-sm text-danger-soft-foreground">
           {m.err_signout_failed()}
         </p>
       ) : null}
 
-      <Link to="/bookings" className="mb-6 block font-semibold text-golden hover:underline">
-        {m.nav_my_bookings()} →
+      <Link to="/bookings" className="card lift flex items-center justify-between gap-4 p-5 md:p-6">
+        <span className="text-[17px] font-bold">{m.nav_my_bookings()}</span>
+        <ChevronRight aria-hidden className="size-5 text-golden" />
       </Link>
 
-      <h3 className="mb-3 font-semibold text-golden">{m.profile_cards_title()}</h3>
       <form
-        className="flex flex-col gap-4"
+        className="card fields-roomy flex flex-col gap-4.5 p-5 md:p-6"
         onSubmit={event => {
           event.preventDefault();
           event.stopPropagation();
           save.mutate(cards);
         }}
       >
+        <h2 className="text-lg font-bold text-golden">{m.profile_cards_title()}</h2>
         <CardFields
           value={cards}
           onChange={next => {
@@ -109,18 +116,19 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
             save.reset();
           }}
         />
-        <Button
+        <button
           type="submit"
-          size="lg"
-          className="h-11.25 w-full text-lg font-bold"
-          isPending={save.isPending}
+          disabled={save.isPending}
+          aria-busy={save.isPending}
+          className="btn-gold h-13 w-full text-base"
         >
+          {save.isPending ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : null}
           {save.isSuccess ? m.saved_ok() : m.btn_save()}
-        </Button>
+        </button>
         {save.isError ? (
           <p className="text-sm text-danger-soft-foreground">{m.err_generic()}</p>
         ) : null}
       </form>
-    </Reveal>
+    </div>
   );
 }

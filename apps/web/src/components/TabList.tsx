@@ -21,13 +21,16 @@ export function TabList<T extends string>({
   tabs,
   selected,
   onSelect,
-  className
+  className,
+  tabClassName
 }: {
   idBase: string;
   tabs: readonly { id: T; label: string }[];
   selected: T;
   onSelect: (id: T) => void;
   className?: string;
+  /** Replaces the default pill look of each tab (e.g. with a segmented control) */
+  tabClassName?: string;
 }) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -55,11 +58,14 @@ export function TabList<T extends string>({
           aria-controls={selected === entry.id ? tabPanelId(idBase) : undefined}
           tabIndex={selected === entry.id ? 0 : -1}
           onClick={() => onSelect(entry.id)}
-          className={`h-10 rounded-[10px] px-4 font-semibold transition-colors ${
-            selected === entry.id
-              ? 'bg-golden text-btn-text'
-              : 'bg-club-green-light text-creme hover:bg-surface-hover'
-          }`}
+          className={
+            tabClassName ??
+            `h-10 rounded-[10px] px-4 font-semibold transition-colors ${
+              selected === entry.id
+                ? 'bg-golden text-btn-text'
+                : 'bg-club-green-light text-creme hover:bg-surface-hover'
+            }`
+          }
         >
           {entry.label}
         </button>

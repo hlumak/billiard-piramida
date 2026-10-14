@@ -512,5 +512,7 @@
   "cta_ready_title": "Ready to play?",
   "cta_ready_text": "Pick a time and a table on the plan — booking takes a minute.",
   "tournament_players_label": "Players",
-  "tournament_until": "until {date}"
+  "tournament_until": "until {date}",
+  "auth_benefits_title": "Why an account",
+  "auth_benefit_optional": "You can book without an account too — it's just handier with one."
 }

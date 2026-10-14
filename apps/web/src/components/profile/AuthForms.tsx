@@ -1,12 +1,12 @@
 import { useId, useState } from 'react';
-import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
+import { FieldError, Input, Label, TextField } from '@heroui/react';
+import { LoaderCircle } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isValidPhone } from '@repo/shared/phone';
 import { CardFields, type CardsState } from './CardFields';
 import { PhoneField } from '../PhoneField';
 import { TabList } from '../TabList';
 import { tabId, tabPanelId } from '../tab-ids';
-import { Reveal } from '../motion';
 import { ApiError } from '../../lib/api';
 import { authApi, storeSession, type RegisterInput } from '../../lib/auth';
 import { m } from '../../paraglide/messages.js';
@@ -62,9 +62,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   };
 
   return (
-    <Reveal className="mx-auto w-full max-w-sm md:max-w-md">
-      <p className="mb-5 text-sm text-grey-cool">{m.auth_promo()}</p>
-
+    <div className="card rounded-3xl p-5 md:p-7">
       <TabList
         idBase={idBase}
         tabs={[
@@ -73,14 +71,15 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
         ]}
         selected={tab}
         onSelect={selectTab}
-        className="mb-6 flex gap-2"
+        className="grid grid-cols-2 gap-1 rounded-[14px] bg-club-green-dark p-1.25"
+        tabClassName="segment h-11 text-[15px]"
       />
 
       <form
         id={tabPanelId(idBase)}
         role="tabpanel"
         aria-labelledby={tabId(idBase, tab)}
-        className="flex flex-col gap-4"
+        className="fields-roomy mt-6 flex flex-col gap-4.5"
         onSubmit={event => {
           event.preventDefault();
           event.stopPropagation();
@@ -129,16 +128,16 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
 
         {tab === 'register' ? <CardFields value={cards} onChange={setCards} /> : null}
 
-        <Button
+        <button
           type="submit"
-          size="lg"
-          className="h-11.25 w-full text-lg font-bold"
-          isDisabled={!isValidPhone(phone) || password.length < 8}
-          isPending={submit.isPending}
+          disabled={!isValidPhone(phone) || password.length < 8 || submit.isPending}
+          aria-busy={submit.isPending}
+          className="btn-gold mt-1.5 h-14 w-full text-base"
         >
+          {submit.isPending ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : null}
           {tab === 'login' ? m.auth_tab_login() : m.auth_register_btn()}
-        </Button>
+        </button>
       </form>
-    </Reveal>
+    </div>
   );
 }

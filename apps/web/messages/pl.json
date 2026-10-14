@@ -515,5 +515,7 @@
   "cta_ready_title": "Gotowi do gry?",
   "cta_ready_text": "Wybierz godzinę i stół na planie — rezerwacja zajmuje minutę.",
   "tournament_players_label": "Uczestnicy",
-  "tournament_until": "do {date}"
+  "tournament_until": "do {date}",
+  "auth_benefits_title": "Po co konto",
+  "auth_benefit_optional": "Rezerwować można też bez konta — z kontem jest po prostu wygodniej."
 }
