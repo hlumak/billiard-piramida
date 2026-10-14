@@ -1,23 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Button, Spinner } from '@heroui/react';
+import { Spinner } from '@heroui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { hoursForDate, type BookingDto, type IsoDate, type TableDto } from '@repo/shared';
+import {
+  hallOf,
+  hoursForDate,
+  sizeOf,
+  type BookingDto,
+  type IsoDate,
+  type TableDto
+} from '@repo/shared';
 import { useVenueConfig } from '../../lib/venue-config';
 import { formatPhone } from '@repo/shared/phone';
 import { adminBookingsQuery } from '../../lib/admin-api';
 import { tablesQuery } from '../../lib/queries';
-import { spotName } from '../../lib/spots';
+import { activityName, gameName, spotName } from '../../lib/spots';
 import { availabilityLive } from '../../lib/availability-live';
-import {
-  addDays,
-  bookingHours,
-  formatDayLong,
-  formatHour,
-  warsawHour,
-  warsawToday
-} from '../../lib/format';
+import { addDays, bookingHours, formatHour, warsawHour, warsawToday } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
+import { getLocale } from '../../paraglide/runtime.js';
 import { QueryError } from '../QueryError';
 import { PHASE_LABELS } from '../booking/phase';
 import { AdminDatePicker } from './AdminDatePicker';
@@ -37,47 +38,52 @@ function occupancyOf(bookings: BookingDto[]): Map<string, BookingDto> {
   return map;
 }
 
+type BlockTone = 'playing' | 'planned' | 'done';
+
+const BLOCK_TONES: Record<BlockTone, string> = {
+  playing: 'bg-golden text-btn-text hover:bg-golden-hover',
+  planned: 'border border-golden/60 bg-club-green-light text-creme hover:bg-surface-hover',
+  done: 'bg-creme/8 text-grey-cool hover:bg-creme/12'
+};
+
 /** A booking as one block spanning its hours; clicking it pulls the booking up. */
 function BookingCell({
   booking,
-  startHour,
-  endHour,
   span,
-  active,
-  past,
+  tone,
   onShowBooking
 }: {
   booking: BookingDto;
-  startHour: number;
-  endHour: number;
   /** Grid columns covered, clamped to the grid's closing hour */
   span: number;
-  /** Being played right now (the grid re-renders every minute) */
-  active: boolean;
-  past: boolean;
+  tone: BlockTone;
   onShowBooking: (phone: string) => void;
 }) {
-  const time = `${formatHour(startHour)}–${formatHour(endHour)}`;
+  const { start, end } = bookingHours(booking);
+  const time = `${formatHour(start)}–${formatHour(end)}`;
+  const game = booking.game ? gameName(booking.game).toLocaleLowerCase(getLocale()) : null;
   return (
     <button
       type="button"
       style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
       onClick={() => onShowBooking(booking.customerPhone)}
       title={`${booking.customerName} · ${formatPhone(booking.customerPhone)} · ${time}`}
-      // Figma: a game in progress is solid golden, any other booking a
-      // #ffb732 fill at half strength. Figma also fades that label to half,
-      // which leaves creme at ~3.8:1; black at full strength keeps it
-      // readable (5.3:1). Hover only brightens the fill a step.
-      className={`flex h-12 min-w-0 flex-col items-start justify-center rounded-[10px] px-2 text-left text-btn-text-hover transition-colors ${
-        active ? 'bg-golden hover:bg-golden-hover' : 'bg-golden-hover/50 hover:bg-golden-hover/70'
-      } ${past ? 'opacity-50' : ''}`}
+      // Above the "now" line, so the line never runs through a name
+      className={`relative z-10 flex h-12.5 min-w-0 flex-col items-start justify-center rounded-[10px] px-3 text-left transition-colors ${BLOCK_TONES[tone]}`}
     >
-      <span className="w-full truncate text-sm font-semibold">
+      <span className="w-full truncate text-[13px] font-bold">
         {booking.customerName}
+        {tone === 'playing' && game ? ` · ${game}` : ''}
         {/* The colour alone says "playing now" only to those who see it */}
-        {active ? <span className="sr-only">, {PHASE_LABELS.active()}</span> : null}
+        {tone === 'playing' ? <span className="sr-only">, {PHASE_LABELS.active()}</span> : null}
       </span>
-      <span className="text-xs">{time}</span>
+      {tone === 'done' ? null : (
+        <span
+          className={`w-full truncate text-xs font-semibold ${tone === 'planned' ? 'text-golden-light' : ''}`}
+        >
+          {formatPhone(booking.customerPhone)}
+        </span>
+      )}
     </button>
   );
 }
@@ -91,22 +97,30 @@ function FreeCell({ label, past, onPick }: { label: string; past: boolean; onPic
       type="button"
       aria-label={label}
       onClick={onPick}
-      className={`h-12 rounded-[10px] border transition-colors hover:bg-surface-hover ${
-        past ? 'border-black opacity-40' : 'border-golden/60'
+      className={`group relative z-10 h-12.5 rounded-[10px] border border-dashed border-creme/14 text-[13px] font-bold text-golden-light transition-colors hover:border-[1.5px] hover:border-golden hover:bg-golden/8 focus-visible:border-golden focus-visible:bg-golden/8 ${
+        past ? 'opacity-45' : ''
       }`}
-    />
+    >
+      <span
+        aria-hidden
+        className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+      >
+        {m.admin_book_slot()}
+      </span>
+    </button>
   );
 }
 
-/** One table's row of grid cells: free hours are buttons that seed a new
- *  booking; a booking renders as a single block spanning all its hours. */
-function TableRow({
+/** One spot's row: free hours are buttons that seed a new booking; a booking
+ *  renders as a single block spanning all its hours. */
+function SpotRow({
   spot,
   open,
   close,
   occupancy,
-  nowHour,
+  now,
   isPastDate,
+  isToday,
   onPickSlot,
   onShowBooking
 }: {
@@ -114,32 +128,31 @@ function TableRow({
   open: number;
   close: number;
   occupancy: Map<string, BookingDto>;
-  /** Current Warsaw hour when the grid shows today, else null */
-  nowHour: number | null;
+  now: number;
   isPastDate: boolean;
+  isToday: boolean;
   onPickSlot: (startHour: number) => void;
   onShowBooking: (phone: string) => void;
 }) {
+  const nowHour = isToday ? warsawHour(now) : null;
   const isPastHour = (hour: number) => isPastDate || (nowHour !== null && hour < nowHour);
-  const tableId = spot.id;
   const name = spotName(spot.kind, spot.label);
 
   const cells = [];
   for (let hour = open; hour < close;) {
-    const booking = occupancy.get(`${tableId}:${hour}`);
+    const booking = occupancy.get(`${spot.id}:${hour}`);
     if (booking) {
       const endHour = bookingHours(booking).end;
+      const started = Date.parse(booking.startsAt) <= now;
+      const ended = Date.parse(booking.endsAt) <= now;
       cells.push(
         <BookingCell
           key={hour}
           booking={booking}
-          startHour={hour}
-          endHour={endHour}
           // A booking can outlast the grid when staff have since moved closing
           // time earlier: clamp, or it would push every following row out of place
           span={Math.min(endHour, close) - hour}
-          active={nowHour !== null && hour <= nowHour && nowHour < endHour}
-          past={isPastHour(endHour - 1)}
+          tone={ended ? 'done' : started ? 'playing' : 'planned'}
           onShowBooking={onShowBooking}
         />
       );
@@ -161,7 +174,7 @@ function TableRow({
 
   return (
     <>
-      <div className="sticky left-0 z-10 flex h-12 items-center bg-club-green pr-3 text-sm font-semibold text-creme">
+      <div className="sticky left-0 z-20 flex h-12.5 items-center bg-card pr-3 text-sm font-bold">
         {name}
       </div>
       {cells}
@@ -169,7 +182,35 @@ function TableRow({
   );
 }
 
-/** Day grid of tables × opening hours — the phone-booking view: spot a free
+/** Hall 1's tables, the dartboards, then hall 2 — the order a guest walks the room. */
+function spotGroups(spots: TableDto[]): { key: string; title: string; spots: TableDto[] }[] {
+  const byLabel = (a: TableDto, b: TableDto) => Number(a.label) - Number(b.label);
+  const hall = (n: 1 | 2) =>
+    spots.filter(spot => spot.kind === 'billiard' && hallOf(spot.id) === n).sort(byLabel);
+  const groups = [
+    { key: 'hall-1', spots: hall(1) },
+    { key: 'darts', spots: spots.filter(spot => spot.kind === 'darts').sort(byLabel) },
+    { key: 'hall-2', spots: hall(2) }
+  ];
+  return groups
+    .filter(group => group.spots.length > 0)
+    .map(group => {
+      const first = group.spots[0];
+      const size = first ? sizeOf(first.id) : null;
+      const n = first ? hallOf(first.id) : null;
+      return {
+        ...group,
+        title:
+          group.key === 'darts' || size === null || n === null
+            ? activityName('darts')
+            : m.admin_hall_size({ n, size })
+      };
+    });
+}
+
+const legendSwatch = 'h-2.5 w-4 rounded-[3px]';
+
+/** Day grid of spots × opening hours — the phone-booking view: spot a free
  *  slot at a glance, click it to book, click a booking to pull it up. */
 export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string) => void }) {
   const queryClient = useQueryClient();
@@ -201,51 +242,72 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
 
   const now = useNowMinute();
   const today = warsawToday(now);
-  const nowHour = date === today ? warsawHour(now) : null;
+  const isToday = date === today;
   const { open, close } = hoursForDate(date, useVenueConfig().hours);
-  const hours = Array.from({ length: close - open }, (_, i) => open + i);
+  const hours = Array.from({ length: Math.max(close - open, 0) }, (_, i) => open + i);
   const occupancy = occupancyOf(bookings ?? []);
+
+  // Where "now" falls across the opening hours, 0–1; only drawn on today's grid
+  const nowFraction = (() => {
+    if (!isToday || hours.length === 0) return null;
+    const minutes = warsawHour(now) * 60 + new Date(now).getUTCMinutes();
+    const fraction = (minutes - open * 60) / ((close - open) * 60);
+    return fraction > 0 && fraction < 1 ? fraction : null;
+  })();
 
   const pickSlot = (tableId: number, startHour: number) => {
     setPrefill({ date, startHour, tableId });
     setCreating(true);
   };
 
+  const dayButton =
+    'flex size-10 items-center justify-center rounded-[10px] bg-club-green-light text-creme transition-colors hover:bg-surface-hover';
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          isIconOnly
-          size="sm"
-          variant="ghost"
+        <button
+          type="button"
           aria-label={m.admin_prev_day()}
-          onPress={() => setDate(addDays(date, -1))}
+          onClick={() => setDate(addDays(date, -1))}
+          className={dayButton}
         >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <AdminDatePicker value={date} onChange={next => setDate(next ?? warsawToday())} />
-        <Button
-          isIconOnly
-          size="sm"
-          variant="ghost"
+          <ChevronLeft aria-hidden className="size-5" />
+        </button>
+        <button
+          type="button"
+          aria-pressed={isToday}
+          onClick={() => setDate(today)}
+          className="chip h-10 rounded-[10px] px-3.5 text-sm"
+        >
+          {m.admin_today()}
+        </button>
+        <button
+          type="button"
           aria-label={m.admin_next_day()}
-          onPress={() => setDate(addDays(date, 1))}
+          onClick={() => setDate(addDays(date, 1))}
+          className={dayButton}
         >
-          <ChevronRight className="size-4" />
-        </Button>
-        {date !== today ? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="border-golden text-creme"
-            onPress={() => setDate(today)}
-          >
-            {m.admin_today()}
-          </Button>
-        ) : null}
-        <span className="ml-auto text-sm text-grey-cool">
-          {formatDayLong(date)} · {formatHour(open)}–{formatHour(close)}
-        </span>
+          <ChevronRight aria-hidden className="size-5" />
+        </button>
+        <AdminDatePicker value={date} onChange={next => setDate(next ?? warsawToday())} />
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-grey-cool lg:ml-auto">
+          <li className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={`${legendSwatch} border border-golden/60 bg-club-green-light`}
+            />
+            {PHASE_LABELS.upcoming().toLocaleLowerCase(getLocale())}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden className={`${legendSwatch} bg-golden`} />
+            {m.admin_legend_playing()}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden className={`${legendSwatch} bg-creme/12`} />
+            {PHASE_LABELS.finished().toLocaleLowerCase(getLocale())}
+          </li>
+        </ul>
       </div>
 
       {isError && !bookings ? (
@@ -255,53 +317,57 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
           <Spinner aria-label={m.loading()} />
         </div>
       ) : (
-        <div className="overflow-x-auto pb-1">
+        <div className="card overflow-x-auto px-4 pt-4.5 pb-5 md:px-5">
           <div
-            className="grid min-w-max gap-1"
-            style={{ gridTemplateColumns: `auto repeat(${hours.length}, minmax(6rem, 1fr))` }}
+            className="relative grid min-w-max gap-1.5"
+            style={{ gridTemplateColumns: `110px repeat(${hours.length}, minmax(5.5rem, 1fr))` }}
           >
-            <div className="sticky left-0 z-10 bg-club-green" />
+            <div className="sticky left-0 z-20 bg-card" />
             {hours.map(hour => (
               <div
                 key={hour}
-                className={`pb-1 text-center text-sm font-semibold ${
-                  hour === nowHour ? 'text-golden' : 'text-grey-cool'
+                className={`pl-1 text-[13px] font-bold ${
+                  isToday && hour === warsawHour(now) ? 'text-golden-light' : 'text-grey-cool'
                 }`}
               >
                 {formatHour(hour)}
               </div>
             ))}
-            {spots.map(spot => (
-              <TableRow
-                key={spot.id}
-                spot={spot}
-                open={open}
-                close={close}
-                occupancy={occupancy}
-                nowHour={nowHour}
-                isPastDate={date < today}
-                onPickSlot={hour => pickSlot(spot.id, hour)}
-                onShowBooking={onShowBooking}
-              />
+            {spotGroups(spots).map(group => (
+              <div key={group.key} className="contents">
+                <p className="sticky left-0 col-span-full mt-2.5 text-[11px] font-bold tracking-[0.16em] text-grey-cool/80 uppercase">
+                  {group.title}
+                </p>
+                {group.spots.map(spot => (
+                  <SpotRow
+                    key={spot.id}
+                    spot={spot}
+                    open={open}
+                    close={close}
+                    occupancy={occupancy}
+                    now={now}
+                    isPastDate={date < today}
+                    isToday={isToday}
+                    onPickSlot={hour => pickSlot(spot.id, hour)}
+                    onShowBooking={onShowBooking}
+                  />
+                ))}
+              </div>
             ))}
+            {nowFraction !== null ? (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute top-0 bottom-0 z-0 w-0.5 rounded-full bg-golden"
+                style={{ left: `calc(116px + (100% - 116px) * ${nowFraction})` }}
+              >
+                <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 rounded-md bg-golden px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-btn-text">
+                  {`${String(warsawHour(now)).padStart(2, '0')}:${String(new Date(now).getUTCMinutes()).padStart(2, '0')}`}
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
-
-      <div className="flex items-center gap-4 text-xs text-grey-cool">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-3 rounded border border-golden/60" />
-          {m.admin_free()}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-3 rounded bg-golden-hover/50" />
-          {m.admin_booked()}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-3 rounded bg-golden" />
-          {PHASE_LABELS.active()}
-        </span>
-      </div>
 
       {prefill ? (
         <AdminBookingModal
