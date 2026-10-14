@@ -1,9 +1,9 @@
 import type { IsoDate } from '@repo/shared';
-import { dateTileParts } from '../../lib/format';
+import { dateTileParts } from '../lib/format';
 
 /**
- * A booking's day as a gold tear-off: weekday, number, month. A past one
- * goes quiet so the list's upcoming bookings stand out.
+ * A day as a gold tear-off: weekday, number, month — a booking's, a
+ * tournament's. A past one goes quiet so what is still ahead stands out.
  */
 export function DateBadge({
   date,

@@ -12,7 +12,7 @@ import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { VenueMap } from '../venue/VenueMap';
 import { AddFoodModal } from './AddFoodModal';
-import { DateBadge } from './DateBadge';
+import { DateBadge } from '../DateBadge';
 import { CancelModal } from './CancelModal';
 import { ExtendModal } from './ExtendModal';
 import { PHASE_LABELS, PHASE_STYLES } from './phase';

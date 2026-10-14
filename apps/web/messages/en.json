@@ -278,7 +278,7 @@
   "tournament_err_full": "There are no places left",
   "tournament_err_closed": "Sign-ups for this tournament are closed",
   "tournament_not_found": "Tournament not found",
-  "tournament_details": "Details",
+  "tournament_details": "About the tournament",
   "tournaments_all": "All tournaments",
   "admin_tab_tournaments": "Tournaments",
   "admin_add_tournament": "Add tournament",
@@ -510,5 +510,7 @@
   "prices_bar": "Bar",
   "prices_bar_note": "Order when you book, or once you're at the table",
   "cta_ready_title": "Ready to play?",
-  "cta_ready_text": "Pick a time and a table on the plan — booking takes a minute."
+  "cta_ready_text": "Pick a time and a table on the plan — booking takes a minute.",
+  "tournament_players_label": "Players",
+  "tournament_until": "until {date}"
 }

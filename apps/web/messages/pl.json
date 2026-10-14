@@ -271,7 +271,7 @@
   "tournament_err_full": "Nie ma już wolnych miejsc",
   "tournament_err_closed": "Zapisy na ten turniej są zamknięte",
   "tournament_not_found": "Nie znaleziono turnieju",
-  "tournament_details": "Szczegóły",
+  "tournament_details": "O turnieju",
   "tournaments_all": "Wszystkie turnieje",
   "admin_tab_tournaments": "Turnieje",
   "admin_add_tournament": "Dodaj turniej",
@@ -513,5 +513,7 @@
   "prices_bar": "Bar",
   "prices_bar_note": "Zamówisz przy rezerwacji albo już przy stole",
   "cta_ready_title": "Gotowi do gry?",
-  "cta_ready_text": "Wybierz godzinę i stół na planie — rezerwacja zajmuje minutę."
+  "cta_ready_text": "Wybierz godzinę i stół na planie — rezerwacja zajmuje minutę.",
+  "tournament_players_label": "Uczestnicy",
+  "tournament_until": "do {date}"
 }

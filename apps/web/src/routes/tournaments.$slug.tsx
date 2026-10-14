@@ -34,9 +34,16 @@ export const Route = createFileRoute('/tournaments/$slug')({
   )
 });
 
-function TournamentShell({ children }: { children: React.ReactNode }) {
+/** The announcement carries its own h1 (the tournament's name), so no page title above it. */
+function TournamentShell({
+  children,
+  showTitle = true
+}: {
+  children: React.ReactNode;
+  showTitle?: boolean;
+}) {
   return (
-    <PageLayout script="tournament" title={m.tournament_badge()}>
+    <PageLayout script="tournament" title={m.tournament_badge()} showTitle={showTitle}>
       {children}
     </PageLayout>
   );
@@ -48,7 +55,7 @@ function TournamentPage() {
   const { data: tournament } = useSuspenseQuery(tournamentQuery(slug, getLocale()));
 
   return (
-    <TournamentShell>
+    <TournamentShell showTitle={false}>
       <TournamentView tournament={tournament} />
     </TournamentShell>
   );

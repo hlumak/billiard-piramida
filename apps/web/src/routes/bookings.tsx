@@ -5,7 +5,7 @@ import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { formatPln, sizeOf, type BookingDto, type BookingSummaryDto } from '@repo/shared';
 import { PageLayout } from '../components/site/PageLayout';
-import { DateBadge } from '../components/booking/DateBadge';
+import { DateBadge } from '../components/DateBadge';
 import { PHASE_LABELS, PHASE_STYLES, mutationErrorText } from '../components/booking/phase';
 import { formatDayLong, intlTag, warsawDate, warsawTime } from '../lib/format';
 import { bookingQuery } from '../lib/queries';

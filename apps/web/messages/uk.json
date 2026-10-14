@@ -293,7 +293,7 @@
   "tournament_err_full": "Вільних місць уже немає",
   "tournament_err_closed": "Реєстрацію на цей турнір закрито",
   "tournament_not_found": "Турнір не знайдено",
-  "tournament_details": "Деталі",
+  "tournament_details": "Про турнір",
   "tournaments_all": "Усі турніри",
   "admin_tab_tournaments": "Турніри",
   "admin_add_tournament": "Додати турнір",
@@ -535,5 +535,7 @@
   "prices_bar": "Бар",
   "prices_bar_note": "Замовити можна під час бронювання або вже за столом",
   "cta_ready_title": "Готові зіграти?",
-  "cta_ready_text": "Оберіть час і стіл на плані — бронювання займає хвилину."
+  "cta_ready_text": "Оберіть час і стіл на плані — бронювання займає хвилину.",
+  "tournament_players_label": "Учасники",
+  "tournament_until": "до {date}"
 }

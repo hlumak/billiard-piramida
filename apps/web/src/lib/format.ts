@@ -55,6 +55,13 @@ export function formatDayLong(isoDate: IsoDate): string {
   }).format(utcDate(isoDate));
 }
 
+/** "15 листопада": day and month only, in the case a "until …" phrase takes. */
+export function formatDayMonth(isoDate: IsoDate): string {
+  return formatter(intlTag(), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
+    utcDate(isoDate)
+  );
+}
+
 /** The three lines of a calendar tile: "чт", "15", "жовт." */
 export function dateTileParts(isoDate: IsoDate): { weekday: string; day: number; month: string } {
   const date = utcDate(isoDate);

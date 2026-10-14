@@ -1,10 +1,10 @@
 import { Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
+import type { TournamentDto } from '@repo/shared';
 import { PageLayout } from '../components/site/PageLayout';
 import { QueryError } from '../components/QueryError';
-import { TournamentCardBody } from '../components/TournamentCard';
-import { StaggerGroup, StaggerItem } from '../components/motion';
+import { TournamentCard } from '../components/TournamentCard';
 import { tournamentsQuery } from '../lib/queries';
 import { pageHead } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
@@ -18,6 +18,27 @@ export const Route = createFileRoute('/tournaments/')({
   component: TournamentsPage
 });
 
+/** Played or called off: these go under "past", the rest are still ahead. */
+const isOver = (tournament: TournamentDto) =>
+  tournament.registrationState === 'completed' || tournament.registrationState === 'cancelled';
+
+function TournamentGroup({ title, tournaments }: { title: string; tournaments: TournamentDto[] }) {
+  return (
+    <section aria-label={title}>
+      <h2 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
+        {title}
+      </h2>
+      <ul className="mt-3.5 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+        {tournaments.map(tournament => (
+          <li key={tournament.id} className="anim-stagger-item">
+            <TournamentCard tournament={tournament} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function TournamentsPage() {
   const {
     data: tournaments,
@@ -25,6 +46,8 @@ function TournamentsPage() {
     isError,
     refetch
   } = useQuery(tournamentsQuery(getLocale()));
+  const upcoming = tournaments?.filter(tournament => !isOver(tournament)) ?? [];
+  const past = tournaments?.filter(isOver) ?? [];
 
   return (
     <PageLayout script="tournaments" title={m.menu_tournaments()}>
@@ -35,26 +58,18 @@ function TournamentsPage() {
           <Spinner aria-label={m.loading()} />
         </div>
       ) : tournaments.length === 0 ? (
-        <p className="py-8 text-center text-grey-cool">{m.tournaments_none()}</p>
+        <p className="card px-6 py-12 text-center text-lg text-cream-soft">
+          {m.tournaments_none()}
+        </p>
       ) : (
-        <StaggerGroup>
-          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {tournaments.map(tournament => (
-              <StaggerItem key={tournament.id} as="li">
-                <Link
-                  to="/tournaments/$slug"
-                  params={{ slug: tournament.slug }}
-                  // Finished and cancelled entries stay readable but recede
-                  className={`block h-full overflow-hidden rounded-[10px] bg-club-green-light transition-colors hover:bg-surface-hover ${
-                    tournament.registrationState === 'cancelled' ? 'opacity-60' : ''
-                  }`}
-                >
-                  <TournamentCardBody tournament={tournament} />
-                </Link>
-              </StaggerItem>
-            ))}
-          </ul>
-        </StaggerGroup>
+        <div className="flex flex-col gap-10">
+          {upcoming.length > 0 ? (
+            <TournamentGroup title={m.tournaments_upcoming()} tournaments={upcoming} />
+          ) : null}
+          {past.length > 0 ? (
+            <TournamentGroup title={m.tournaments_past()} tournaments={past} />
+          ) : null}
+        </div>
       )}
     </PageLayout>
   );
