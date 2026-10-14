@@ -251,7 +251,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
               </thead>
               <tbody>
                 {bookings.map(booking => {
-                  const void_ = booking.phase === 'cancelled' || booking.phase === 'no_show';
+                  const voided = booking.phase === 'cancelled' || booking.phase === 'no_show';
                   return (
                     <tr
                       key={booking.id}
@@ -318,7 +318,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
                       </td>
                       <td
                         className={`col-span-2 font-bold whitespace-nowrap tabular-nums lg:px-3 lg:py-3.5 lg:text-right ${
-                          void_ ? 'text-grey-cool' : 'text-golden-light'
+                          voided ? 'text-grey-cool' : 'text-golden-light'
                         } ${booking.phase === 'cancelled' ? 'line-through' : ''}`}
                       >
                         {formatPln(booking.totalGrosz, intlTag())}

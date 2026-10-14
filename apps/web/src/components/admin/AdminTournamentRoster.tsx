@@ -35,7 +35,7 @@ function RosterRow({
   const { status } = registration;
   return (
     <li
-      className={`flex flex-wrap items-center gap-3 rounded-[10px] bg-club-green p-3 ${
+      className={`flex flex-wrap items-center gap-3 rounded-xl bg-club-green p-3 ${
         status === 'cancelled' ? 'opacity-60' : ''
       }`}
     >

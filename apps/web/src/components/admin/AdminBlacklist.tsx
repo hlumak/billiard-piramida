@@ -32,7 +32,7 @@ function EntryRow({ entry }: { entry: AdminBlacklistEntryDto }) {
       : m.admin_blacklist_reason_manual();
 
   return (
-    <div className="rounded-[10px] bg-club-green-light p-3">
+    <div className="card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="font-semibold text-creme">
@@ -99,7 +99,7 @@ function AddForm() {
 
   return (
     <form
-      className="flex flex-col gap-3 rounded-[10px] bg-club-green-light p-3"
+      className="flex flex-col gap-3 card p-4"
       onSubmit={event => {
         event.preventDefault();
         if (isValidPhone(phone)) add.mutate();

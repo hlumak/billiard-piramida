@@ -34,11 +34,7 @@ function TournamentRow({ item }: { item: AdminTournamentDto }) {
         : null;
 
   return (
-    <div
-      className={`rounded-[10px] bg-club-green-light p-3 ${
-        item.status === 'draft' ? 'opacity-60' : ''
-      }`}
-    >
+    <div className={`card p-4 ${item.status === 'draft' ? 'opacity-60' : ''}`}>
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-creme">{item.title}</p>

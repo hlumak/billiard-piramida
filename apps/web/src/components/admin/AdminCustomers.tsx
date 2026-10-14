@@ -69,11 +69,7 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
       <StaggerGroup>
         <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
           {customers.map(customer => (
-            <StaggerItem
-              key={customer.phone}
-              as="li"
-              className="h-full rounded-[10px] bg-club-green-light p-3"
-            >
+            <StaggerItem key={customer.phone} as="li" className="h-full card p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold text-creme">
                   {customer.name}

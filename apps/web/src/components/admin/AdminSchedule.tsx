@@ -199,7 +199,8 @@ function spotGroups(spots: TableDto[]): { key: string; title: string; spots: Tab
       const size = first ? sizeOf(first.id) : null;
       const n = first ? hallOf(first.id) : null;
       return {
-        ...group,
+        key: group.key,
+        spots: group.spots,
         title:
           group.key === 'darts' || size === null || n === null
             ? activityName('darts')

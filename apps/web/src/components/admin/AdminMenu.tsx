@@ -38,9 +38,7 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
   const deleteBlocked = remove.error instanceof ApiError && remove.error.code === 'has_orders';
 
   return (
-    <div
-      className={`rounded-[10px] bg-club-green-light p-3 ${item.isAvailable ? '' : 'opacity-60'}`}
-    >
+    <div className={`card p-4 ${item.isAvailable ? '' : 'opacity-60'}`}>
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-creme">{item.name}</p>

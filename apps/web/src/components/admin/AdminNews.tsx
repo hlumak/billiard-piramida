@@ -34,9 +34,7 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
   });
 
   return (
-    <div
-      className={`rounded-[10px] bg-club-green-light p-3 ${item.isPublished ? '' : 'opacity-60'}`}
-    >
+    <div className={`card p-4 ${item.isPublished ? '' : 'opacity-60'}`}>
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-creme">{item.title}</p>
