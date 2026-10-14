@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { isExternalUrl, type NewsItemDto, type TournamentDto } from '@repo/shared';
 import { resolveAssetUrl } from '../lib/api';
 import { newsHref } from '../lib/news';
@@ -118,13 +118,12 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
   const [forward, setForward] = useState(true);
   // Read by the auto-advance timer, which must not restart on every scroll tick
   const activeRef = useRef(0);
-  // Three independent reasons to hold the rotation (WCAG 2.2.2): pointer over
-  // it, keyboard focus inside it, or the visitor pressed pause. One flag for
-  // all three let leaving with the pointer restart it under a focused control.
+  // Two independent reasons to hold the rotation: pointer over it or keyboard
+  // focus inside it. One flag for both let leaving with the pointer restart it
+  // under a focused control.
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [stopped, setStopped] = useState(false);
-  const paused = hovered || focused || stopped;
+  const paused = hovered || focused;
 
   const scrollToIndex = useCallback((index: number) => {
     const track = trackRef.current;
@@ -247,17 +246,7 @@ export function NewsCarousel({ className }: { className?: string | undefined }) 
       </div>
 
       {count > 1 ? (
-        <div className="mt-1 flex items-center justify-center gap-1">
-          <button
-            type="button"
-            aria-pressed={stopped}
-            aria-label={stopped ? m.news_play() : m.news_pause()}
-            onClick={() => setStopped(value => !value)}
-            // A 24px tap target like the dots' (--dot-slot is scoped to .carousel-dots)
-            className="flex size-6 items-center justify-center text-creme/70 hover:text-golden"
-          >
-            {stopped ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
-          </button>
+        <div className="mt-1 flex justify-center">
           <div
             role="group"
             aria-label={m.news_title()}
