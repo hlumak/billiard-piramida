@@ -6,3 +6,15 @@ allowBuilds:
   lightningcss: true
 # Delay newly-published versions for a day before installing (supply-chain guard)
 minimumReleaseAge: 1440
+# What each dependency may do beyond being installed. Agent skills: only TanStack
+# Start's (linked into .claude/skills); drizzle-kit's are committed there already,
+# and the devtools ones are for building devtools, which this project does not do.
+permissions:
+  '@tanstack/devtools-event-client':
+    skills: false
+  '@tanstack/devtools-vite':
+    skills: false
+  '@tanstack/react-start':
+    skills: true
+  drizzle-kit:
+    skills: false
