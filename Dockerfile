@@ -3,7 +3,7 @@
 #   docker build --target web -t piramida-web --build-arg VITE_SITE_URL=https://club.example .
 # (docker-compose.yaml builds both; see the README.)
 
-ARG NODE_IMAGE=node:26.11.1-alpine3.24
+ARG NODE_IMAGE=node:26.12.0-alpine3.24
 
 # ---------------------------------------------------------------- shared base
 FROM ${NODE_IMAGE} AS base

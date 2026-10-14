@@ -26,7 +26,7 @@ Monorepo for the booking site of a billiard club in Poland: nine billiard tables
   Paraglide JS for i18n (pl default · uk · en; locale = cookie → browser language → pl)
 - **Shared** (`packages/shared`): business rules (hours, pricing, venue) and DTO types
 
-Node 26.11.1 (`.node-version`), pnpm 12.10.1 (`packageManager`).
+Node 26.12.0 (`.node-version`), pnpm 12.10.1 (`packageManager`).
 
 Installing pnpm on a dev machine: pnpm's standalone installer, pinned to the
 project's version (without `PNPM_VERSION` it installs the latest):
