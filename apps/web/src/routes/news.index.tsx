@@ -4,7 +4,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { PageLayout } from '../components/site/PageLayout';
 import { NewsListItem } from '../components/NewsListItem';
 import { QueryError } from '../components/QueryError';
-import { StaggerGroup, StaggerItem } from '../components/motion';
 import { newsQuery } from '../lib/queries';
 import { pageHead } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
@@ -29,17 +28,15 @@ function NewsIndexPage() {
           <Spinner aria-label={m.loading()} />
         </div>
       ) : news.length === 0 ? (
-        <p className="py-8 text-center text-grey-cool">{m.news_none()}</p>
+        <p className="card px-6 py-12 text-center text-lg text-cream-soft">{m.news_none()}</p>
       ) : (
-        <StaggerGroup>
-          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {news.map(item => (
-              <StaggerItem key={item.id} as="li">
-                <NewsListItem item={item} />
-              </StaggerItem>
-            ))}
-          </ul>
-        </StaggerGroup>
+        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+          {news.map(item => (
+            <li key={item.id} className="anim-stagger-item">
+              <NewsListItem item={item} />
+            </li>
+          ))}
+        </ul>
       )}
     </PageLayout>
   );

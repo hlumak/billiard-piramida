@@ -2,7 +2,6 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { PageLayout } from '../components/site/PageLayout';
 import { ArticleBody } from '../components/ArticleBody';
-import { Reveal } from '../components/motion';
 import { notFoundOn404, resolveAssetUrl } from '../lib/api';
 import { formatPublished } from '../lib/news';
 import { newsArticleQuery } from '../lib/queries';
@@ -37,9 +36,16 @@ export const Route = createFileRoute('/news/$slug')({
   )
 });
 
-function ArticleShell({ children }: { children: React.ReactNode }) {
+/** The article carries its own h1 (the headline), so no page title above it. */
+function ArticleShell({
+  children,
+  showTitle = true
+}: {
+  children: React.ReactNode;
+  showTitle?: boolean;
+}) {
   return (
-    <PageLayout script="news" title={m.news_title()} decorativeTitle>
+    <PageLayout script="news" title={m.news_title()} showTitle={showTitle} width="medium">
       {children}
     </PageLayout>
   );
@@ -51,38 +57,47 @@ function NewsArticlePage() {
   const { data: article } = useSuspenseQuery(newsArticleQuery(slug, getLocale()));
 
   return (
-    <ArticleShell>
-      <article className="flex flex-col gap-5">
-        {article.imageUrl ? (
-          <Reveal>
-            <img
-              src={resolveAssetUrl(article.imageUrl)}
-              alt=""
-              // The box is reserved before the picture arrives (no text jump);
-              // at the article width 16:9 is the old max-h-96 landscape crop
-              className="aspect-video w-full rounded-[10px] object-cover"
-            />
-          </Reveal>
-        ) : null}
-        <Reveal delay={0.05}>
-          <header className="flex flex-col gap-2">
-            <time dateTime={article.publishedAt} className="text-sm text-grey-cool">
-              {formatPublished(article.publishedAt)}
-            </time>
-            <h1 className="text-2xl font-bold text-golden md:text-3xl">{article.title}</h1>
-            {article.body ? <p className="text-lg text-creme/90">{article.body}</p> : null}
-          </header>
-        </Reveal>
-        {article.content ? (
-          <Reveal delay={0.1}>
-            <ArticleBody source={article.content} />
-          </Reveal>
-        ) : null}
-        <Reveal delay={0.15}>
-          <Link to="/news" className="font-semibold text-golden hover:text-golden-hover">
+    <ArticleShell showTitle={false}>
+      <article className="mx-auto max-w-[760px]">
+        <header className="anim-reveal">
+          <Link
+            to="/news"
+            className="text-sm font-semibold text-golden-light transition-colors hover:text-golden"
+          >
             ← {m.news_all()}
           </Link>
-        </Reveal>
+          <time
+            dateTime={article.publishedAt}
+            className="mt-5 block text-sm text-grey-cool first-letter:uppercase"
+          >
+            {formatPublished(article.publishedAt)}
+          </time>
+          <h1 className="mt-3 text-[30px] leading-[1.15] font-bold tracking-[-0.01em] md:text-[42px]">
+            {article.title}
+          </h1>
+          {article.body ? (
+            <p className="mt-4 text-[17px] leading-relaxed text-cream-soft md:text-[19px]">
+              {article.body}
+            </p>
+          ) : null}
+        </header>
+        {article.imageUrl ? (
+          <img
+            src={resolveAssetUrl(article.imageUrl)}
+            alt=""
+            // The box is reserved before the picture arrives (no text jump)
+            className="anim-reveal mt-8 aspect-video w-full rounded-[20px] object-cover [animation-delay:100ms]"
+          />
+        ) : null}
+        {article.content ? (
+          <ArticleBody
+            source={article.content}
+            className="anim-reveal mt-8 [animation-delay:150ms]"
+          />
+        ) : null}
+        <Link to="/news" className="btn-outline mt-12 h-12 px-5.5 text-[15px]">
+          ← {m.news_all()}
+        </Link>
       </article>
     </ArticleShell>
   );

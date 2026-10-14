@@ -69,12 +69,14 @@ function Inlines({ inlines }: { inlines: Inline[] }) {
 export function ArticleBody({ source, className }: { source: string; className?: string }) {
   const blocks = parseArticle(source);
   return (
-    <div className={`flex flex-col gap-4 text-creme/85 ${className ?? ''}`}>
+    <div
+      className={`flex flex-col gap-4.5 leading-[1.75] text-cream-soft md:text-[17px] ${className ?? ''}`}
+    >
       {blocks.map(block => {
         switch (block.type) {
           case 'heading':
             return (
-              <h2 key={block.line} className="mt-2 text-xl font-semibold text-golden">
+              <h2 key={block.line} className="mt-4 text-[22px] leading-snug font-bold text-creme">
                 <Inlines inlines={block.inlines} />
               </h2>
             );
@@ -102,10 +104,10 @@ export function ArticleBody({ source, className }: { source: string; className?:
                   src={resolveAssetUrl(block.src)}
                   alt={block.caption}
                   loading="lazy"
-                  className="w-full rounded-[10px] bg-club-green-light"
+                  className="w-full rounded-2xl bg-card"
                 />
                 {block.caption ? (
-                  <figcaption className="mt-1 text-center text-sm text-grey-cool">
+                  <figcaption className="mt-2 text-center text-sm text-grey-cool">
                     {block.caption}
                   </figcaption>
                 ) : null}
