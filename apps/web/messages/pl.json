@@ -472,5 +472,22 @@
   "find_booking_signin": "Po zalogowaniu widzisz rezerwacje ze wszystkich urządzeń.",
   "tournaments_upcoming": "Nadchodzące",
   "tournaments_past": "Minione",
-  "back_to_top": "Do góry"
+  "back_to_top": "Do góry",
+  "home_reviews": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} opinia w Google",
+        "nPlural=few": "{n} opinie w Google",
+        "nPlural=many": "{n} opinii w Google",
+        "nPlural=other": "{n} opinii w Google"
+      }
+    }
+  ],
+  "home_rating_label": "Ocena {score} na 5 w Google, opinii: {count}",
+  "tournament_starts": "Start",
+  "hours_busy": "zajęte",
+  "rate_unit": "PLN / godzina",
+  "book_this": "Zarezerwuj"
 }

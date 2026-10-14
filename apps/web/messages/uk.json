@@ -494,5 +494,22 @@
   "find_booking_signin": "Увійшовши, ви бачите бронювання з усіх пристроїв.",
   "tournaments_upcoming": "Найближчі",
   "tournaments_past": "Минулі",
-  "back_to_top": "Наверх"
+  "back_to_top": "Наверх",
+  "home_reviews": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} відгук у Google",
+        "nPlural=few": "{n} відгуки у Google",
+        "nPlural=many": "{n} відгуків у Google",
+        "nPlural=other": "{n} відгуку у Google"
+      }
+    }
+  ],
+  "home_rating_label": "Оцінка {score} з 5 у Google, відгуків: {count}",
+  "tournament_starts": "Початок",
+  "hours_busy": "зайнято",
+  "rate_unit": "PLN / година",
+  "book_this": "Забронювати"
 }

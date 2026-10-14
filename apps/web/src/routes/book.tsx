@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Spinner } from '@heroui/react';
+import { isIsoDate, type IsoDate } from '@repo/shared';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
@@ -23,6 +24,8 @@ import {
   WIZARD_STEPS,
   goToStep,
   resetIfDateStale,
+  selectDate,
+  selectTime,
   stepIndex,
   wizardStore,
   type WizardState,
@@ -30,6 +33,15 @@ import {
 } from '../store/booking-wizard';
 
 export const Route = createFileRoute('/book')({
+  // ?date=…&start=… arrives from the home page's free-tables strip: the guest
+  // picked an hour there, so the wizard opens on the table step with it set.
+  validateSearch: (search: Record<string, unknown>): { date?: IsoDate; start?: number } => {
+    const start = Number(search.start);
+    return {
+      ...(typeof search.date === 'string' && isIsoDate(search.date) ? { date: search.date } : {}),
+      ...(Number.isInteger(start) && start >= 0 && start <= 23 ? { start } : {})
+    };
+  },
   head: () => ({ meta: noindexMeta(msg.seo_title_book()) }),
   component: BookingWizard
 });
@@ -78,9 +90,20 @@ function BookingWizard() {
   const navigate = useNavigate();
   const state = useStore(wizardStore);
 
-  // Drop an abandoned wizard whose date has since passed (client-only mutation)
+  const prefill = Route.useSearch();
+
+  // Drop an abandoned wizard whose date has since passed, then take an hour
+  // handed over by the home page — once, and out of the address bar, so a
+  // reload or a back step does not re-pick it (client-only mutation)
   useEffect(() => {
-    resetIfDateStale(warsawToday());
+    const today = warsawToday();
+    resetIfDateStale(today);
+    if (prefill.date !== undefined && prefill.start !== undefined && prefill.date >= today) {
+      selectDate(prefill.date);
+      selectTime(prefill.start, 1);
+      void navigate({ to: '/book', search: {}, replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const step = permittedStep(state);

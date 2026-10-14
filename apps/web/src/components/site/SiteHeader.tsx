@@ -63,7 +63,9 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0 lg:gap-3">
-          <LocaleSwitcher className="hidden xl:inline-flex" />
+          <div className="hidden xl:block">
+            <LocaleSwitcher />
+          </div>
           <Link to="/profile" aria-label={m.nav_profile()} className={iconButton}>
             <CircleUser className="size-[22px]" aria-hidden />
           </Link>

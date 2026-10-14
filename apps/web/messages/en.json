@@ -471,5 +471,20 @@
   "find_booking_signin": "Signed in, you see the bookings from every device.",
   "tournaments_upcoming": "Coming up",
   "tournaments_past": "Past",
-  "back_to_top": "Back to top"
+  "back_to_top": "Back to top",
+  "home_reviews": [
+    {
+      "declarations": ["input n", "local nPlural = n: plural"],
+      "selectors": ["nPlural"],
+      "match": {
+        "nPlural=one": "{n} review on Google",
+        "nPlural=other": "{n} reviews on Google"
+      }
+    }
+  ],
+  "home_rating_label": "Rated {score} out of 5 on Google, {count} reviews",
+  "tournament_starts": "Starts",
+  "hours_busy": "booked",
+  "rate_unit": "PLN / hour",
+  "book_this": "Book"
 }
