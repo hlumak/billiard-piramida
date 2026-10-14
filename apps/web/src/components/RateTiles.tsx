@@ -3,6 +3,7 @@ import { SPOTS, type RateTier } from '@repo/shared';
 import { intlTag } from '../lib/format';
 import { useVenueConfig } from '../lib/venue-config';
 import { m } from '../paraglide/messages.js';
+import { getLocale } from '../paraglide/runtime.js';
 
 /** How many spots bill at each tier — counted from the room, not typed in. */
 function countOf(tier: RateTier): number {
@@ -78,7 +79,7 @@ export function RateTiles({ withBooking = false }: { withBooking?: boolean }) {
               to="/book"
               className="mt-5.5 hidden text-[15px] font-bold text-golden transition-colors hover:text-golden-hover md:block"
             >
-              {m.book_this()} {title()} →
+              {m.book_this()} {tier === 'darts' ? title().toLocaleLowerCase(getLocale()) : tier} →
             </Link>
           ) : null}
         </li>

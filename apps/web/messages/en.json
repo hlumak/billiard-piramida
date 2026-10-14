@@ -504,5 +504,11 @@
   "sport_cards_each": "−{amount} each, once a day",
   "sport_cards_check": "Everyone playing can add their own — we check them at the reception desk.",
   "btn_confirm_short": "Confirm",
-  "cancel_short": "Cancel"
+  "cancel_short": "Cancel",
+  "prices_rent": "Rental",
+  "prices_rent_note": "Price per hour · minimum booking — 1 hour",
+  "prices_bar": "Bar",
+  "prices_bar_note": "Order when you book, or once you're at the table",
+  "cta_ready_title": "Ready to play?",
+  "cta_ready_text": "Pick a time and a table on the plan — booking takes a minute."
 }

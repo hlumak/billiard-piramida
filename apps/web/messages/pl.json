@@ -507,5 +507,11 @@
   "sport_cards_each": "−{amount} za każdą, raz dziennie",
   "sport_cards_check": "Każdy gracz może dodać swoją — sprawdzimy je w recepcji.",
   "btn_confirm_short": "Potwierdź",
-  "cancel_short": "Anuluj"
+  "cancel_short": "Anuluj",
+  "prices_rent": "Wynajem",
+  "prices_rent_note": "Cena za godzinę · minimalna rezerwacja — 1 godzina",
+  "prices_bar": "Bar",
+  "prices_bar_note": "Zamówisz przy rezerwacji albo już przy stole",
+  "cta_ready_title": "Gotowi do gry?",
+  "cta_ready_text": "Wybierz godzinę i stół na planie — rezerwacja zajmuje minutę."
 }
