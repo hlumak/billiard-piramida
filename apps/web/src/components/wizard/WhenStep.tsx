@@ -146,9 +146,15 @@ function TimePicker({ date }: { date: IsoDate }) {
   const durationHours = useStore(wizardStore, state => state.durationHours);
 
   useLiveAvailability(date);
-  const { data: availability, isPending, isError, refetch } = useQuery(availabilityQuery(date));
+  const {
+    data: availability,
+    isPending,
+    isError,
+    error,
+    refetch
+  } = useQuery(availabilityQuery(date));
 
-  if (isError && !availability) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !availability) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !availability) return <TimeSkeleton />;
 
   const starts = freeHours(availability);

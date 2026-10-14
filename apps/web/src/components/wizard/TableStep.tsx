@@ -84,12 +84,18 @@ export function TableStep({
   kind: ActivityKind | null;
 }) {
   useLiveAvailability(date);
-  const { data: availability, isPending, isError, refetch } = useQuery(availabilityQuery(date));
+  const {
+    data: availability,
+    isPending,
+    isError,
+    error,
+    refetch
+  } = useQuery(availabilityQuery(date));
   const { rates } = useVenueConfig();
   // The chips show one kind at a time; a spot already picked decides which
   const [kind, setKind] = useState<ActivityKind>(pickedKind ?? 'billiard');
 
-  if (isError && !availability) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !availability) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !availability) {
     return (
       <div className="flex justify-center py-16">

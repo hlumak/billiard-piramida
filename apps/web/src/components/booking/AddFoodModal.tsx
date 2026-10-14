@@ -15,7 +15,7 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const { data: menu, isError, refetch } = useQuery(menuQuery(getLocale()));
+  const { data: menu, isError, error: menuError, refetch } = useQuery(menuQuery(getLocale()));
 
   const total =
     menu?.reduce((sum, item) => sum + (quantities[item.id] ?? 0) * item.priceGrosz, 0) ?? 0;
@@ -60,7 +60,7 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
             </Modal.Header>
             <Modal.Body>
               {isError ? (
-                <QueryError onRetry={() => refetch()} />
+                <QueryError error={menuError} onRetry={() => refetch()} />
               ) : menu ? (
                 <MenuPicker
                   items={menu}

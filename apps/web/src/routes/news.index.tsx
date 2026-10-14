@@ -17,12 +17,12 @@ export const Route = createFileRoute('/news/')({
 });
 
 function NewsIndexPage() {
-  const { data: news, isPending, isError, refetch } = useQuery(newsQuery(getLocale()));
+  const { data: news, isPending, isError, error, refetch } = useQuery(newsQuery(getLocale()));
 
   return (
     <PageLayout script="news" title={m.news_title()}>
       {isError ? (
-        <QueryError onRetry={() => refetch()} />
+        <QueryError error={error} onRetry={() => refetch()} />
       ) : isPending || !news ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

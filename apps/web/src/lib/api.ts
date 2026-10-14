@@ -87,6 +87,15 @@ export function notFoundOn404(error: unknown): never {
   throw error;
 }
 
+/**
+ * The API refused for too many requests. Checked by shape as well as class: a
+ * loader's error crosses from the server render to the browser as plain data.
+ */
+export function isRateLimited(error: unknown): boolean {
+  if (error instanceof ApiError) return error.status === 429;
+  return error instanceof Error && error.message.startsWith('API 429');
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;

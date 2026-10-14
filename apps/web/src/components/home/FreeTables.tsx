@@ -7,6 +7,7 @@ import {
   type AvailabilityDto,
   type IsoDate
 } from '@repo/shared';
+import { isRateLimited } from '../../lib/api';
 import { useLiveAvailability } from '../../lib/availability-live';
 import { formatHour, warsawHour, warsawToday } from '../../lib/format';
 import { useIsHydrated } from '../../lib/hydration';
@@ -49,9 +50,23 @@ function useShownDate(): { date: IsoDate; tomorrow: boolean } {
 
 function Chips({ date }: { date: IsoDate }) {
   useLiveAvailability(date);
-  const { data, isPending, isError } = useQuery(availabilityQuery(date));
+  const { data, isPending, isError, error, refetch } = useQuery(availabilityQuery(date));
 
-  if (isError) return null;
+  // Said, not hidden: an empty strip reads as "no free tables" or a broken page
+  if (isError) {
+    return (
+      <p role="alert" className="py-4 text-sm text-cream-soft">
+        {isRateLimited(error) ? m.err_rate_limited() : m.err_generic()}{' '}
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="font-semibold text-golden-light underline-offset-2 hover:underline"
+        >
+          {m.btn_retry()}
+        </button>
+      </p>
+    );
+  }
   if (isPending) {
     return (
       <>

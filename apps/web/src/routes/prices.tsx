@@ -31,7 +31,7 @@ function SectionHead({ title, note }: { title: string; note: string }) {
 }
 
 function PricesPage() {
-  const { data: menu, isPending, isError, refetch } = useQuery(menuQuery(getLocale()));
+  const { data: menu, isPending, isError, error, refetch } = useQuery(menuQuery(getLocale()));
 
   return (
     <PageLayout script="prices" title={m.menu_prices()}>
@@ -46,7 +46,7 @@ function PricesPage() {
       <section className="mt-11 md:mt-18">
         <SectionHead title={m.prices_bar()} note={m.prices_bar_note()} />
         {isError ? (
-          <QueryError onRetry={() => refetch()} />
+          <QueryError error={error} onRetry={() => refetch()} />
         ) : isPending || !menu ? (
           <div className="flex justify-center py-16">
             <Spinner aria-label={m.loading()} />

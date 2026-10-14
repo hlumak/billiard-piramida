@@ -46,10 +46,11 @@ function TournamentList() {
     data: tournaments,
     isPending,
     isError,
+    error,
     refetch
   } = useQuery(tournamentsQuery(getLocale()));
 
-  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isError) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !tournaments) {
     return (
       <div className="flex justify-center py-16">

@@ -12,7 +12,7 @@ import { StepActions } from './WizardFrame';
 /** Step 3, the bar: optional, and the summary adds each line as it is picked. */
 export function FoodStep() {
   const items = useStore(wizardStore, state => state.items);
-  const { data: menu, isPending, isError, refetch } = useQuery(menuQuery(getLocale()));
+  const { data: menu, isPending, isError, error, refetch } = useQuery(menuQuery(getLocale()));
 
   return (
     <div>
@@ -21,7 +21,7 @@ export function FoodStep() {
 
       <div className="mt-6 md:mt-7">
         {isError && !menu ? (
-          <QueryError onRetry={() => refetch()} />
+          <QueryError error={error} onRetry={() => refetch()} />
         ) : isPending || !menu ? (
           <div className="flex justify-center py-16">
             <Spinner aria-label={m.loading()} />
