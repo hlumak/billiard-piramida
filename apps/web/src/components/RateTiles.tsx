@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { SPOTS, type RateTier } from '@repo/shared';
-import { intlTag } from '../lib/format';
+import { formatNumber } from '../lib/format';
 import { useVenueConfig } from '../lib/venue-config';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
@@ -45,7 +45,6 @@ const TIERS = [
  */
 export function RateTiles({ withBooking = false }: { withBooking?: boolean }) {
   const { rates } = useVenueConfig();
-  const number = new Intl.NumberFormat(intlTag(), { maximumFractionDigits: 2 });
 
   return (
     <ul className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-6">
@@ -68,7 +67,7 @@ export function RateTiles({ withBooking = false }: { withBooking?: boolean }) {
           </div>
           <p className="flex shrink-0 flex-col items-end md:mt-7 md:flex-row md:items-baseline md:gap-2">
             <span className="text-[28px] leading-none font-bold text-golden tabular-nums md:text-[46px]">
-              {number.format(rates[tier] / 100)}
+              {formatNumber(rates[tier] / 100, { maximumFractionDigits: 2 })}
             </span>
             <span className="mt-0.5 text-xs text-grey-cool md:mt-0 md:text-[15px]">
               {m.rate_unit()}

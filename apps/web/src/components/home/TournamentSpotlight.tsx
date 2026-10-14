@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { dateParts, formatPln, type IsoDate, type TournamentDto } from '@repo/shared';
-import { intlTag, warsawToday } from '../../lib/format';
+import { dateTileParts, formatDaysFromNow, intlTag, warsawToday } from '../../lib/format';
 import { rosterProgress, whenLabel } from '../../lib/tournaments';
 import { m } from '../../paraglide/messages.js';
 
@@ -16,22 +16,16 @@ function daysUntil(date: IsoDate): number {
 
 /** The calendar leaf: weekday, day, month — gold, the card's anchor. */
 function DateTile({ date }: { date: IsoDate }) {
-  const at = new Date(utcDay(date));
-  const part = (options: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat(intlTag(), { ...options, timeZone: 'UTC' }).format(at);
+  const part = dateTileParts(date);
   return (
     <div
       aria-hidden
       className="flex h-[74px] w-[66px] shrink-0 flex-col items-center justify-center rounded-[14px] bg-golden text-btn-text lg:h-[92px] lg:w-[84px] lg:rounded-2xl"
     >
-      <span className="text-[11px] font-bold uppercase lg:text-xs">
-        {part({ weekday: 'short' })}
-      </span>
-      <span className="text-[26px] leading-[1.05] font-bold lg:text-[34px]">
-        {part({ day: 'numeric' })}
-      </span>
+      <span className="text-[11px] font-bold uppercase lg:text-xs">{part.weekday}</span>
+      <span className="text-[26px] leading-[1.05] font-bold lg:text-[34px]">{part.day}</span>
       <span className="text-[10px] font-bold tracking-[0.08em] uppercase lg:text-[11px]">
-        {part({ month: 'short' })}
+        {part.month}
       </span>
     </div>
   );
@@ -67,7 +61,7 @@ export function TournamentSpotlight({
         </span>
         {days !== null && days >= 0 ? (
           <span className="rounded-full bg-golden/16 px-2.5 py-1 text-[11px] font-bold text-golden-light lg:text-xs">
-            {new Intl.RelativeTimeFormat(intlTag(), { numeric: 'auto' }).format(days, 'day')}
+            {formatDaysFromNow(days)}
           </span>
         ) : null}
       </div>

@@ -14,6 +14,39 @@ import { m } from '../../paraglide/messages.js';
 const EMPTY_CARDS: CardsState = { sportCardType: null, sportCardNumber: '' };
 type AuthTab = 'login' | 'register';
 
+/** What the guest typed: the login uses phone and password, registration all of it. */
+interface AuthFields {
+  phone: string;
+  password: string;
+  name: string;
+  cards: CardsState;
+}
+
+function registerInput({ phone, password, name, cards }: AuthFields): RegisterInput {
+  const hasCard = cards.sportCardType !== null;
+  return {
+    phone: phone.trim(),
+    name: name.trim(),
+    password,
+    sportCardType: cards.sportCardType,
+    sportCardNumber: hasCard ? cards.sportCardNumber.trim() || null : null
+  };
+}
+
+/**
+ * Where a failed submit is reported. A phone problem belongs on the phone
+ * field, where it is read with the field; anything else goes under the
+ * password, as "wrong phone or password" for a 401.
+ */
+function authErrors(error: Error | null): { phone: string | null; form: string | null } {
+  if (error === null) return { phone: null, form: null };
+  const code = error instanceof ApiError ? error.code : null;
+  if (code === 'phone_taken') return { phone: m.auth_err_phone_taken(), form: null };
+  if (code === 'invalid_phone') return { phone: m.err_phone_invalid(), form: null };
+  const unauthorized = error instanceof ApiError && error.status === 401;
+  return { phone: null, form: unauthorized ? m.auth_err_invalid() : m.err_generic() };
+}
+
 export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<AuthTab>('login');
@@ -23,37 +56,17 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   const [cards, setCards] = useState<CardsState>(EMPTY_CARDS);
 
   const submit = useMutation({
-    mutationFn: async () => {
-      if (tab === 'login') return authApi.login(phone.trim(), password);
-      const input: RegisterInput = {
-        phone: phone.trim(),
-        name: name.trim(),
-        password,
-        sportCardType: cards.sportCardType,
-        sportCardNumber: cards.sportCardType !== null ? cards.sportCardNumber.trim() || null : null
-      };
-      return authApi.register(input);
-    },
+    mutationFn: async () =>
+      tab === 'login'
+        ? authApi.login(phone.trim(), password)
+        : authApi.register(registerInput({ phone, password, name, cards })),
     onSuccess: auth => {
       storeSession(queryClient, auth);
       onSignedIn();
     }
   });
 
-  // A phone problem belongs on the phone field, where it is read with the field
-  const error = submit.error instanceof ApiError ? submit.error : null;
-  const phoneError =
-    error?.code === 'phone_taken'
-      ? m.auth_err_phone_taken()
-      : error?.code === 'invalid_phone'
-        ? m.err_phone_invalid()
-        : null;
-  const errorText =
-    submit.error === null || phoneError !== null
-      ? null
-      : error?.status === 401
-        ? m.auth_err_invalid()
-        : m.err_generic();
+  const { phone: phoneError, form: errorText } = authErrors(submit.error);
 
   const idBase = useId();
   const selectTab = (entry: AuthTab) => {

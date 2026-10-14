@@ -20,6 +20,32 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
   return cached;
 }
 
+const numberCache = new Map<string, Intl.NumberFormat>();
+
+/** A number in the visitor's locale ("4,8", "1 250"); built once per variant like the dates. */
+export function formatNumber(value: number, options: Intl.NumberFormatOptions = {}): string {
+  const key = `${intlTag()}|${JSON.stringify(options)}`;
+  let cached = numberCache.get(key);
+  if (!cached) {
+    cached = new Intl.NumberFormat(intlTag(), options);
+    numberCache.set(key, cached);
+  }
+  return cached.format(value);
+}
+
+const relativeCache = new Map<string, Intl.RelativeTimeFormat>();
+
+/** "сьогодні", "завтра", "через 31 день": a whole-day distance in words. */
+export function formatDaysFromNow(days: number): string {
+  const tag = intlTag();
+  let cached = relativeCache.get(tag);
+  if (!cached) {
+    cached = new Intl.RelativeTimeFormat(tag, { numeric: 'auto' });
+    relativeCache.set(tag, cached);
+  }
+  return cached.format(days, 'day');
+}
+
 /** Today's date (YYYY-MM-DD) in the venue's timezone. */
 export function warsawToday(at: number = Date.now()): IsoDate {
   // en-CA short style is defined as YYYY-MM-DD

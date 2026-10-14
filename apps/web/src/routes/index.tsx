@@ -13,7 +13,7 @@ import { SiteHeader } from '../components/site/SiteHeader';
 import { SportCardsBand } from '../components/SportCardsBand';
 import { VenueMap } from '../components/venue/VenueMap';
 import { VisitCard } from '../components/venue/VisitCard';
-import { formatHour, intlTag, warsawToday } from '../lib/format';
+import { formatHour, formatNumber, warsawToday } from '../lib/format';
 import { newsQuery, tournamentsQuery, venueConfigQuery } from '../lib/queries';
 import { pageHead, venueJsonLd, websiteJsonLd } from '../lib/seo';
 import { GOOGLE_LISTING_URL, GOOGLE_RATING } from '../lib/venue';
@@ -55,9 +55,7 @@ function nextOpenTournament(tournaments: TournamentDto[] | undefined): Tournamen
 
 function Pills() {
   const today = hoursForDate(warsawToday(), useVenueConfig().hours);
-  const score = new Intl.NumberFormat(intlTag(), { minimumFractionDigits: 1 }).format(
-    GOOGLE_RATING.score
-  );
+  const score = formatNumber(GOOGLE_RATING.score, { minimumFractionDigits: 1 });
   const pill =
     'inline-flex items-center gap-2 rounded-full border border-creme/20 bg-club-green-deepest/65 px-3 py-1.5 text-xs font-medium lg:gap-2.5 lg:px-4 lg:py-2 lg:text-sm';
   return (

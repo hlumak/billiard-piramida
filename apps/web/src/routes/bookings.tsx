@@ -78,38 +78,60 @@ function useMyBookings() {
   return { bookings, isLoading, hardFailure, retry, signedIn };
 }
 
-function MyBookingsPage() {
-  const { bookings, isLoading, hardFailure, retry, signedIn } = useMyBookings();
-  // Soonest first while still ahead; most recent first once over
-  const upcoming = bookings
-    .filter(booking => booking.phase === 'upcoming' || booking.phase === 'active')
-    .reverse();
-  const past = bookings.filter(booking => !upcoming.includes(booking));
+/**
+ * One pass over the newest-first list: what is still ahead (soonest first)
+ * and what is over (most recent first).
+ */
+function splitByPhase(bookings: BookingDto[]): { upcoming: BookingDto[]; past: BookingDto[] } {
+  const upcoming: BookingDto[] = [];
+  const past: BookingDto[] = [];
+  for (const booking of bookings) {
+    const ahead = booking.phase === 'upcoming' || booking.phase === 'active';
+    (ahead ? upcoming : past).push(booking);
+  }
+  return { upcoming: upcoming.reverse(), past };
+}
 
+/** The guest's bookings in whichever state they are in: loading, failed, none, or grouped. */
+function MyBookingsList({
+  bookings,
+  isLoading,
+  hardFailure,
+  retry
+}: Omit<ReturnType<typeof useMyBookings>, 'signedIn'>) {
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner aria-label={m.loading()} />
+      </div>
+    );
+  }
+  if (bookings.length === 0) {
+    // A network/5xx failure with nothing to show must not masquerade as "no bookings"
+    if (hardFailure) return <QueryError onRetry={retry} />;
+    return (
+      <div className="card anim-reveal flex flex-col items-center gap-5 px-6 py-12 text-center">
+        <p className="text-lg text-cream-soft">{m.no_bookings()}</p>
+        <Link to="/book" className="btn-gold h-12.5 px-7 text-[15px]">
+          {m.book_now()}
+        </Link>
+      </div>
+    );
+  }
+  const { upcoming, past } = splitByPhase(bookings);
+  return (
+    <div className="flex flex-col gap-10">
+      <BookingGroup title={m.bookings_upcoming()} bookings={upcoming} />
+      <BookingGroup title={m.bookings_past()} bookings={past} past />
+    </div>
+  );
+}
+
+function MyBookingsPage() {
+  const { signedIn, ...list } = useMyBookings();
   return (
     <PageLayout script="bookings" title={m.nav_my_bookings()} width="medium">
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Spinner aria-label={m.loading()} />
-        </div>
-      ) : hardFailure && bookings.length === 0 ? (
-        <QueryError onRetry={retry} />
-      ) : bookings.length === 0 ? (
-        <div className="card anim-reveal flex flex-col items-center gap-5 px-6 py-12 text-center">
-          <p className="text-lg text-cream-soft">{m.no_bookings()}</p>
-          <Link to="/book" className="btn-gold h-12.5 px-7 text-[15px]">
-            {m.book_now()}
-          </Link>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-10">
-          {upcoming.length > 0 ? (
-            <BookingGroup title={m.bookings_upcoming()} bookings={upcoming} />
-          ) : null}
-          {past.length > 0 ? <BookingGroup title={m.bookings_past()} bookings={past} past /> : null}
-        </div>
-      )}
-
+      <MyBookingsList {...list} />
       <LookupSection signedIn={signedIn} />
     </PageLayout>
   );
@@ -124,6 +146,7 @@ function BookingGroup({
   bookings: BookingDto[];
   past?: boolean;
 }) {
+  if (bookings.length === 0) return null;
   return (
     <section aria-label={title}>
       <h2 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
@@ -192,6 +215,7 @@ function LookupSection({ signedIn }: { signedIn: boolean }) {
 
   // A read, kept as a mutation because it runs on submit: its result is shown
   // from `lookup.data` and no cached query holds it, so nothing to invalidate
+  // react-doctor-disable-next-line react-doctor/query-mutation-missing-invalidation
   const lookup = useMutation({
     mutationFn: (value: string) => api.lookupBookings(value)
   });
@@ -216,6 +240,9 @@ function LookupSection({ signedIn }: { signedIn: boolean }) {
           </p>
         )}
       </div>
+      {/* Needs JavaScript by design: the number is checked in the browser and
+          looked up on the separate API service, so there is no server action */}
+      {/* react-doctor-disable-next-line react-doctor/no-prevent-default */}
       <form
         className="fields-roomy flex flex-col gap-3"
         // A client-side submission on purpose: the phone check loads its

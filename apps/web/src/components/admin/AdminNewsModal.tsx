@@ -61,6 +61,7 @@ export function AdminNewsModal({ item }: { item: AdminNewsItemDto | null }) {
   // file and hands back its URL, which lands in the draft. Nothing cached reads
   // the upload store, and the storefront/staff lists only change when the card
   // is saved — `save` above owns that invalidation.
+  // react-doctor-disable-next-line react-doctor/query-mutation-missing-invalidation
   const insertPicture = useMutation({
     mutationFn: ({ file }: { file: File; locale: Locale }) => adminApi.uploadImage(file),
     onMutate: () => setInsertError(null),

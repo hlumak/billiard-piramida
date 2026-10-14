@@ -88,7 +88,9 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
       </div>
 
       {/* Full screen on a phone, a side sheet from the right on a tablet. A
-          click on the backdrop (the dialog element itself) closes it. */}
+          click on the backdrop (the dialog element itself) closes it — a
+          pointer shortcut only: keyboard users have Escape and the close button */}
+      {/* react-doctor-disable-next-line react-doctor/no-noninteractive-element-interactions */}
       <dialog
         ref={sheet}
         aria-label={m.nav_menu()}

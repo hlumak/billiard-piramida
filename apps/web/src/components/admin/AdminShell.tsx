@@ -234,6 +234,9 @@ export function AdminShell({
         </button>
       </nav>
 
+      {/* The click handler only adds "click outside to close" for a pointer;
+          keyboard users close the sheet with Escape or its close button */}
+      {/* react-doctor-disable-next-line react-doctor/no-noninteractive-element-interactions */}
       <dialog
         ref={sheet}
         aria-label={m.admin_sections()}

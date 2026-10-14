@@ -23,6 +23,7 @@ const isOver = (tournament: TournamentDto) =>
   tournament.registrationState === 'completed' || tournament.registrationState === 'cancelled';
 
 function TournamentGroup({ title, tournaments }: { title: string; tournaments: TournamentDto[] }) {
+  if (tournaments.length === 0) return null;
   return (
     <section aria-label={title}>
       <h2 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
@@ -39,38 +40,43 @@ function TournamentGroup({ title, tournaments }: { title: string; tournaments: T
   );
 }
 
-function TournamentsPage() {
+/** The list in whichever state its query is in: failed, loading, empty, or grouped. */
+function TournamentList() {
   const {
     data: tournaments,
     isPending,
     isError,
     refetch
   } = useQuery(tournamentsQuery(getLocale()));
-  const upcoming = tournaments?.filter(tournament => !isOver(tournament)) ?? [];
-  const past = tournaments?.filter(isOver) ?? [];
 
+  if (isError) return <QueryError onRetry={() => refetch()} />;
+  if (isPending || !tournaments) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner aria-label={m.loading()} />
+      </div>
+    );
+  }
+  if (tournaments.length === 0) {
+    return (
+      <p className="card px-6 py-12 text-center text-lg text-cream-soft">{m.tournaments_none()}</p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-10">
+      <TournamentGroup
+        title={m.tournaments_upcoming()}
+        tournaments={tournaments.filter(tournament => !isOver(tournament))}
+      />
+      <TournamentGroup title={m.tournaments_past()} tournaments={tournaments.filter(isOver)} />
+    </div>
+  );
+}
+
+function TournamentsPage() {
   return (
     <PageLayout script="tournaments" title={m.menu_tournaments()}>
-      {isError ? (
-        <QueryError onRetry={() => refetch()} />
-      ) : isPending || !tournaments ? (
-        <div className="flex justify-center py-16">
-          <Spinner aria-label={m.loading()} />
-        </div>
-      ) : tournaments.length === 0 ? (
-        <p className="card px-6 py-12 text-center text-lg text-cream-soft">
-          {m.tournaments_none()}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-10">
-          {upcoming.length > 0 ? (
-            <TournamentGroup title={m.tournaments_upcoming()} tournaments={upcoming} />
-          ) : null}
-          {past.length > 0 ? (
-            <TournamentGroup title={m.tournaments_past()} tournaments={past} />
-          ) : null}
-        </div>
-      )}
+      <TournamentList />
     </PageLayout>
   );
 }
