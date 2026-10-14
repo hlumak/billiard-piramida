@@ -88,8 +88,8 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
       >
         {tab === 'register' ? (
           <TextField name="name" value={name} onChange={setName} isRequired>
-            <Label>{m.name_label()}</Label>
-            <Input placeholder={m.name_placeholder()} />
+            <Label>{m.name_full_label()}</Label>
+            <Input placeholder={m.name_full_placeholder()} autoComplete="name" />
           </TextField>
         ) : null}
 

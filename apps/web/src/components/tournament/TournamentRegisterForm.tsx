@@ -121,8 +121,12 @@ export function TournamentRegisterForm({
             }}
             isInvalid={field.state.meta.errors.length > 0}
           >
-            <Label>{m.name_label()}</Label>
-            <Input placeholder={m.name_placeholder()} onBlur={field.handleBlur} />
+            <Label>{m.name_full_label()}</Label>
+            <Input
+              placeholder={m.name_full_placeholder()}
+              autoComplete="name"
+              onBlur={field.handleBlur}
+            />
             <FieldError>{field.state.meta.errors[0]}</FieldError>
           </TextField>
         )}
