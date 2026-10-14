@@ -506,5 +506,6 @@
   "when_until_close": "do zamknięcia o {time}",
   "sport_cards_each": "−{amount} za każdą, raz dziennie",
   "sport_cards_check": "Każdy gracz może dodać swoją — sprawdzimy je w recepcji.",
-  "btn_confirm_short": "Potwierdź"
+  "btn_confirm_short": "Potwierdź",
+  "cancel_short": "Anuluj"
 }

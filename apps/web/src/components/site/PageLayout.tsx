@@ -20,6 +20,7 @@ export function PageLayout({
   script,
   title,
   decorativeTitle = false,
+  showTitle = true,
   width = 'wide',
   footer = true,
   children
@@ -28,6 +29,8 @@ export function PageLayout({
   title: string;
   /** The page carries its own h1 further down (an article, a tournament) */
   decorativeTitle?: boolean;
+  /** Off where the page opens with a heading of its own (a fresh booking's confirmation) */
+  showTitle?: boolean;
   width?: keyof typeof WIDTHS;
   /** The booking flow drops the footer to keep the visitor on the task */
   footer?: boolean;
@@ -36,12 +39,14 @@ export function PageLayout({
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
-      <PageTitle
-        script={script}
-        title={title}
-        decorative={decorativeTitle}
-        className="px-5 pt-8 md:pt-10"
-      />
+      {showTitle ? (
+        <PageTitle
+          script={script}
+          title={title}
+          decorative={decorativeTitle}
+          className="px-5 pt-8 md:pt-10"
+        />
+      ) : null}
       <main
         id="main"
         className={`mx-auto w-full px-5 pt-8 md:px-10 md:pt-12 ${WIDTHS[width]} ${footer ? '' : 'flex-1 pb-18'}`}

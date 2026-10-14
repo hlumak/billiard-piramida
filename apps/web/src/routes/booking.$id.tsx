@@ -32,9 +32,11 @@ function BookingPage() {
   const { id } = Route.useParams();
   const { new: justCreated } = Route.useSearch();
   const { data: booking, isPending, error } = useQuery(bookingQuery(id));
+  // A fresh booking opens with its own "confirmed" heading instead of the title
+  const celebrate = justCreated === true && booking?.phase !== 'cancelled';
 
   return (
-    <PageLayout script="booking" title={m.booking_title()} width="medium">
+    <PageLayout script="booking" title={m.booking_title()} showTitle={!celebrate}>
       {isPending ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

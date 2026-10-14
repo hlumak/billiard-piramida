@@ -45,9 +45,8 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
   return (
     <Modal isOpen={isOpen} onOpenChange={setOpen}>
       <Button
-        size="lg"
         variant="outline"
-        className="h-11.25 w-full border-golden text-lg font-semibold text-creme"
+        className="btn-outline h-12.5 w-full px-4 text-[15px]"
         onPress={() => setOpen(true)}
       >
         {m.add_food()}
@@ -88,7 +87,7 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
             </Modal.Body>
             <Modal.Footer>
               <Button
-                className="w-full font-bold"
+                className="btn-gold h-12.5 w-full text-[15px]"
                 isDisabled={total === 0}
                 isPending={addItems.isPending}
                 onPress={() => addItems.mutate()}

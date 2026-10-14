@@ -11,7 +11,7 @@ export const PHASE_LABELS: Record<BookingPhase, () => string> = {
 };
 
 export const PHASE_STYLES: Record<BookingPhase, string> = {
-  upcoming: 'bg-golden/15 text-golden',
+  upcoming: 'border border-golden/60 text-golden-light',
   active: 'bg-golden text-btn-text',
   finished: 'bg-deep-cream/20 text-deep-cream',
   cancelled: 'bg-danger-soft text-danger-soft-foreground',

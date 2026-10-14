@@ -33,8 +33,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
   return (
     <Modal isOpen={isOpen} onOpenChange={setOpen}>
       <Button
-        size="lg"
-        className="h-11.25 w-full text-lg font-bold"
+        className="btn-gold h-12.5 w-full px-4 text-[15px]"
         onPress={() => {
           setHours(1);
           extend.reset();
@@ -58,11 +57,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
                     type="button"
                     aria-pressed={effectiveHours === count}
                     onClick={() => setHours(count)}
-                    className={`h-10 min-w-16 rounded-[10px] px-3 font-semibold transition-colors ${
-                      effectiveHours === count
-                        ? 'bg-golden text-btn-text'
-                        : 'bg-club-green text-creme hover:bg-surface-hover'
-                    }`}
+                    className="chip h-11 min-w-18 px-4"
                   >
                     {m.hours_n({ n: count })}
                   </button>
@@ -77,7 +72,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
             </Modal.Body>
             <Modal.Footer>
               <Button
-                className="w-full font-bold"
+                className="btn-gold h-12.5 w-full text-[15px]"
                 isPending={extend.isPending}
                 onPress={() => extend.mutate()}
               >

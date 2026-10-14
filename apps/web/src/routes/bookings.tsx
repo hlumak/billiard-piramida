@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button, FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { ChevronRight } from 'lucide-react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { formatPln, type BookingDto, type BookingSummaryDto } from '@repo/shared';
+import { formatPln, sizeOf, type BookingDto, type BookingSummaryDto } from '@repo/shared';
 import { PageLayout } from '../components/site/PageLayout';
-import { PHASE_LABELS, mutationErrorText } from '../components/booking/phase';
-import { StaggerGroup, StaggerItem } from '../components/motion';
+import { DateBadge } from '../components/booking/DateBadge';
+import { PHASE_LABELS, PHASE_STYLES, mutationErrorText } from '../components/booking/phase';
 import { formatDayLong, intlTag, warsawDate, warsawTime } from '../lib/format';
 import { bookingQuery } from '../lib/queries';
 import { ApiError, api } from '../lib/api';
@@ -74,15 +75,19 @@ function useMyBookings() {
     if (signedIn) void mine.refetch();
   };
 
-  return { bookings, isLoading, hardFailure, retry };
+  return { bookings, isLoading, hardFailure, retry, signedIn };
 }
 
 function MyBookingsPage() {
-  const { bookings, isLoading, hardFailure, retry } = useMyBookings();
+  const { bookings, isLoading, hardFailure, retry, signedIn } = useMyBookings();
+  // Soonest first while still ahead; most recent first once over
+  const upcoming = bookings
+    .filter(booking => booking.phase === 'upcoming' || booking.phase === 'active')
+    .reverse();
+  const past = bookings.filter(booking => !upcoming.includes(booking));
 
   return (
     <PageLayout script="bookings" title={m.nav_my_bookings()} width="medium">
-      <h2 className="mb-4 text-xl font-semibold text-creme">{m.my_bookings_title()}</h2>
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />
@@ -90,53 +95,87 @@ function MyBookingsPage() {
       ) : hardFailure && bookings.length === 0 ? (
         <QueryError onRetry={retry} />
       ) : bookings.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-12">
-          <p className="text-grey-cool">{m.no_bookings()}</p>
-          <Link to="/book" className="font-semibold text-golden">
-            {m.menu_booking()}
+        <div className="card anim-reveal flex flex-col items-center gap-5 px-6 py-12 text-center">
+          <p className="text-lg text-cream-soft">{m.no_bookings()}</p>
+          <Link to="/book" className="btn-gold h-12.5 px-7 text-[15px]">
+            {m.book_now()}
           </Link>
         </div>
       ) : (
-        <StaggerGroup>
-          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {bookings.map(booking => (
-              <StaggerItem key={booking.id} as="li">
-                <Link
-                  to="/booking/$id"
-                  params={{ id: booking.id }}
-                  className="block rounded-[10px] bg-club-green-light p-4 transition-colors hover:bg-surface-hover"
-                >
-                  <BookingLine booking={booking} />
-                  <div className="mt-1 text-right text-sm font-semibold text-creme">
-                    {formatPln(booking.totalGrosz, intlTag())}
-                  </div>
-                </Link>
-              </StaggerItem>
-            ))}
-          </ul>
-        </StaggerGroup>
+        <div className="flex flex-col gap-10">
+          {upcoming.length > 0 ? (
+            <BookingGroup title={m.bookings_upcoming()} bookings={upcoming} />
+          ) : null}
+          {past.length > 0 ? <BookingGroup title={m.bookings_past()} bookings={past} past /> : null}
+        </div>
       )}
 
-      <LookupSection />
+      <LookupSection signedIn={signedIn} />
     </PageLayout>
   );
 }
 
-/** Date, phase and time·spot — shared by managed bookings and lookup summaries. */
-function BookingLine({ booking }: { booking: BookingSummaryDto }) {
+function BookingGroup({
+  title,
+  bookings,
+  past = false
+}: {
+  title: string;
+  bookings: BookingDto[];
+  past?: boolean;
+}) {
+  return (
+    <section aria-label={title}>
+      <h2 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
+        {title}
+      </h2>
+      <ul className="mt-3.5 flex flex-col gap-3">
+        {bookings.map(booking => (
+          <li key={booking.id} className="anim-stagger-item">
+            <Link
+              to="/booking/$id"
+              params={{ id: booking.id }}
+              className="card lift flex items-center gap-4 p-4 md:gap-5 md:p-5"
+            >
+              <BookingLine booking={booking} muted={past} />
+              <span className="flex-none text-right font-bold text-golden tabular-nums md:text-lg">
+                {formatPln(booking.totalGrosz, intlTag())}
+              </span>
+              <ChevronRight
+                aria-hidden
+                className="hidden size-5 flex-none text-grey-cool sm:block"
+              />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Day, time, phase and spot — shared by managed bookings and lookup summaries. */
+function BookingLine({ booking, muted }: { booking: BookingSummaryDto; muted: boolean }) {
+  const date = warsawDate(booking.startsAt);
+  const size = sizeOf(booking.tableId);
   return (
     <>
-      <div className="flex items-center justify-between">
-        <span className="font-semibold capitalize text-creme">
-          {formatDayLong(warsawDate(booking.startsAt))}
-        </span>
-        <span className="text-xs font-semibold text-golden-light">
-          {PHASE_LABELS[booking.phase]()}
-        </span>
-      </div>
-      <div className="mt-1 text-sm text-grey-cool">
-        {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)} ·{' '}
-        {spotName(booking.kind, booking.tableLabel)}
+      <DateBadge date={date} muted={muted} />
+      <div className="min-w-0 flex-1">
+        <p className="sr-only">{formatDayLong(date)}</p>
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span className="text-lg font-bold tabular-nums md:text-xl">
+            {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
+          >
+            {PHASE_LABELS[booking.phase]()}
+          </span>
+        </div>
+        <p className="mt-1 truncate text-sm text-cream-soft">
+          {spotName(booking.kind, booking.tableLabel)}
+          {size ? ` · ${size}` : ''}
+        </p>
       </div>
     </>
   );
@@ -147,7 +186,7 @@ function BookingLine({ booking }: { booking: BookingSummaryDto }) {
  * phone number is easy to know, so it reveals when — never who, and gives no
  * way to manage the booking (that takes its link, the account, or a call).
  */
-function LookupSection() {
+function LookupSection({ signedIn }: { signedIn: boolean }) {
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
 
@@ -164,11 +203,21 @@ function LookupSection() {
       : null;
 
   return (
-    <section className="mt-12 flex flex-col items-center text-center">
-      <h2 className="mb-2 text-xl font-semibold text-creme">{m.find_booking_title()}</h2>
-      <p className="mb-4 text-sm text-grey-cool">{m.find_booking_hint()}</p>
+    <section className="panel mt-12 grid gap-6 p-5 md:mt-14 md:grid-cols-2 md:gap-8 md:p-8">
+      <div>
+        <h2 className="text-xl font-bold">{m.find_booking_title()}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-grey-cool">{m.find_booking_hint()}</p>
+        {signedIn ? null : (
+          <p className="mt-3 text-sm leading-relaxed text-grey-cool">
+            {m.find_booking_signin()}{' '}
+            <Link to="/profile" className="font-semibold text-golden-light hover:underline">
+              {m.sign_in()}
+            </Link>
+          </p>
+        )}
+      </div>
       <form
-        className="flex w-full flex-col gap-3 text-left md:max-w-sm"
+        className="fields-roomy flex flex-col gap-3"
         // A client-side submission on purpose: the phone check loads its
         // metadata lazily, and the lookup goes to the separate API service
         onSubmit={async event => {
@@ -203,25 +252,25 @@ function LookupSection() {
             {statusMessage}
           </p>
         ) : null}
-        <Button
+        <button
           type="submit"
-          size="lg"
-          className="h-11.25 w-full text-lg font-bold"
-          isPending={lookup.isPending}
+          disabled={lookup.isPending}
+          aria-busy={lookup.isPending}
+          className="btn-gold h-12.5 w-full text-[15px]"
         >
           {m.btn_find()}
-        </Button>
+        </button>
       </form>
 
       {lookup.data && lookup.data.length > 0 ? (
-        <div className="mt-6 w-full text-left md:max-w-sm" role="status">
+        <div className="md:col-span-2" role="status">
           <ul className="flex flex-col gap-3">
             {lookup.data.map(summary => (
               <li
                 key={`${summary.startsAt}-${summary.tableId}`}
-                className="rounded-[10px] bg-club-green-light p-4"
+                className="card flex items-center gap-4 p-4 md:gap-5"
               >
-                <BookingLine booking={summary} />
+                <BookingLine booking={summary} muted={false} />
               </li>
             ))}
           </ul>

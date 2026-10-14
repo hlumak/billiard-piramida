@@ -503,5 +503,6 @@
   "when_until_close": "until closing at {time}",
   "sport_cards_each": "−{amount} each, once a day",
   "sport_cards_check": "Everyone playing can add their own — we check them at the reception desk.",
-  "btn_confirm_short": "Confirm"
+  "btn_confirm_short": "Confirm",
+  "cancel_short": "Cancel"
 }
