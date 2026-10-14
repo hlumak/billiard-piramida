@@ -38,7 +38,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { name: 'theme-color', content: '#0b4e31' },
+      { name: 'theme-color', content: '#0a4730' },
       { title: m.app_title() },
       { property: 'og:site_name', content: 'Piramida' },
       { property: 'og:type', content: 'website' },

@@ -16,26 +16,49 @@
   --font-script: 'Great Vibes', cursive;
   --font-alt: 'Montserrat Alternates', sans-serif;
 
-  --color-golden: #feaa00;
-  --color-golden-hover: #ffb732;
-  /* Golden for small text on club-green-light cards: #feaa00 there is 3.4:1,
-     under WCAG AA; this is 4.6:1 on the cards and 6.9:1 on club-green. */
+  /* A touch warmer and less neon than the original #feaa00: 5.6:1 on the
+     page ground, 8:1 behind btn-text. */
+  --color-golden: #f7ad1e;
+  --color-golden-hover: #ffbd45;
+  /* Golden for small text on cards and controls, where #f7ad1e falls under
+     WCAG AA: 4.6:1 on club-green-light and 6.9:1 on the page. */
   --color-golden-light: #ffd36b;
-  --color-creme: #f9f9e1;
+  --color-creme: #f6f1dc;
   --color-deep-cream: #dbdabc;
-  --color-club-green: #0b4e31;
+  /* The felt: page ground, a shade deeper than the original #0b4e31 */
+  --color-club-green: #0a4730;
+  /* Controls that lift off a card or panel: chips, fields, icon buttons */
   --color-club-green-light: #176b47;
-  /* Sunken ground for the booking wizard: club-green darkened ~35% (sampled
-     from the Figma "pyramida 2" step panel). Dark enough that the
+  /* Sunken ground (booking wizard panel, admin sidebar). Dark enough that the
      club-green-light option buttons read as lifted off it. */
-  --color-club-green-dark: #083220;
-  --color-btn-text: #373328;
+  --color-club-green-dark: #073522;
+  /* Cards sit between the page and the controls on them */
+  --color-card: #10573a;
+  --color-card-hover: #156143;
+  /* The footer, the deepest green on the site */
+  --color-club-green-deepest: #052a1b;
+  /* Hairlines: card edges, dividers */
+  --color-line: rgb(246 241 220 / 0.13);
+  --color-btn-text: #2a2417;
   /* Figma "primary button tx/hover" */
   --color-btn-text-hover: #000000;
   --color-grey-warm: #585650;
-  /* Secondary text: lightened from #b2b2b2 to clear WCAG AA (4.5:1) on the
-     club-green-light card surface (#176b47), where the old value was ~3.05:1. */
-  --color-grey-cool: #d9d9d9;
+  /* Secondary text, tinted toward the cream: 4.7:1 on club-green-light,
+     6.2:1 on cards, comfortably AA on the page. */
+  --color-grey-cool: #d9ddc8;
+}
+
+/* A raised panel: the default container for a block of content */
+@utility card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 1.25rem;
+}
+
+/* A sunken panel: the working area of a form-heavy step */
+@utility panel {
+  background-color: var(--color-club-green-dark);
+  border-radius: 1.5rem;
 }
 
 /* Single dark-green club theme (Figma "pyramida 2" tokens) */
@@ -44,27 +67,29 @@
 [data-theme='dark'] {
   --radius: 0.625rem; /* 10px per Figma buttons */
 
-  --background: #0b4e31;
-  --foreground: #f9f9e1;
+  --background: #0a4730;
+  --foreground: #f6f1dc;
 
   --surface: #176b47;
-  --surface-foreground: #f9f9e1;
-  --surface-secondary: #135c3d;
-  --surface-secondary-foreground: #f9f9e1;
-  --surface-tertiary: #0f5236;
-  --surface-tertiary-foreground: #f9f9e1;
+  --surface-foreground: #f6f1dc;
+  /* Hover for anything club-green-light: a step lighter, never darker */
+  --surface-hover: #1e7a52;
+  --surface-secondary: #10573a;
+  --surface-secondary-foreground: #f6f1dc;
+  --surface-tertiary: #0d4f34;
+  --surface-tertiary-foreground: #f6f1dc;
 
-  --overlay: #135c3d;
-  --overlay-foreground: #f9f9e1;
+  --overlay: #10573a;
+  --overlay-foreground: #f6f1dc;
 
   --default: #176b47;
-  --default-foreground: #f9f9e1;
+  --default-foreground: #f6f1dc;
 
-  --accent: #feaa00;
-  --accent-foreground: #373328;
-  --accent-hover: #ffb732;
+  --accent: #f7ad1e;
+  --accent-foreground: #2a2417;
+  --accent-hover: #ffbd45;
 
-  --muted: #b2b2b2;
+  --muted: #c3cab2;
   --scrollbar: #176b47;
 
   /* Filled fields per the Figma "Booking — piramida" / "profile — piramida"
@@ -74,22 +99,22 @@
      0, so the hairline never painted and the fields were invisible. Applies to
      every field, not just the phone one, so forms stay of a piece. */
   --field-background: #176b47;
-  --field-foreground: #f9f9e1;
-  --field-placeholder: #b2b2b2;
+  --field-foreground: #f6f1dc;
+  --field-placeholder: #b4bda6;
   --field-border-width: 0px;
   --field-border: transparent;
   --field-shadow:
     0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.06);
 
   --segment: #176b47;
-  --segment-foreground: #f9f9e1;
+  --segment-foreground: #f6f1dc;
 
   --border: color-mix(in oklab, #dbdabc 40%, transparent);
   --separator: color-mix(in oklab, #dbdabc 30%, transparent);
-  --focus: #feaa00;
-  --link: #feaa00;
+  --focus: #f7ad1e;
+  --link: #f7ad1e;
   --backdrop: rgba(0, 0, 0, 0.6);
-  --background-inverse: #f9f9e1;
+  --background-inverse: #f6f1dc;
 }
 
 * {
