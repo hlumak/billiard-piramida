@@ -1,5 +1,4 @@
 import { useRef } from 'react';
-import { Button } from '@heroui/react';
 import { Minus, Plus } from 'lucide-react';
 import { formatPln, MAX_ORDER_ITEM_QUANTITY, type MenuItemDto } from '@repo/shared';
 import { intlTag } from '../lib/format';
@@ -16,24 +15,30 @@ export function MenuPicker({
   onQuantityChange: (foodItemId: number, quantity: number) => void;
 }) {
   return (
-    <div className="@container flex flex-col gap-6">
+    <div className="@container flex flex-col gap-7">
       {groupMenu(items).map(({ category, items: categoryItems }) => (
         <section key={category}>
-          <h3 className="mb-2 text-lg font-semibold text-golden">{categoryLabel(category)}</h3>
-          <ul className="grid grid-cols-1 gap-2 @xl:grid-cols-2">
+          <h3 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
+            {categoryLabel(category)}
+          </h3>
+          <ul className="mt-3 grid grid-cols-1 gap-3 @xl:grid-cols-2">
             {categoryItems.map(item => {
               const quantity = quantities[item.id] ?? 0;
               return (
                 <li
                   key={item.id}
-                  className="flex items-center gap-3 rounded-[10px] bg-club-green-light p-3"
+                  className={`anim-stagger-item flex items-center gap-3.5 rounded-2xl border bg-card p-4 transition-colors md:p-4.5 ${
+                    quantity > 0 ? 'border-golden/60' : 'border-line'
+                  }`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-creme">{item.name}</p>
+                    <p className="font-semibold">{item.name}</p>
                     {item.description ? (
-                      <p className="truncate text-xs text-grey-cool">{item.description}</p>
+                      <p className="mt-0.5 truncate text-[13px] text-grey-cool">
+                        {item.description}
+                      </p>
                     ) : null}
-                    <p className="mt-0.5 text-sm font-semibold text-golden-light">
+                    <p className="mt-1.5 text-[15px] font-bold text-golden-light">
                       {formatPln(item.priceGrosz, intlTag())}
                     </p>
                   </div>
@@ -69,40 +74,43 @@ function QuantityStepper({
 }) {
   const addRef = useRef<HTMLButtonElement>(null);
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-none items-center gap-2.5">
       {quantity > 0 ? (
         <>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="outline"
+          <button
+            type="button"
             aria-label={`${m.btn_remove()}: ${name}`}
-            className="border-golden text-golden-light"
-            onPress={() => {
+            className="btn-outline size-10.5 rounded-xl p-0"
+            onClick={() => {
               onChange(quantity - 1);
               if (quantity === 1) addRef.current?.focus();
             }}
           >
-            <Minus className="size-4" />
-          </Button>
-          <output aria-live="polite" className="w-5 text-center font-semibold text-creme">
+            <Minus aria-hidden className="size-4.5" />
+          </button>
+          <output
+            aria-live="polite"
+            className="min-w-4.5 text-center text-lg font-bold tabular-nums"
+          >
             {quantity}
           </output>
         </>
       ) : null}
-      <Button
+      <button
         ref={addRef}
-        isIconOnly={quantity > 0}
-        size="sm"
-        variant="outline"
+        type="button"
         aria-label={`${m.btn_add()}: ${name}`}
-        className="border-golden text-golden-light"
-        isDisabled={quantity >= MAX_ORDER_ITEM_QUANTITY}
-        onPress={() => onChange(Math.min(quantity + 1, MAX_ORDER_ITEM_QUANTITY))}
+        disabled={quantity >= MAX_ORDER_ITEM_QUANTITY}
+        onClick={() => onChange(Math.min(quantity + 1, MAX_ORDER_ITEM_QUANTITY))}
+        className={
+          quantity > 0
+            ? 'btn-gold size-10.5 rounded-xl p-0'
+            : 'btn-outline h-10.5 gap-1.5 rounded-xl border-golden px-4 text-sm font-bold text-golden-light hover:border-golden'
+        }
       >
-        <Plus className="size-4" />
+        <Plus aria-hidden className="size-4" strokeWidth={2.6} />
         {quantity === 0 ? m.btn_add() : null}
-      </Button>
+      </button>
     </div>
   );
 }

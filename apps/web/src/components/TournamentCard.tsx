@@ -43,7 +43,8 @@ export function RosterMeter({ tournament }: { tournament: TournamentDto }) {
           aria-label={label}
           className="mt-1.5 h-2 w-full overflow-hidden rounded-[3px] bg-deep-cream"
         >
-          {/* Width is the only animated property — see WizardProgress */}
+          {/* Width is the only animated property: Tailwind has no transition-width,
+              and transition-all would sweep in every other change too */}
           <div
             className="h-full rounded-[3px] bg-golden transition-[width] duration-300"
             style={{ width: `${fraction * 100}%` }}

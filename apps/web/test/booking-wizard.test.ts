@@ -4,6 +4,9 @@ import {
   resetIfDateStale,
   resetWizard,
   selectDate,
+  selectDuration,
+  selectGame,
+  selectStart,
   selectTable,
   selectTime,
   setItemQuantity,
@@ -15,24 +18,30 @@ beforeEach(resetWizard);
 
 const state = () => wizardStore.state;
 
-/** Date, time and a 9ft table picked — the state a guest reaches the food step in. */
+/** Date, time and a 9ft table picked on the steps that ask for them. */
 function pickUpToTable() {
   selectDate('2026-10-12');
-  selectTime(18, 2);
+  selectStart(18);
+  selectDuration(2);
+  goToStep('table');
   selectTable(1, 'billiard', '1');
 }
 
-test('the happy path walks the steps forward with the picks in place', () => {
-  pickUpToTable();
+test('date, start and length are picked on one step; the table is its own', () => {
+  selectDate('2026-10-12');
+  selectStart(18);
+  selectDuration(2);
+  // Picking does not move the guest on: "next" does
   expect(state()).toMatchObject({
-    step: 'food',
-    direction: 1,
+    step: 'when',
     date: '2026-10-12',
     startHour: 18,
-    durationHours: 2,
-    tableId: 1,
-    kind: 'billiard'
+    durationHours: 2
   });
+
+  goToStep('table');
+  selectTable(1, 'billiard', '1');
+  expect(state()).toMatchObject({ step: 'table', direction: 1, tableId: 1, kind: 'billiard' });
   // The spot decides what is playable: a game is set the moment it is picked
   expect(state().game).not.toBeNull();
 });
@@ -44,14 +53,22 @@ test('a dartboard has no game to rack', () => {
   expect(state().game).toBeNull();
 });
 
-test('re-confirming the same date keeps later picks; a new date clears them', () => {
+test('re-picking the same table keeps the chosen game; another table resets it', () => {
+  pickUpToTable();
+  selectGame('pool');
+  selectTable(1, 'billiard', '1');
+  expect(state().game).toBe('pool');
+  selectTable(8, 'billiard', '6');
+  expect(state().game).toBe('piramida');
+});
+
+test('re-picking the same date keeps later picks; a new date clears them', () => {
   pickUpToTable();
   selectDate('2026-10-12');
-  expect(state()).toMatchObject({ step: 'time', startHour: 18, tableId: 1 });
+  expect(state()).toMatchObject({ startHour: 18, tableId: 1 });
 
   selectDate('2026-10-13');
   expect(state()).toMatchObject({
-    step: 'time',
     startHour: null,
     durationHours: 1,
     tableId: null,
@@ -59,16 +76,26 @@ test('re-confirming the same date keeps later picks; a new date clears them', ()
   });
 });
 
-test('a new time clears the table, since it may not be free then', () => {
+test('a new start or length clears the table, since it may not be free then', () => {
   pickUpToTable();
-  selectTime(20, 1);
-  expect(state()).toMatchObject({ step: 'table', startHour: 20, tableId: null, kind: null });
+  selectStart(20);
+  expect(state()).toMatchObject({ startHour: 20, tableId: null, kind: null });
+
+  selectTable(1, 'billiard', '1');
+  selectDuration(1);
+  expect(state()).toMatchObject({ durationHours: 1, tableId: null });
+});
+
+test('a window handed over from the home page lands on the table step', () => {
+  selectDate('2026-10-12');
+  selectTime(19, 1);
+  expect(state()).toMatchObject({ step: 'table', startHour: 19, durationHours: 1 });
 });
 
 test('going back is direction -1, so the slide-in plays the other way', () => {
   pickUpToTable();
-  goToStep('time');
-  expect(state()).toMatchObject({ step: 'time', direction: -1 });
+  goToStep('when');
+  expect(state()).toMatchObject({ step: 'when', direction: -1 });
   goToStep('table');
   expect(state().direction).toBe(1);
 });
@@ -87,5 +114,5 @@ test('an abandoned wizard on a past date starts over; today or later is kept', (
   resetIfDateStale('2026-10-12');
   expect(state().date).toBe('2026-10-12');
   resetIfDateStale('2026-10-13');
-  expect(state()).toMatchObject({ step: 'date', date: null, tableId: null });
+  expect(state()).toMatchObject({ step: 'when', date: null, tableId: null });
 });

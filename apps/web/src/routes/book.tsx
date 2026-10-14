@@ -1,27 +1,27 @@
 import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Spinner } from '@heroui/react';
-import { isIsoDate, type IsoDate } from '@repo/shared';
+import {
+  BOOKING_DAYS_AHEAD,
+  hoursForDate,
+  isClosedAllDay,
+  isIsoDate,
+  MIN_BOOKING_HOURS,
+  type IsoDate,
+  type WeeklyHours
+} from '@repo/shared';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
-import { warsawToday } from '../lib/format';
+import { addDays, warsawHour, warsawToday } from '../lib/format';
+import { useVenueConfig } from '../lib/venue-config';
 import { PageLayout } from '../components/site/PageLayout';
-import { WizardProgress } from '../components/WizardProgress';
-import { DateStep } from '../components/wizard/DateStep';
-import { TimeStep } from '../components/wizard/TimeStep';
+import { BookingStepper } from '../components/wizard/BookingStepper';
+import { WhenStep } from '../components/wizard/WhenStep';
 import { TableStep } from '../components/wizard/TableStep';
 import { FoodStep } from '../components/wizard/FoodStep';
-
-/**
- * The last step carries the phone field and libphonenumber's metadata — about
- * 60 kB gzip that only step 5 uses. Loaded on demand (and prefetched as soon
- * as the guest reaches the table step) instead of with step 1.
- */
-const loadDetailsStep = () => import('../components/wizard/DetailsStep');
-const DetailsStep = lazy(() => loadDetailsStep().then(module => ({ default: module.DetailsStep })));
+import { WizardFrame } from '../components/wizard/WizardFrame';
 import {
-  WIZARD_STEPS,
   goToStep,
   resetIfDateStale,
   selectDate,
@@ -31,6 +31,14 @@ import {
   type WizardState,
   type WizardStep
 } from '../store/booking-wizard';
+
+/**
+ * The last step carries the phone field and libphonenumber's metadata — about
+ * 60 kB gzip that only that step uses. Loaded on demand (and prefetched as
+ * soon as the guest reaches the table step) instead of with step 1.
+ */
+const loadDetailsStep = () => import('../components/wizard/DetailsStep');
+const DetailsStep = lazy(() => loadDetailsStep().then(module => ({ default: module.DetailsStep })));
 
 export const Route = createFileRoute('/book')({
   // ?date=…&start=… arrives from the home page's free-tables strip: the guest
@@ -47,14 +55,27 @@ export const Route = createFileRoute('/book')({
 });
 
 /**
+ * The first day in the booking window with an hour still to start: today
+ * only while its last start hour is ahead, then the next day the club opens.
+ */
+function firstOpenDay(today: IsoDate, hourNow: number, hours: WeeklyHours): IsoDate | null {
+  for (let i = 0; i < BOOKING_DAYS_AHEAD; i++) {
+    const day = addDays(today, i);
+    const { close } = hoursForDate(day, hours);
+    const over = i === 0 && hourNow >= close - MIN_BOOKING_HOURS;
+    if (!isClosedAllDay(hoursForDate(day, hours)) && !over) return day;
+  }
+  return null;
+}
+
+/**
  * Clamp forward jumps to the first step whose prerequisites are missing.
  * Never pushes forward: standing on an earlier step (e.g. going back to
- * change the date) is always valid.
+ * change the time) is always valid.
  */
 function permittedStep(state: WizardState): WizardStep {
   const index = stepIndex(state.step);
-  if (index > stepIndex('date') && state.date == null) return 'date';
-  if (index > stepIndex('time') && state.startHour == null) return 'time';
+  if (index > stepIndex('when') && (state.date == null || state.startHour == null)) return 'when';
   if (index > stepIndex('table') && (state.tableId == null || state.kind == null)) return 'table';
   return state.step;
 }
@@ -65,12 +86,19 @@ function permittedStep(state: WizardState): WizardStep {
  */
 function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) {
   const { date, startHour, durationHours, tableId, kind, tableLabel, game } = state;
-  if (step === 'date' || date == null) return <DateStep />;
-  if (step === 'time' || startHour == null) return <TimeStep date={date} />;
+  if (step === 'when' || date == null || startHour == null) return <WhenStep />;
   // `kind` is written together with `tableId`, so a spot without one can only
   // be a stale store from before darts existed — send them back to re-pick.
   if (step === 'table' || tableId == null || kind == null || tableLabel == null) {
-    return <TableStep date={date} startHour={startHour} durationHours={durationHours} />;
+    return (
+      <TableStep
+        date={date}
+        startHour={startHour}
+        durationHours={durationHours}
+        tableId={tableId}
+        kind={kind}
+      />
+    );
   }
   if (step === 'food') return <FoodStep />;
   return (
@@ -89,12 +117,15 @@ function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) 
 function BookingWizard() {
   const navigate = useNavigate();
   const state = useStore(wizardStore);
+  const { hours } = useVenueConfig();
 
   const prefill = Route.useSearch();
 
   // Drop an abandoned wizard whose date has since passed, then take an hour
   // handed over by the home page — once, and out of the address bar, so a
-  // reload or a back step does not re-pick it (client-only mutation)
+  // reload or a back step does not re-pick it. With neither, open on the
+  // first day the club is open, so step 1 shows its hours straight away
+  // (client-only mutations).
   useEffect(() => {
     const today = warsawToday();
     resetIfDateStale(today);
@@ -102,13 +133,16 @@ function BookingWizard() {
       selectDate(prefill.date);
       selectTime(prefill.start, 1);
       void navigate({ to: '/book', search: {}, replace: true });
+    } else if (wizardStore.state.date === null) {
+      const day = firstOpenDay(today, warsawHour(Date.now()), hours);
+      if (day !== null) selectDate(day);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const step = permittedStep(state);
   // The store carries the direction of the last step change, so a mid-step
-  // update (adding a menu item on the food step) can't flip the wrapper's
+  // update (adding a menu item on the bar step) can't flip the wrapper's
   // animation class and replay the slide-in over the whole step. A clamp only
   // ever sends the guest backwards, and holds that until the effect below
   // writes the corrected step to the store.
@@ -122,8 +156,6 @@ function BookingWizard() {
   useEffect(() => {
     if (step === 'table' || step === 'food') void loadDetailsStep();
   }, [step]);
-
-  const index = stepIndex(step);
 
   // Each step replaces the last one wholesale, taking the focused control with
   // it: move focus to the new step's heading so keyboard and screen-reader
@@ -155,29 +187,12 @@ function BookingWizard() {
     return () => observer.disconnect();
   }, [step]);
 
-  const handleBack = () => {
-    const previous = WIZARD_STEPS[index - 1];
-    if (previous === undefined) {
-      navigate({ to: '/' });
-    } else {
-      goToStep(previous);
-    }
-  };
-
   return (
     <PageLayout script="booking" title={msg.page_booking()} footer={false}>
-      <button type="button" onClick={handleBack} className="btn-outline mb-4 h-10 px-4 text-sm">
-        ← {msg.nav_back()}
-      </button>
-      <WizardProgress step={index + 1} total={WIZARD_STEPS.length} />
-      {/* Every step shares one sunken panel: the darker ground marks off the
-            wizard's working area and gives the club-green-light option buttons
-            something to lift from. It is also the clip box — the step slide-in
-            is contained by the panel rather than by the viewport — and its own
-            padding keeps input focus rings well clear of that clipped edge. */}
-      <div className="overflow-x-clip rounded-3xl bg-club-green-dark p-4 md:p-6">
+      <BookingStepper step={step} />
+      <WizardFrame>
         {/* key remounts the wrapper per step so the CSS slide-in replays;
-              enter-only on purpose — see step-in-* keyframes in styles.css */}
+            enter-only on purpose — see step-in-* keyframes in styles.css */}
         <div
           key={step}
           ref={panelRef}
@@ -185,7 +200,7 @@ function BookingWizard() {
         >
           <CurrentStep state={state} step={step} />
         </div>
-      </div>
+      </WizardFrame>
     </PageLayout>
   );
 }

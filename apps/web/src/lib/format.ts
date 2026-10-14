@@ -55,6 +55,22 @@ export function formatDayLong(isoDate: IsoDate): string {
   }).format(utcDate(isoDate));
 }
 
+/** The three lines of a calendar tile: "чт", "15", "жовт." */
+export function dateTileParts(isoDate: IsoDate): { weekday: string; day: number; month: string } {
+  const date = utcDate(isoDate);
+  return {
+    weekday: formatter(intlTag(), { weekday: 'short', timeZone: 'UTC' }).format(date),
+    day: dateParts(isoDate)[2],
+    month: formatter(intlTag(), { month: 'short', timeZone: 'UTC' }).format(date)
+  };
+}
+
+/** "Жовтень 2026": the month a date falls in, as a heading over a calendar. */
+export function formatMonthYear(isoDate: IsoDate): string {
+  const month = formatter(intlTag(), { month: 'long', timeZone: 'UTC' }).format(utcDate(isoDate));
+  return `${month.charAt(0).toLocaleUpperCase(intlTag())}${month.slice(1)} ${dateParts(isoDate)[0]}`;
+}
+
 /** Localized weekday name for a JS weekday index (0 = Sunday). */
 export function weekdayName(weekday: number, style: 'long' | 'short' = 'long'): string {
   // 2026-03-01 was a Sunday, so adding the index lands on the wanted weekday

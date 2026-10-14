@@ -176,12 +176,14 @@ function PlanSpot({
   id,
   label,
   free,
+  selected,
   onSelect,
   children
 }: {
   id: number;
   label: string;
   free: boolean;
+  selected: boolean;
   onSelect: (tableId: number) => void;
   children: React.ReactNode;
 }) {
@@ -195,7 +197,8 @@ function PlanSpot({
   return (
     <g
       role="button"
-      aria-label={label}
+      aria-label={free ? label : `${label}, ${msg.plan_taken_now()}`}
+      aria-pressed={free ? selected : undefined}
       aria-disabled={!free}
       tabIndex={free ? 0 : -1}
       {...(free
@@ -219,6 +222,7 @@ function PlanTable({
   displayNumber,
   size,
   free,
+  selected,
   onSelect
 }: {
   spot: TableSpot;
@@ -227,31 +231,41 @@ function PlanTable({
   /** Cloth size, suffixed to the number — 9ft and 12ft bill apart */
   size: string | null;
   free: boolean;
+  selected: boolean;
   onSelect: (tableId: number) => void;
 }) {
   const { id, x, y, w, h } = spot;
   const cx = x + w / 2;
   const cy = y + h / 2;
+  let ink = 'fill-grey-cool';
+  if (selected) ink = 'fill-btn-text';
+  else if (free) ink = 'fill-creme';
+  let frame = 'fill-club-green-light stroke-grey-cool';
+  if (selected) frame = 'fill-golden stroke-golden-light';
+  else if (free) {
+    frame =
+      'fill-club-green-light stroke-golden transition-colors group-hover:stroke-golden-hover group-focus-visible:stroke-creme';
+  }
 
   return (
-    <PlanSpot id={id} label={label} free={free} onSelect={onSelect}>
+    <PlanSpot id={id} label={label} free={free} selected={selected} onSelect={onSelect}>
       {/* Oversized invisible hit area for fat fingers */}
       <rect x={x - 14} y={y - 14} width={w + 28} height={h + 28} fill="transparent" />
+      {/* The picked table sends one ring out as it turns gold */}
+      {selected ? (
+        <rect
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          rx={12}
+          fill="none"
+          strokeWidth={5}
+          className="anim-ripple stroke-golden"
+        />
+      ) : null}
       {/* Frame */}
-      <rect
-        x={x}
-        y={y}
-        width={w}
-        height={h}
-        rx={12}
-        fill="var(--color-club-green-light)"
-        strokeWidth={5}
-        className={
-          free
-            ? 'stroke-golden transition-colors group-hover:stroke-golden-hover group-focus-visible:stroke-creme'
-            : 'stroke-grey-cool'
-        }
-      />
+      <rect x={x} y={y} width={w} height={h} rx={12} strokeWidth={5} className={frame} />
       {/* Felt */}
       <rect
         x={x + 10}
@@ -259,7 +273,11 @@ function PlanTable({
         width={w - 20}
         height={h - 20}
         rx={6}
-        className="fill-club-green transition-colors group-hover:fill-surface-tertiary"
+        className={
+          selected
+            ? 'fill-[#e29c12]'
+            : 'fill-club-green transition-colors group-hover:fill-surface-tertiary'
+        }
       />
       {pocketCenters(spot).map(([px, py]) => (
         <circle key={`${px}-${py}`} cx={px} cy={py} r={5} className="fill-black/60" />
@@ -274,12 +292,12 @@ function PlanTable({
         textAnchor="middle"
         dominantBaseline="central"
         transform={h > w ? `rotate(-90 ${cx} ${cy})` : undefined}
-        className={`text-[26px] font-bold ${free ? 'fill-creme' : 'fill-grey-cool'}`}
+        className={`text-[26px] font-bold ${ink}`}
       >
         {displayNumber}
         {/* The gap is a non-breaking space — SVG collapses an ordinary one */}
         {size ? (
-          <tspan className={`text-[15px] ${free ? 'fill-golden' : 'fill-grey-cool'}`}>
+          <tspan className={`text-[15px] ${free && !selected ? 'fill-golden' : ink}`}>
             {` ${size}`}
           </tspan>
         ) : null}
@@ -294,24 +312,48 @@ function PlanDartboard({
   label,
   displayNumber,
   free,
+  selected,
   onSelect
 }: {
   spot: DartSpot;
   label: string;
   displayNumber: string;
   free: boolean;
+  selected: boolean;
   onSelect: (tableId: number) => void;
 }) {
   const { id, cx, cy, r } = spot;
-  const ringClass = free
-    ? 'stroke-golden transition-colors group-hover:stroke-golden-hover group-focus-visible:stroke-creme'
-    : 'stroke-grey-cool';
+  let ringClass = 'stroke-grey-cool';
+  let ink = 'fill-grey-cool';
+  if (selected) {
+    ringClass = 'stroke-btn-text';
+    ink = 'fill-btn-text';
+  } else if (free) {
+    ringClass =
+      'stroke-golden transition-colors group-hover:stroke-golden-hover group-focus-visible:stroke-creme';
+    ink = 'fill-creme';
+  }
 
   return (
-    <PlanSpot id={id} label={label} free={free} onSelect={onSelect}>
+    <PlanSpot id={id} label={label} free={free} selected={selected} onSelect={onSelect}>
       {/* The pair sits 67 apart, so 12 is all the padding that fits between */}
       <circle cx={cx} cy={cy} r={r + 12} fill="transparent" />
-      <circle cx={cx} cy={cy} r={r} fill="var(--color-club-green-light)" />
+      {selected ? (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          strokeWidth={4}
+          className="anim-ripple stroke-golden"
+        />
+      ) : null}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        className={selected ? 'fill-golden' : 'fill-club-green-light'}
+      />
       <circle cx={cx} cy={cy} r={r} fill="none" strokeWidth={4} className={ringClass} />
       <circle
         cx={cx}
@@ -325,14 +367,18 @@ function PlanDartboard({
         cx={cx}
         cy={cy}
         r={r * 0.3}
-        className="fill-club-green transition-colors group-hover:fill-surface-tertiary"
+        className={
+          selected
+            ? 'fill-[#e29c12]'
+            : 'fill-club-green transition-colors group-hover:fill-surface-tertiary'
+        }
       />
       <text
         x={cx}
         y={cy}
         textAnchor="middle"
         dominantBaseline="central"
-        className={`text-[16px] font-bold ${free ? 'fill-creme' : 'fill-grey-cool'}`}
+        className={`text-[16px] font-bold ${ink}`}
       >
         {displayNumber}
       </text>
@@ -386,11 +432,13 @@ function RoomLabel({
 export function FloorPlan({
   spots,
   freeTableIds,
+  selectedId,
   onSelect
 }: {
   /** Every spot in the room, whatever the guest is currently filtering to */
   spots: readonly Pick<TableDto, 'id' | 'label' | 'kind'>[];
   freeTableIds: ReadonlySet<number>;
+  selectedId: number | null;
   onSelect: (tableId: number) => void;
 }) {
   const byId = new Map(spots.map(spot => [spot.id, spot]));
@@ -407,85 +455,105 @@ export function FloorPlan({
   const dartboards = DARTBOARDS.filter(spot => byId.has(spot.id));
 
   return (
-    <div>
-      <svg
-        viewBox="0 0 1000 1190"
-        role="group"
-        aria-label={msg.step_table_title()}
-        className="w-full"
+    <svg
+      viewBox="0 0 1000 1190"
+      role="group"
+      aria-label={msg.step_table_title()}
+      className="w-full"
+    >
+      <path d={ROOM_FILLS} className="fill-club-green-light" />
+      <path
+        d={OUTLINES}
+        fill="none"
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="stroke-deep-cream/50"
+      />
+      {ROOMS.map(room => (
+        <RoomLabel key={room.d} tx={room.tx} ty={room.ty} size={room.size} label={room.label()} />
+      ))}
+
+      {/* Entrance: in from the west, then south into hall 1 */}
+      <g
+        fill="none"
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="stroke-golden"
       >
-        <path d={ROOM_FILLS} className="fill-club-green-light" />
-        <path
-          d={OUTLINES}
-          fill="none"
-          strokeWidth={5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="stroke-deep-cream/50"
-        />
-        {ROOMS.map(room => (
-          <RoomLabel key={room.d} tx={room.tx} ty={room.ty} size={room.size} label={room.label()} />
-        ))}
+        <path d="M10 64H143M126 47L143 64L126 81" />
+        <path d="M247 132V265M230 248L247 265L264 248" />
+      </g>
+      <text
+        x={215}
+        y={80}
+        textAnchor="middle"
+        dominantBaseline="central"
+        transform="rotate(50 215 80)"
+        className="fill-creme/80 text-[22px]"
+      >
+        {msg.plan_entrance()}
+      </text>
 
-        {/* Entrance: in from the west, then south into hall 1 */}
-        <g
-          fill="none"
-          strokeWidth={5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="stroke-golden"
-        >
-          <path d="M10 64H143M126 47L143 64L126 81" />
-          <path d="M247 132V265M230 248L247 265L264 248" />
-        </g>
-        <text
-          x={215}
-          y={80}
-          textAnchor="middle"
-          dominantBaseline="central"
-          transform="rotate(50 215 80)"
-          className="fill-creme/80 text-[22px]"
-        >
-          {msg.plan_entrance()}
+      {/* Hall names sit on open floor, clear of every wall and table */}
+      <g aria-hidden className="fill-grey-cool text-[22px] font-semibold">
+        <text x={452} y={290}>
+          {msg.hall_n({ n: 1 })}
         </text>
+        <text x={268} y={560}>
+          {msg.hall_n({ n: 2 })}
+        </text>
+      </g>
 
-        {/* Own group: the stagger cascade indexes by sibling position, and the
-            spots must not share a parent with the static room shapes above */}
-        <g>
-          {tables.map(spot => (
-            <PlanTable
-              key={spot.id}
-              spot={spot}
-              label={nameOf(spot.id, 'billiard')}
-              displayNumber={byId.get(spot.id)?.label ?? String(spot.id)}
-              size={sizeOf(spot.id)}
-              free={freeTableIds.has(spot.id)}
-              onSelect={onSelect}
-            />
-          ))}
-          {dartboards.map(spot => (
-            <PlanDartboard
-              key={spot.id}
-              spot={spot}
-              label={nameOf(spot.id, 'darts')}
-              displayNumber={byId.get(spot.id)?.label ?? String(spot.id)}
-              free={freeTableIds.has(spot.id)}
-              onSelect={onSelect}
-            />
-          ))}
-        </g>
-      </svg>
+      {/* Own group: the stagger cascade indexes by sibling position, and the
+          spots must not share a parent with the static room shapes above */}
+      <g>
+        {tables.map(spot => (
+          <PlanTable
+            key={spot.id}
+            spot={spot}
+            label={nameOf(spot.id, 'billiard')}
+            displayNumber={byId.get(spot.id)?.label ?? String(spot.id)}
+            size={sizeOf(spot.id)}
+            free={freeTableIds.has(spot.id)}
+            selected={spot.id === selectedId}
+            onSelect={onSelect}
+          />
+        ))}
+        {dartboards.map(spot => (
+          <PlanDartboard
+            key={spot.id}
+            spot={spot}
+            label={nameOf(spot.id, 'darts')}
+            displayNumber={byId.get(spot.id)?.label ?? String(spot.id)}
+            free={freeTableIds.has(spot.id)}
+            selected={spot.id === selectedId}
+            onSelect={onSelect}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}
 
-      <div className="mt-3 flex items-center gap-5 text-xs text-grey-cool">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block size-3 rounded-[4px] border-2 border-golden bg-club-green-light" />
-          {msg.plan_free()}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block size-3 rounded-[4px] border-2 border-grey-cool bg-club-green-light opacity-40" />
-          {msg.plan_taken()}
-        </span>
-      </div>
-    </div>
+/** What the plan's three looks mean. */
+export function PlanLegend({ className = '' }: { className?: string }) {
+  const swatch = 'h-3.5 w-5.5 flex-none rounded';
+  return (
+    <ul className={`flex text-cream-soft ${className}`}>
+      <li className="flex items-center gap-2.5">
+        <span className={`${swatch} border-[2.5px] border-golden bg-club-green-light`} />
+        {msg.plan_free()}
+      </li>
+      <li className="flex items-center gap-2.5">
+        <span className={`${swatch} bg-golden`} />
+        {msg.plan_selected()}
+      </li>
+      <li className="flex items-center gap-2.5">
+        <span className={`${swatch} border-[2.5px] border-grey-cool opacity-40`} />
+        {msg.plan_taken_now()}
+      </li>
+    </ul>
   );
 }
