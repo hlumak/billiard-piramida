@@ -1294,8 +1294,9 @@ test('guest phone lookup returns only active bookings and normalizes the query',
 
   // National-format query must match the E.164-stored number
   const found = await app.inject({
-    method: 'GET',
-    url: '/api/bookings/lookup?phone=512100100',
+    method: 'POST',
+    url: '/api/bookings/lookup',
+    payload: { phone: '512100100' },
     headers: ip
   });
   assert.equal(found.statusCode, 200);
@@ -1305,6 +1306,14 @@ test('guest phone lookup returns only active bookings and normalizes the query',
   for (const secret of ['id', 'customerName', 'customerPhone', 'manageToken']) {
     assert.equal(secret in summary, false, `lookup must not expose ${secret}`);
   }
+  // The number is never taken from a URL, where request and access logs keep it
+  // (a GET falls through to /api/bookings/:id and fails its UUID check)
+  const viaQuery = await app.inject({
+    method: 'GET',
+    url: '/api/bookings/lookup?phone=512100100',
+    headers: ip
+  });
+  assert.equal(viaQuery.statusCode, 400);
 
   // Cancelled bookings drop out of the recovery list
   await app.inject({
@@ -1313,16 +1322,18 @@ test('guest phone lookup returns only active bookings and normalizes the query',
     headers: { ...ip, 'x-booking-token': manageToken }
   });
   const afterCancel = await app.inject({
-    method: 'GET',
-    url: '/api/bookings/lookup?phone=512100100',
+    method: 'POST',
+    url: '/api/bookings/lookup',
+    payload: { phone: '512100100' },
     headers: ip
   });
   assert.equal(afterCancel.json().length, 0);
 
   // A number with no bookings returns an empty list, not an error
   const none = await app.inject({
-    method: 'GET',
-    url: '/api/bookings/lookup?phone=999888777',
+    method: 'POST',
+    url: '/api/bookings/lookup',
+    payload: { phone: '999888777' },
     headers: ip
   });
   assert.equal(none.statusCode, 200);
@@ -1334,8 +1345,9 @@ test('lookup is rate limited to 10 requests per minute', async () => {
   let limited = false;
   for (let i = 0; i < 11; i++) {
     const res = await app.inject({
-      method: 'GET',
-      url: '/api/bookings/lookup?phone=500500500',
+      method: 'POST',
+      url: '/api/bookings/lookup',
+      payload: { phone: '500500500' },
       headers: ip
     });
     if (res.statusCode === 429) {
@@ -1816,6 +1828,29 @@ test('guests book at most 14 days ahead and hold at most 3 upcoming bookings per
 
   // Another phone is unaffected
   assert.equal((await book(thursday, 4, '+48 602 111 334')).statusCode, 201);
+});
+
+test('the global limit leaves room for quick browsing, but still applies', async () => {
+  // Production defaults: a burst like thirty fast page loads (about five
+  // requests each) from one visitor must not be refused — the old ceiling of
+  // 100 a minute refused the 101st
+  const defaults = await buildApp({ databaseUrl: TEST_URL, logger: false, uploadsDir });
+  try {
+    const headers = { 'x-forwarded-for': '198.51.100.77' };
+    for (let i = 0; i < 150; i++) {
+      const res = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers });
+      assert.notEqual(res.statusCode, 429, `request ${i + 1} of a page-load burst was refused`);
+    }
+    // …while a flood is still cut off
+    let limited = false;
+    for (let i = 0; i < 600 && !limited; i++) {
+      const res = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers });
+      if (res.statusCode === 429) limited = true;
+    }
+    assert.ok(limited, 'expected a 429 once one address floods the API');
+  } finally {
+    await defaults.close();
+  }
 });
 
 test('public booking creation is limited per IP', async () => {

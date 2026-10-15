@@ -1,17 +1,18 @@
-import { CalendarDays, Users } from 'lucide-react';
-import type { TournamentDto } from '@repo/shared';
+import { Link } from '@tanstack/react-router';
+import { formatPln, type TournamentDto } from '@repo/shared';
 import { resolveAssetUrl } from '../lib/api';
-import { formatDayLong } from '../lib/format';
+import { intlTag } from '../lib/format';
 import { isLive, rosterProgress, stateLabel, whenLabel } from '../lib/tournaments';
 import { m } from '../paraglide/messages.js';
+import { DateBadge } from './DateBadge';
 
 /** Registration state as a pill: golden while sign-ups are open, muted after. */
 export function TournamentBadge({ tournament }: { tournament: TournamentDto }) {
   const live = isLive(tournament.registrationState);
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-        live ? 'bg-golden text-btn-text' : 'bg-creme/15 text-creme/80'
+      className={`inline-block rounded-full px-3 py-1 text-xs font-bold md:text-[13px] ${
+        live ? 'bg-golden text-btn-text' : 'bg-creme/12 text-cream-soft'
       }`}
     >
       {stateLabel(tournament.registrationState)}
@@ -20,87 +21,90 @@ export function TournamentBadge({ tournament }: { tournament: TournamentDto }) {
 }
 
 /**
- * Seats taken against the number the bracket needs. Renders as a real
- * progressbar so the count is announced, and falls back to the bare count when
- * the club set neither a minimum nor a cap.
+ * A tournament in the list: its day, state, name and pitch, then how full the
+ * roster is, when it starts and what it costs. The whole card is the link.
  */
-export function RosterMeter({ tournament }: { tournament: TournamentDto }) {
-  const { taken, target, fraction, label } = rosterProgress(tournament);
-
-  return (
-    <div>
-      <div className="flex items-center gap-1.5 text-sm text-creme">
-        <Users className="size-4 shrink-0 text-golden" />
-        <span>{label}</span>
-      </div>
-      {fraction === null || target === null ? null : (
-        <div
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={target}
-          aria-valuenow={Math.min(taken, target)}
-          aria-valuetext={label}
-          aria-label={label}
-          className="mt-1.5 h-2 w-full overflow-hidden rounded-[3px] bg-deep-cream"
-        >
-          {/* Width is the only animated property — see WizardProgress */}
-          <div
-            className="h-full rounded-[3px] bg-golden transition-[width] duration-300"
-            style={{ width: `${fraction * 100}%` }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * The body of a tournament card, without a surface or a link of its own: the
- * home carousel sits it on the hero photo, the list page on a solid panel, and
- * each supplies its own wrapper.
- */
-export function TournamentCardBody({ tournament }: { tournament: TournamentDto }) {
+export function TournamentCard({ tournament }: { tournament: TournamentDto }) {
+  const live = isLive(tournament.registrationState);
+  const { taken, target, fraction, label, placesLeft } = rosterProgress(tournament);
   const when = whenLabel(tournament);
-  const { registrationDeadline, registrationState } = tournament;
-  // The deadline only informs a decision while it can still be met
-  const deadline =
-    registrationState === 'open' && registrationDeadline !== null
-      ? m.tournament_deadline({ date: formatDayLong(registrationDeadline) })
-      : null;
+  const fee = tournament.entryFeeGrosz;
 
   return (
-    <>
+    <Link
+      to="/tournaments/$slug"
+      params={{ slug: tournament.slug }}
+      className={`card lift flex h-full flex-col overflow-hidden ${
+        tournament.registrationState === 'cancelled' ? 'opacity-60' : ''
+      }`}
+    >
       {tournament.imageUrl ? (
         // Decorative: the headline right below carries the same information
         <img
           src={resolveAssetUrl(tournament.imageUrl)}
           alt=""
           loading="lazy"
-          className="h-24 w-full object-cover"
+          className="h-36 w-full object-cover"
         />
       ) : null}
-      <div className="flex flex-col gap-2 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-golden-light">
-            {m.tournament_badge()}
-          </span>
-          <TournamentBadge tournament={tournament} />
+      <div className="flex flex-1 flex-col p-5 md:p-6">
+        <div className="flex items-start gap-4">
+          {tournament.startsOn !== null ? (
+            <DateBadge date={tournament.startsOn} muted={!live} />
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <TournamentBadge tournament={tournament} />
+            <h2 className="mt-2 text-lg leading-snug font-bold md:text-xl">{tournament.title}</h2>
+            {tournament.summary ? (
+              <p className="mt-1 line-clamp-2 text-sm text-grey-cool">{tournament.summary}</p>
+            ) : null}
+          </div>
         </div>
 
-        <p className="font-semibold text-creme">{tournament.title}</p>
-        {tournament.summary ? (
-          <p className="line-clamp-2 text-sm text-creme/85">{tournament.summary}</p>
-        ) : null}
-
-        <RosterMeter tournament={tournament} />
-
-        {when !== null || deadline !== null ? (
-          <p className="flex items-center gap-1.5 text-xs text-grey-cool">
-            <CalendarDays className="size-3.5 shrink-0" />
-            <span className="first-letter:uppercase">{when ?? deadline}</span>
-          </p>
-        ) : null}
+        <div className="mt-auto pt-5">
+          <div className="flex justify-between gap-3 text-sm">
+            <span className="font-semibold">{label}</span>
+            {live && placesLeft !== null ? (
+              <span className="font-bold text-golden-light">
+                {m.tournament_seats_left({ n: placesLeft })}
+              </span>
+            ) : null}
+          </div>
+          {fraction === null || target === null ? null : (
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={target}
+              aria-valuenow={Math.min(taken, target)}
+              aria-label={label}
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-creme/16"
+            >
+              <div
+                className="anim-bar-fill h-full rounded-full bg-golden"
+                style={{ width: `${fraction * 100}%` }}
+              />
+            </div>
+          )}
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt className="text-grey-cool">{m.tournament_starts()}</dt>
+              <dd className="mt-0.5 font-semibold first-letter:uppercase">
+                {when ?? m.tournament_date_tbd({ n: tournament.minPlayers })}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-grey-cool">{m.tournament_fee()}</dt>
+              <dd className="mt-0.5 font-semibold">
+                {fee === null
+                  ? m.tournament_fee_tbd()
+                  : fee === 0
+                    ? m.tournament_fee_free()
+                    : formatPln(fee, intlTag())}
+              </dd>
+            </div>
+          </dl>
+        </div>
       </div>
-    </>
+    </Link>
   );
 }

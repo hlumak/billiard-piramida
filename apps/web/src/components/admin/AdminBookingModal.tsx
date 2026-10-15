@@ -1,4 +1,5 @@
 import { useReducer, useState } from 'react';
+import { Pencil, Plus } from 'lucide-react';
 import { Button, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -184,10 +185,18 @@ export function AdminNewBooking() {
   const [isOpen, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" className="font-semibold" onPress={() => setOpen(true)}>
-        {m.admin_new_booking()}
-      </Button>
-      <AdminBookingModal isOpen={isOpen} onOpenChange={setOpen} />
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="btn-gold h-11 flex-none rounded-xl px-3.5 text-sm sm:px-4.5 sm:text-[15px]"
+      >
+        <Plus aria-hidden className="size-4.5" strokeWidth={2.4} />
+        <span className="sm:hidden">{m.admin_book_short()}</span>
+        <span className="hidden sm:inline">{m.admin_new_booking()}</span>
+      </button>
+      {/* Mounted only while open: the button lives in the panel's header for
+          the whole shift, and each booking starts from today with an empty form */}
+      {isOpen ? <AdminBookingModal isOpen={isOpen} onOpenChange={setOpen} /> : null}
     </>
   );
 }
@@ -197,9 +206,15 @@ export function AdminEditBooking({ booking }: { booking: BookingDto }) {
   const [isOpen, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant="ghost" onPress={() => setOpen(true)}>
+      <button
+        type="button"
+        title={m.admin_edit_tip()}
+        onClick={() => setOpen(true)}
+        className="btn-outline h-9 rounded-[10px] border-creme/25 px-3 text-[13px]"
+      >
+        <Pencil aria-hidden className="size-3.5" strokeWidth={2.2} />
         {m.admin_edit_btn()}
-      </Button>
+      </button>
       {/* Keyed so reopening after a change starts from the saved window */}
       {isOpen ? (
         <AdminBookingModal

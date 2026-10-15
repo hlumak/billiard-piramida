@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, Modal, Spinner } from '@heroui/react';
+import { Coffee } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MAX_ORDER_ITEM_QUANTITY, formatPln, type BookingDto } from '@repo/shared';
 import { adminApi } from '../../lib/admin-api';
@@ -22,6 +23,7 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
   const {
     data: menu,
     isError,
+    error,
     refetch
   } = useQuery({
     ...menuQuery(getLocale()),
@@ -66,11 +68,13 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
   return (
     <Modal isOpen={isOpen} onOpenChange={setOpen}>
       <Button
-        size="sm"
         variant="outline"
-        className="border-golden text-creme"
+        // Starts with the visible word, so voice control ("click Bar") still works
+        aria-label={`${m.admin_order_btn()}: ${m.admin_bar_tip()}`}
+        className="h-9 gap-1.5 rounded-[10px] border-[1.5px] border-golden/70 bg-transparent px-3 text-[13px] font-bold text-golden-light hover:bg-golden/10"
         onPress={() => setOpen(true)}
       >
+        <Coffee aria-hidden className="size-3.5" strokeWidth={2.2} />
         {m.admin_order_btn()}
       </Button>
       <Modal.Backdrop>
@@ -148,7 +152,7 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
 
                 <p className="text-sm font-semibold text-golden-light">{m.admin_order_add()}</p>
                 {isError && !menu ? (
-                  <QueryError onRetry={() => refetch()} />
+                  <QueryError error={error} onRetry={() => refetch()} />
                 ) : !menu ? (
                   <div className="flex justify-center py-6">
                     <Spinner aria-label={m.loading()} />

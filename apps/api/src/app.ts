@@ -71,7 +71,12 @@ export interface AppOptions {
   cookieSecure?: boolean | undefined;
   /**
    * Global per-IP request ceiling per minute. Routes that set their own
-   * `config.rateLimit` are unaffected. Tests raise it because Fastify's
+   * `config.rateLimit` are unaffected. One page load costs about five
+   * requests (three from the server render, counted against the visitor,
+   * plus the browser's own), and switching the site's language is a full page
+   * load: at 100, a visitor clicking through languages, or a few people
+   * behind one address (club Wi-Fi, a mobile carrier's NAT), was locked out
+   * for the rest of the minute with every list on the page empty. Tests raise it because Fastify's
    * `inject` gives every request the same source address, so the whole suite
    * shares one bucket that a real client never would.
    */
@@ -100,7 +105,7 @@ export async function buildApp({
   adminToken,
   jwtSecret,
   cookieSecure = false,
-  rateLimitMax = 100,
+  rateLimitMax = 600,
   bookingCreateLimit = 10,
   trustedProxies = DEFAULT_TRUSTED_PROXIES,
   uploadsDir = DEFAULT_UPLOADS_DIR,

@@ -83,7 +83,7 @@ function HourSelect({
  */
 export function AdminVenueConfig() {
   const queryClient = useQueryClient();
-  const { data: config, isPending, isError, refetch } = useQuery(adminVenueConfigQuery());
+  const { data: config, isPending, isError, error, refetch } = useQuery(adminVenueConfigQuery());
   const [draft, setDraft] = useState<{ rates: RateDraft; hours: WeeklyHours } | null>(null);
 
   // Seeded from the server copy on first load, then owned by the form
@@ -114,7 +114,7 @@ export function AdminVenueConfig() {
     }
   });
 
-  if (isError && !config) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !config) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !current) {
     return (
       <div className="flex justify-center py-16">
@@ -135,7 +135,7 @@ export function AdminVenueConfig() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="rounded-[10px] bg-club-green-light p-4">
+      <section className="card p-5">
         <h3 className="mb-3 font-semibold text-golden-light">{m.admin_rates_title()}</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {RATE_ROWS.map(row => (
@@ -156,7 +156,7 @@ export function AdminVenueConfig() {
         <p className="mt-3 text-xs text-grey-cool">{m.admin_settings_hint()}</p>
       </section>
 
-      <section className="rounded-[10px] bg-club-green-light p-4">
+      <section className="card p-5">
         <h3 className="mb-3 font-semibold text-golden-light">{m.admin_hours_title()}</h3>
         <ul className="flex flex-col gap-2">
           {WEEKDAY_DISPLAY_ORDER.map(weekday => {
@@ -166,7 +166,7 @@ export function AdminVenueConfig() {
             return (
               <li
                 key={weekday}
-                className="flex flex-wrap items-end gap-3 rounded-[10px] bg-club-green p-3"
+                className="flex flex-wrap items-end gap-3 rounded-xl bg-club-green p-3"
               >
                 <span className="min-w-28 flex-1 font-medium capitalize text-creme">
                   {weekdayName(weekday)}

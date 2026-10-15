@@ -45,3 +45,12 @@ export function venueMapEmbedUrl(locale: Locale): string {
 export const VENUE_DIRECTIONS_URL = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
   `Klub Bilardowy Piramida, ${VENUE_ADDRESS}`
 )}`;
+
+/**
+ * The club's Google rating, as its Maps listing shows it. Set by hand — there
+ * is no API key on this site to fetch it live — so bump both numbers when the
+ * listing moves. The link opens the listing (its CID is the second half of the
+ * place id in MAP_EMBED_PB), where the reviews are.
+ */
+export const GOOGLE_RATING = { score: 4.8, count: 196 } as const;
+export const GOOGLE_LISTING_URL = 'https://maps.google.com/?cid=4716951905891963001';

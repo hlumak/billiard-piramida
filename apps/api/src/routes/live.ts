@@ -32,7 +32,10 @@ export function liveRoutes(app: AppInstance) {
   // open them until memory or file descriptors run out
   const socketsByIp = new Map<string, number>();
 
-  app.get('/api/ws', { websocket: true }, (socket, request) => {
+  // Not counted by the global request limiter: a handshake per page load would
+  // spend the visitor's budget on a socket that is capped per IP right here
+  // (and by nginx), and a refused handshake only feeds the client's retry loop
+  app.get('/api/ws', { websocket: true, config: { rateLimit: false } }, (socket, request) => {
     const ip = request.ip;
     const open = socketsByIp.get(ip) ?? 0;
     if (open >= MAX_SOCKETS_PER_IP) {

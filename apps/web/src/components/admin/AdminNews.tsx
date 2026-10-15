@@ -34,9 +34,7 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
   });
 
   return (
-    <div
-      className={`rounded-[10px] bg-club-green-light p-3 ${item.isPublished ? '' : 'opacity-60'}`}
-    >
+    <div className={`card p-4 ${item.isPublished ? '' : 'opacity-60'}`}>
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-creme">{item.title}</p>
@@ -112,7 +110,7 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
 
 export function AdminNews() {
   const queryClient = useQueryClient();
-  const { data: items, isPending, isError, refetch } = useQuery(adminNewsQuery());
+  const { data: items, isPending, isError, error, refetch } = useQuery(adminNewsQuery());
 
   // ±1 on a single row would only create ties (which the API breaks by date, not
   // by intent), so a move renumbers positions to indexes and writes just the
@@ -139,7 +137,7 @@ export function AdminNews() {
     }
   });
 
-  if (isError && !items) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !items) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !items) {
     return (
       <div className="flex justify-center py-16">

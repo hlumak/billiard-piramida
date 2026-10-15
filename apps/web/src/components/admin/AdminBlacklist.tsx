@@ -32,7 +32,7 @@ function EntryRow({ entry }: { entry: AdminBlacklistEntryDto }) {
       : m.admin_blacklist_reason_manual();
 
   return (
-    <div className="rounded-[10px] bg-club-green-light p-3">
+    <div className="card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="font-semibold text-creme">
@@ -40,7 +40,7 @@ function EntryRow({ entry }: { entry: AdminBlacklistEntryDto }) {
             {entry.name !== null ? (
               <a
                 href={`tel:${entry.phone}`}
-                className="ml-2 text-sm font-normal text-golden-light hover:underline"
+                className="ml-2 text-sm font-normal text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
               >
                 {formatPhone(entry.phone)}
               </a>
@@ -99,7 +99,7 @@ function AddForm() {
 
   return (
     <form
-      className="flex flex-col gap-3 rounded-[10px] bg-club-green-light p-3"
+      className="flex flex-col gap-3 card p-4"
       onSubmit={event => {
         event.preventDefault();
         if (isValidPhone(phone)) add.mutate();
@@ -146,14 +146,14 @@ function AddForm() {
  * book by phone; removing a number forgives it.
  */
 export function AdminBlacklist() {
-  const { data: entries, isPending, isError, refetch } = useQuery(adminBlacklistQuery());
+  const { data: entries, isPending, isError, error, refetch } = useQuery(adminBlacklistQuery());
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-grey-cool">{m.admin_blacklist_hint()}</p>
       <AddForm />
       {isError && !entries ? (
-        <QueryError onRetry={() => refetch()} />
+        <QueryError error={error} onRetry={() => refetch()} />
       ) : isPending || !entries ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

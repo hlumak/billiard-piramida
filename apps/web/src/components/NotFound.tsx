@@ -1,18 +1,17 @@
 import { Link } from '@tanstack/react-router';
-import { PageHeader } from './AppHeader';
+import { PageLayout } from './site/PageLayout';
 import { m } from '../paraglide/messages.js';
 
 /** Router-level 404 for unknown URLs — localized, styled like every other page. */
 export function NotFound() {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="404" />
-      <main id="main" className="mt-8 flex flex-1 flex-col items-center justify-center gap-4 py-16">
-        <p className="text-grey-cool">{m.not_found()}</p>
-        <Link to="/" className="font-semibold text-golden">
+    <PageLayout script="404" title={m.not_found()} width="narrow">
+      <div className="flex flex-col items-center gap-6 py-10 text-center">
+        <p className="text-cream-soft">{m.not_found_hint()}</p>
+        <Link to="/" className="btn-gold h-12 px-6">
           {m.go_home()}
         </Link>
-      </main>
-    </div>
+      </div>
+    </PageLayout>
   );
 }

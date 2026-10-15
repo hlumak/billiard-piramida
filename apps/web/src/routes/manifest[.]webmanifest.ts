@@ -21,8 +21,8 @@ export const Route = createFileRoute('/manifest.webmanifest')({
           // An installed app opens in the language it was installed from
           start_url: localizeHref('/', { locale }),
           display: 'standalone',
-          background_color: '#0b4e31',
-          theme_color: '#0b4e31',
+          background_color: '#0a4730',
+          theme_color: '#0a4730',
           icons: [
             { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
             { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },

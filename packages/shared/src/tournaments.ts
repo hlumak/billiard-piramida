@@ -51,6 +51,8 @@ export const PENDING_SEAT_HOLD_MS = 72 * 3_600_000;
 /** Everything `registrationStateOf` needs — the DTO and the DB row both satisfy it. */
 export interface RegistrationWindow {
   status: TournamentStatus;
+  /** Play day; sign-ups stop once it is over, even with no deadline set */
+  startsOn: IsoDate | null;
   /** Last day sign-ups are accepted, inclusive */
   registrationDeadline: IsoDate | null;
   maxPlayers: number | null;
@@ -70,10 +72,13 @@ export function registrationStateOf(
   tournament: RegistrationWindow,
   today: IsoDate
 ): TournamentRegistrationState {
-  const { status, registrationDeadline, maxPlayers, takenSeats } = tournament;
+  const { status, startsOn, registrationDeadline, maxPlayers, takenSeats } = tournament;
   if (status === 'cancelled') return 'cancelled';
   if (status === 'completed') return 'completed';
   if (status !== 'registration') return 'closed';
+  // Played, and staff have not moved it on yet: a walk-in can still sign up on
+  // the day itself, never after it
+  if (startsOn !== null && today > startsOn) return 'closed';
   if (maxPlayers !== null && takenSeats >= maxPlayers) return 'full';
   // Inclusive: "до 30.08" means a sign-up still lands on the 30th
   if (registrationDeadline !== null && today > registrationDeadline) return 'deadline_passed';

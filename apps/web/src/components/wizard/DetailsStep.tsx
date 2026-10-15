@@ -1,45 +1,36 @@
-import { Button, FieldError, Input, Label, TextField } from '@heroui/react';
+import { Description, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useForm } from '@tanstack/react-form';
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import {
-  discountGroszFor,
-  formatPln,
-  gamesFor,
-  MAX_SPORT_CARDS_PER_BOOKING,
-  sizeOf,
-  spotPriceGrosz
-} from '@repo/shared';
+import { CircleUserRound } from 'lucide-react';
+import { MAX_SPORT_CARDS_PER_BOOKING } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { ApiError, api } from '../../lib/api';
-import { formatDayLong, formatHour, intlTag } from '../../lib/format';
+import { profileQuery } from '../../lib/auth';
+import { isFullName } from '../../lib/names';
 import { availabilityQuery, bookingQuery, menuQuery } from '../../lib/queries';
 import { rememberBooking } from '../../lib/recent-bookings';
-import { profileQuery } from '../../lib/auth';
+import { useSubmitOnce } from '../../lib/use-submit-once';
 import { PhoneField } from '../PhoneField';
-import { useVenueConfig } from '../../lib/venue-config';
-import { Link } from '@tanstack/react-router';
-import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
-import { SportCardPicker } from './SportCardPicker';
 import { mutationErrorText } from '../booking/phase';
+import { goToStep, resetWizard, setSportCardCount, wizardStore } from '../../store/booking-wizard';
 import {
   bookingRequestFrom,
   needsNewTime,
   orderLinesFrom,
-  type BookingDraft,
-  type OrderLine
+  type BookingDraft
 } from './booking-request';
-import {
-  goToStep,
-  resetWizard,
-  selectGame,
-  setSportCardCount,
-  wizardStore
-} from '../../store/booking-wizard';
+import { SportCardPicker } from './SportCardPicker';
+import { StepActions } from './WizardFrame';
+import { WizardSummary } from './WizardSummary';
 
+const FORM_ID = 'booking-details';
+
+/** Step 4: who is coming. The confirm button lives with the summary, outside the form. */
 export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -49,6 +40,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const { data: profile } = useQuery(profileQuery());
 
   const orderLines = orderLinesFrom(items, menu);
+  const once = useSubmitOnce();
 
   const createBooking = useMutation({
     mutationFn: api.createBooking,
@@ -70,10 +62,16 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
       });
       resetWizard();
     },
-    onError: error => {
+    onError: (error, input) => {
+      once.release();
       // The menu moved on under the guest: refresh it so the order shows the truth
       if (error instanceof ApiError && error.code === 'unknown_food_item') {
         void queryClient.invalidateQueries({ queryKey: menuQuery(getLocale()).queryKey });
+      }
+      // Someone else got there first: the grid is stale, and the table step
+      // should show the spot taken when the guest goes back to it
+      if (error instanceof ApiError && error.code === 'slot_taken') {
+        void queryClient.invalidateQueries({ queryKey: availabilityQuery(input.date).queryKey });
       }
     }
   });
@@ -82,215 +80,166 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
     defaultValues: { customerName: profile?.name ?? '', customerPhone: profile?.phone ?? '' },
     onSubmit: ({ value }) => {
       createBooking.mutate(bookingRequestFrom(draft, value, sportCardCount, orderLines));
+    },
+    // The confirm button sits away from the fields (beside the summary, or in
+    // the phone's bottom bar), so take the guest to what needs fixing
+    onSubmitInvalid: () => {
+      once.release();
+      requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>(`#${FORM_ID} [aria-invalid=true]`)?.focus();
+      });
     }
   });
 
   const err = createBooking.error;
   const isTimeError = needsNewTime(err);
+  const slotTaken = err instanceof ApiError && err.code === 'slot_taken';
   const errorMessage = err ? mutationErrorText(err) : null;
+
+  // The confirm button sits in the phone's bottom bar, often far below the
+  // error: bring the error into view rather than leave it off screen
+  const alertRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (err) alertRef.current?.scrollIntoView({ block: 'center' });
+  }, [err]);
   // With food in the order the menu must be known, or the lines can't be priced
   const menuPending = Object.keys(items).length > 0 && menu === undefined;
 
   return (
-    <section>
-      <h2 className="mb-4 text-xl font-semibold text-creme">{m.step_details_title()}</h2>
+    <div>
+      <h2 className="text-2xl font-bold md:text-[26px]">{m.step_details_title()}</h2>
+      <p className="mt-1 text-sm leading-normal text-grey-cool md:mt-1.5 md:text-[15px]">
+        {m.contacts_lead()}
+      </p>
+
       {!profile ? (
-        <Link to="/profile" className="mb-4 block text-sm text-golden hover:underline">
-          {m.auth_promo()}
-        </Link>
+        <div className="mt-4.5 flex items-center gap-3 rounded-2xl border border-golden/40 px-4 py-3.5 md:mt-6 md:gap-3.5 md:px-4.5 md:py-4">
+          <CircleUserRound aria-hidden className="hidden size-6 flex-none text-golden md:block" />
+          <p className="flex-1 text-sm leading-snug md:text-[15px]">{m.auth_promo()}</p>
+          <Link
+            to="/profile"
+            className="btn-outline h-10 flex-none rounded-[10px] border-golden px-3.5 text-sm font-bold text-golden-light hover:border-golden md:px-4.5"
+          >
+            {m.sign_in()}
+          </Link>
+        </div>
       ) : null}
 
-      <div className="md:grid md:grid-cols-2 md:items-start md:gap-6">
-        <BookingSummary draft={draft} orderLines={orderLines} sportCardCount={sportCardCount} />
-
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={event => {
-            event.preventDefault();
-            event.stopPropagation();
-            form.handleSubmit();
+      <form
+        id={FORM_ID}
+        noValidate
+        className="fields-roomy mt-5 grid gap-4 md:mt-6 md:grid-cols-2 md:gap-4.5"
+        onSubmit={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          // Success leaves the page, so only a refusal reopens the form
+          if (once.claim()) form.handleSubmit();
+        }}
+      >
+        <form.Field
+          name="customerName"
+          validators={{
+            onSubmit: ({ value }) => {
+              if (!value.trim()) return m.err_name_required();
+              return isFullName(value) ? undefined : m.err_full_name();
+            }
           }}
         >
-          <SportCardPicker
-            count={sportCardCount}
-            max={MAX_SPORT_CARDS_PER_BOOKING}
-            onChange={setSportCardCount}
-          />
-
-          <form.Field
-            name="customerName"
-            validators={{
-              onSubmit: ({ value }) => (value.trim() ? undefined : m.err_name_required())
-            }}
-          >
-            {field => (
-              <TextField
-                name={field.name}
-                value={field.state.value}
-                onChange={value => field.handleChange(value)}
-                isInvalid={field.state.meta.errors.length > 0}
-              >
-                <Label>{m.name_label()}</Label>
-                <Input
-                  placeholder={m.name_placeholder()}
-                  autoComplete="name"
-                  onBlur={field.handleBlur}
-                />
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </TextField>
-            )}
-          </form.Field>
-
-          <form.Field
-            name="customerPhone"
-            validators={{
-              onSubmit: ({ value }) => (isValidPhone(value) ? undefined : m.err_phone_invalid())
-            }}
-          >
-            {field => (
-              <PhoneField
-                name={field.name}
-                value={field.state.value}
-                onChange={value => field.handleChange(value)}
+          {field => (
+            <TextField
+              name={field.name}
+              value={field.state.value}
+              onChange={value => field.handleChange(value)}
+              isInvalid={field.state.meta.errors.length > 0}
+              isRequired
+            >
+              <Label>{m.name_full_label()}</Label>
+              <Input
+                placeholder={m.name_full_placeholder()}
+                autoComplete="name"
                 onBlur={field.handleBlur}
-                isInvalid={field.state.meta.errors.length > 0}
-                errorMessage={field.state.meta.errors[0]}
               />
-            )}
-          </form.Field>
+              {field.state.meta.errors.length > 0 ? (
+                <FieldError>{field.state.meta.errors[0]}</FieldError>
+              ) : (
+                <Description>{m.name_full_hint()}</Description>
+              )}
+            </TextField>
+          )}
+        </form.Field>
 
-          {errorMessage ? (
-            <div role="alert" className="rounded-[10px] bg-danger-soft p-3 text-sm text-creme">
-              {errorMessage}
-              {isTimeError ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 w-full border-golden text-creme"
-                  onPress={() => goToStep('time')}
-                >
-                  {m.btn_back()}
-                </Button>
-              ) : null}
-            </div>
+        <form.Field
+          name="customerPhone"
+          validators={{
+            onSubmit: ({ value }) => (isValidPhone(value) ? undefined : m.err_phone_invalid())
+          }}
+        >
+          {field => (
+            <PhoneField
+              name={field.name}
+              value={field.state.value}
+              onChange={value => field.handleChange(value)}
+              onBlur={field.handleBlur}
+              isInvalid={field.state.meta.errors.length > 0}
+              errorMessage={field.state.meta.errors[0]}
+              isRequired
+            />
+          )}
+        </form.Field>
+      </form>
+
+      <SportCardPicker
+        className="mt-5 md:mt-6"
+        count={sportCardCount}
+        max={MAX_SPORT_CARDS_PER_BOOKING}
+        onChange={setSportCardCount}
+      />
+
+      {errorMessage ? (
+        <div
+          ref={alertRef}
+          role="alert"
+          className="mt-5 scroll-mt-24 rounded-2xl bg-danger-soft p-4 text-sm text-creme"
+        >
+          {errorMessage}
+          {/* Taken spot: another one at the same time may still be free */}
+          {slotTaken ? (
+            <button
+              type="button"
+              onClick={() => goToStep('table')}
+              className="btn-outline mt-3 h-10 w-full text-sm"
+            >
+              ← {m.change_spot()}
+            </button>
           ) : null}
+          {isTimeError ? (
+            <button
+              type="button"
+              onClick={() => goToStep('when')}
+              className="btn-outline mt-3 h-10 w-full text-sm"
+            >
+              ← {m.change_time()}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
-          <Button
-            type="submit"
-            size="lg"
-            className="h-11.25 w-full text-lg font-bold"
-            isPending={createBooking.isPending}
-            isDisabled={menuPending}
-          >
-            {createBooking.isPending ? m.creating() : m.btn_confirm()}
-          </Button>
-        </form>
-      </div>
-    </section>
-  );
-}
+      {/* A phone has no summary column: the booking is read back here, above the bar */}
+      <section className="mt-5 rounded-[20px] border border-line bg-club-green-dark px-4.5 py-5.5 lg:hidden">
+        <WizardSummary />
+      </section>
 
-/**
- * What the guest is about to book and what it will cost: the picks so far, the
- * game choice where the table offers one, and the price lines. A preview — the
- * server prices the booking itself and locks the discount in.
- */
-function BookingSummary({
-  draft,
-  orderLines,
-  sportCardCount
-}: {
-  draft: BookingDraft;
-  orderLines: OrderLine[];
-  sportCardCount: number;
-}) {
-  const spot = { id: draft.tableId, kind: draft.kind };
-  const tableSize = sizeOf(draft.tableId);
-  const games = gamesFor(draft.tableId);
-  const tableTotal = spotPriceGrosz(spot, draft.durationHours, useVenueConfig().rates);
-  const foodTotal = orderLines.reduce((sum, line) => sum + line.item.priceGrosz * line.quantity, 0);
-  const discount = discountGroszFor(sportCardCount, tableTotal);
-
-  return (
-    <div className="mb-6 rounded-[10px] bg-club-green-light p-4 md:mb-0">
-      <h3 className="mb-2 font-semibold text-golden-light">{m.summary_title()}</h3>
-      <dl className="flex flex-col gap-1 text-sm text-creme">
-        <div className="flex justify-between">
-          <dt className="text-grey-cool">{m.summary_date()}</dt>
-          <dd className="capitalize">{formatDayLong(draft.date)}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-grey-cool">{m.summary_time()}</dt>
-          <dd>
-            {formatHour(draft.startHour)}–{formatHour(draft.startHour + draft.durationHours)}
-          </dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-grey-cool">{spotSummaryLabel(draft.kind)}</dt>
-          {/* The size is what the rate hangs off, so it reads next to the name */}
-          <dd>
-            {spotName(draft.kind, draft.tableLabel)}
-            {tableSize ? <span className="text-grey-cool"> · {tableSize}</span> : null}
-          </dd>
-        </div>
-        {/* Only tables offer a game, and only hall 1 offers a choice of one
-            — elsewhere this reads as the plain fact that it is pyramid. */}
-        {games.length > 0 ? (
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-grey-cool">{m.game_label()}</dt>
-            <dd>
-              {games.length > 1 ? (
-                <div role="group" aria-label={m.game_label()} className="flex gap-1.5">
-                  {games.map(option => (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={draft.game === option}
-                      onClick={() => selectGame(option)}
-                      className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-colors ${
-                        draft.game === option
-                          ? 'bg-golden text-btn-text'
-                          : 'bg-club-green text-creme hover:bg-surface-hover'
-                      }`}
-                    >
-                      {gameName(option)}
-                    </button>
-                  ))}
-                </div>
-              ) : draft.game ? (
-                gameName(draft.game)
-              ) : null}
-            </dd>
-          </div>
-        ) : null}
-      </dl>
-
-      <div className="mt-3 border-t border-deep-cream/30 pt-3 text-sm">
-        <div className="flex justify-between text-creme">
-          <span className="text-grey-cool">
-            {spotRentalLabel(draft.kind)} · {m.hours_n({ n: draft.durationHours })}
-          </span>
-          <span>{formatPln(tableTotal, intlTag())}</span>
-        </div>
-        {orderLines.map(line => (
-          <div key={line.item.id} className="flex justify-between text-creme">
-            <span className="text-grey-cool">
-              {line.item.name} × {line.quantity}
-            </span>
-            <span>{formatPln(line.item.priceGrosz * line.quantity, intlTag())}</span>
-          </div>
-        ))}
-        {discount > 0 ? (
-          <div className="flex justify-between text-creme">
-            <span className="text-grey-cool">{m.sport_cards_count({ n: sportCardCount })}</span>
-            <span className="text-golden-light">−{formatPln(discount, intlTag())}</span>
-          </div>
-        ) : null}
-        <div className="mt-2 flex justify-between text-base font-bold text-golden-light">
-          <span>{m.total()}</span>
-          <span>{formatPln(tableTotal + foodTotal - discount, intlTag())}</span>
-        </div>
-      </div>
+      <StepActions
+        bar="total"
+        action={{
+          label: createBooking.isPending ? m.creating() : m.btn_confirm(),
+          short: m.btn_confirm_short(),
+          form: FORM_ID,
+          disabled: menuPending,
+          pending: createBooking.isPending
+        }}
+        note={m.manage_note()}
+      />
     </div>
   );
 }

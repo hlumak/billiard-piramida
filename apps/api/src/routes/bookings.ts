@@ -106,13 +106,15 @@ export function bookingRoutes(
     }
   );
 
-  app.get(
+  app.post(
     '/api/bookings/lookup',
     {
       // Tighter than the global limit: this endpoint is phone-enumerable
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
-        querystring: Type.Object(
+        // The number rides in the body, not the query string: a URL is written
+        // to the API's request log and nginx's access log, a body is not
+        body: Type.Object(
           { phone: Type.String({ minLength: 5, maxLength: 25 }) },
           { additionalProperties: false }
         ),
@@ -120,7 +122,7 @@ export function bookingRoutes(
       }
     },
     async (request, reply) => {
-      const phone = normalizePhone(request.query.phone);
+      const phone = normalizePhone(request.body.phone);
       if (phone === null) return reply.code(422).send({ error: 'invalid_phone' });
 
       // Only bookings the guest can still use; finished history stays private.

@@ -38,9 +38,7 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
   const deleteBlocked = remove.error instanceof ApiError && remove.error.code === 'has_orders';
 
   return (
-    <div
-      className={`rounded-[10px] bg-club-green-light p-3 ${item.isAvailable ? '' : 'opacity-60'}`}
-    >
+    <div className={`card p-4 ${item.isAvailable ? '' : 'opacity-60'}`}>
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="font-medium text-creme">{item.name}</p>
@@ -105,9 +103,9 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
 }
 
 export function AdminMenu() {
-  const { data: items, isPending, isError, refetch } = useQuery(adminMenuQuery());
+  const { data: items, isPending, isError, error, refetch } = useQuery(adminMenuQuery());
 
-  if (isError && !items) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !items) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !items) {
     return (
       <div className="flex justify-center py-16">

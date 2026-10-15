@@ -20,6 +20,32 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
   return cached;
 }
 
+const numberCache = new Map<string, Intl.NumberFormat>();
+
+/** A number in the visitor's locale ("4,8", "1 250"); built once per variant like the dates. */
+export function formatNumber(value: number, options: Intl.NumberFormatOptions = {}): string {
+  const key = `${intlTag()}|${JSON.stringify(options)}`;
+  let cached = numberCache.get(key);
+  if (!cached) {
+    cached = new Intl.NumberFormat(intlTag(), options);
+    numberCache.set(key, cached);
+  }
+  return cached.format(value);
+}
+
+const relativeCache = new Map<string, Intl.RelativeTimeFormat>();
+
+/** "сьогодні", "завтра", "через 31 день": a whole-day distance in words. */
+export function formatDaysFromNow(days: number): string {
+  const tag = intlTag();
+  let cached = relativeCache.get(tag);
+  if (!cached) {
+    cached = new Intl.RelativeTimeFormat(tag, { numeric: 'auto' });
+    relativeCache.set(tag, cached);
+  }
+  return cached.format(days, 'day');
+}
+
 /** Today's date (YYYY-MM-DD) in the venue's timezone. */
 export function warsawToday(at: number = Date.now()): IsoDate {
   // en-CA short style is defined as YYYY-MM-DD
@@ -35,12 +61,14 @@ function utcDate(isoDate: IsoDate): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
-/** "чт, 17 лип." — weekday + day + month for a YYYY-MM-DD, locale-aware. */
-export function formatDay(isoDate: IsoDate): string {
+/** "чт, 17 лип." — weekday + day + month for a YYYY-MM-DD, locale-aware; with
+ *  `withYear`, "чт, 17 лип. 2025 р." for a list that spans years. */
+export function formatDay(isoDate: IsoDate, { withYear = false } = {}): string {
   return formatter(intlTag(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+    ...(withYear ? { year: 'numeric' } : {}),
     timeZone: 'UTC'
   }).format(utcDate(isoDate));
 }
@@ -53,6 +81,29 @@ export function formatDayLong(isoDate: IsoDate): string {
     month: 'long',
     timeZone: 'UTC'
   }).format(utcDate(isoDate));
+}
+
+/** "15 листопада": day and month only, in the case a "until …" phrase takes. */
+export function formatDayMonth(isoDate: IsoDate): string {
+  return formatter(intlTag(), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
+    utcDate(isoDate)
+  );
+}
+
+/** The three lines of a calendar tile: "чт", "15", "жовт." */
+export function dateTileParts(isoDate: IsoDate): { weekday: string; day: number; month: string } {
+  const date = utcDate(isoDate);
+  return {
+    weekday: formatter(intlTag(), { weekday: 'short', timeZone: 'UTC' }).format(date),
+    day: dateParts(isoDate)[2],
+    month: formatter(intlTag(), { month: 'short', timeZone: 'UTC' }).format(date)
+  };
+}
+
+/** "Жовтень 2026": the month a date falls in, as a heading over a calendar. */
+export function formatMonthYear(isoDate: IsoDate): string {
+  const month = formatter(intlTag(), { month: 'long', timeZone: 'UTC' }).format(utcDate(isoDate));
+  return `${month.charAt(0).toLocaleUpperCase(intlTag())}${month.slice(1)} ${dateParts(isoDate)[0]}`;
 }
 
 /** Localized weekday name for a JS weekday index (0 = Sunday). */

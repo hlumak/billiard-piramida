@@ -19,8 +19,16 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
     return () => clearTimeout(timer);
   }, [phoneInput]);
 
-  const { data, isPending, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
-    useInfiniteQuery(adminCustomersQuery(phone));
+  const {
+    data,
+    isPending,
+    isError,
+    error,
+    refetch,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage
+  } = useInfiniteQuery(adminCustomersQuery(phone));
   const customers = data?.pages.flat();
 
   const search = (
@@ -39,7 +47,7 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
     return (
       <div>
         {search}
-        <QueryError onRetry={() => refetch()} />
+        <QueryError error={error} onRetry={() => refetch()} />
       </div>
     );
   }
@@ -69,11 +77,7 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
       <StaggerGroup>
         <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
           {customers.map(customer => (
-            <StaggerItem
-              key={customer.phone}
-              as="li"
-              className="h-full rounded-[10px] bg-club-green-light p-3"
-            >
+            <StaggerItem key={customer.phone} as="li" className="h-full card p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold text-creme">
                   {customer.name}
@@ -86,7 +90,7 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
                 <span className="flex items-center gap-2">
                   <a
                     href={`tel:${customer.phone.replaceAll(' ', '')}`}
-                    className="text-sm text-golden-light hover:underline"
+                    className="text-sm text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
                   >
                     {formatPhone(customer.phone)}
                   </a>

@@ -1,9 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import {
+  BOOKING_DAYS_AHEAD,
   DEFAULT_HOURLY_RATE_GROSZ,
   DEFAULT_WEEKLY_HOURS,
+  MIN_BOOKING_HOURS,
+  addDays,
+  hoursForDate,
   isClosedAllDay,
   type DayHours,
+  type IsoDate,
   type VenueConfigDto,
   type WeeklyHours
 } from '@repo/shared';
@@ -27,6 +32,20 @@ export const FALLBACK_VENUE_CONFIG: VenueConfigDto = {
 export function useVenueConfig(): VenueConfigDto {
   const { data } = useQuery(venueConfigQuery());
   return data ?? FALLBACK_VENUE_CONFIG;
+}
+
+/**
+ * The first day in the booking window with an hour still to start: today
+ * only while its last start hour is ahead, then the next day the club opens.
+ */
+export function firstOpenDay(today: IsoDate, hourNow: number, hours: WeeklyHours): IsoDate | null {
+  for (let i = 0; i < BOOKING_DAYS_AHEAD; i++) {
+    const day = addDays(today, i);
+    const dayHours = hoursForDate(day, hours);
+    const over = i === 0 && hourNow >= dayHours.close - MIN_BOOKING_HOURS;
+    if (!isClosedAllDay(dayHours) && !over) return day;
+  }
+  return null;
 }
 
 /** Monday first, Sunday last — how a European opening-hours table reads. */

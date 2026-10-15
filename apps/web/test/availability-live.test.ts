@@ -48,7 +48,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test('subscribes on open, refetches once for missed events, then on each change', () => {
+test('subscribes on open, then hears each change to its date', () => {
   const heard: string[] = [];
   const stop = availabilityLive.subscribe('2026-10-12', date => heard.push(date));
   const socket = latest();
@@ -56,7 +56,7 @@ test('subscribes on open, refetches once for missed events, then on each change'
 
   socket.fire('open');
   expect(socket.sent).toEqual([{ type: 'subscribe', date: '2026-10-12' }]);
-  expect(heard).toEqual(['2026-10-12']); // the catch-up refetch
+  expect(heard).toEqual([]); // the query has only just fetched: nothing missed yet
 
   socket.fire('message', {
     data: JSON.stringify({ type: 'availability_changed', date: '2026-10-12' })
@@ -65,7 +65,7 @@ test('subscribes on open, refetches once for missed events, then on each change'
   socket.fire('message', {
     data: JSON.stringify({ type: 'availability_changed', date: '2026-10-13' })
   });
-  expect(heard).toEqual(['2026-10-12', '2026-10-12']);
+  expect(heard).toEqual(['2026-10-12']);
 
   stop();
   expect(socket.sent.at(-1)).toEqual({ type: 'unsubscribe', date: '2026-10-12' });
@@ -96,6 +96,38 @@ test('a dropped connection retries with growing delays while someone is watching
   expect(FakeSocket.instances).toHaveLength(2); // backed off to 2 s
   vi.advanceTimersByTime(1);
   expect(FakeSocket.instances).toHaveLength(3);
+  stop();
+});
+
+test('a reconnect after a drop refetches what may have been missed', () => {
+  const heard: string[] = [];
+  const stop = availabilityLive.subscribe('2026-10-12', date => heard.push(date));
+  latest().fire('open');
+  latest().fire('close');
+  vi.advanceTimersByTime(1_000);
+  latest().fire('open');
+  expect(heard).toEqual(['2026-10-12']);
+  stop();
+});
+
+test('a socket refused right after it opens keeps backing off', () => {
+  const stop = availabilityLive.subscribe('2026-10-12', () => {});
+  latest().fire('open');
+  latest().fire('close'); // the server's "too many connections"
+  vi.advanceTimersByTime(1_000);
+  latest().fire('open');
+  latest().fire('close');
+  vi.advanceTimersByTime(1_999);
+  expect(FakeSocket.instances).toHaveLength(2); // 2 s now, not 1 s again
+  vi.advanceTimersByTime(1);
+  expect(FakeSocket.instances).toHaveLength(3);
+
+  // One that stayed up a while starts over from the shortest delay
+  latest().fire('open');
+  vi.advanceTimersByTime(10_000);
+  latest().fire('close');
+  vi.advanceTimersByTime(1_000);
+  expect(FakeSocket.instances).toHaveLength(4);
   stop();
 });
 

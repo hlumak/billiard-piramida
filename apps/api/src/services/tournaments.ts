@@ -117,6 +117,7 @@ export function toTournamentDto(row: TournamentRow, copy: Copy, seats: SeatCount
     registrationState: registrationStateOf(
       {
         status: row.status,
+        startsOn: asIsoDate(row.startsOn),
         registrationDeadline,
         maxPlayers: row.maxPlayers,
         takenSeats: seats.confirmed + seats.pending

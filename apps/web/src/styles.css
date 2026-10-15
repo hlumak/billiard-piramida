@@ -16,26 +16,178 @@
   --font-script: 'Great Vibes', cursive;
   --font-alt: 'Montserrat Alternates', sans-serif;
 
-  --color-golden: #feaa00;
-  --color-golden-hover: #ffb732;
-  /* Golden for small text on club-green-light cards: #feaa00 there is 3.4:1,
-     under WCAG AA; this is 4.6:1 on the cards and 6.9:1 on club-green. */
+  /* A touch warmer and less neon than the original #feaa00: 5.6:1 on the
+     page ground, 8:1 behind btn-text. */
+  --color-golden: #f7ad1e;
+  --color-golden-hover: #ffbd45;
+  /* Golden for small text on cards and controls, where #f7ad1e falls under
+     WCAG AA: 4.6:1 on club-green-light and 6.9:1 on the page. */
   --color-golden-light: #ffd36b;
-  --color-creme: #f9f9e1;
+  --color-creme: #f6f1dc;
+  /* Body copy that steps back from headings: captions, leads, list text */
+  --color-cream-soft: #e4e2c9;
   --color-deep-cream: #dbdabc;
-  --color-club-green: #0b4e31;
+  /* The felt: page ground, a shade deeper than the original #0b4e31 */
+  --color-club-green: #0a4730;
+  /* Controls that lift off a card or panel: chips, fields, icon buttons */
   --color-club-green-light: #176b47;
-  /* Sunken ground for the booking wizard: club-green darkened ~35% (sampled
-     from the Figma "pyramida 2" step panel). Dark enough that the
+  /* Sunken ground (booking wizard panel, admin sidebar). Dark enough that the
      club-green-light option buttons read as lifted off it. */
-  --color-club-green-dark: #083220;
-  --color-btn-text: #373328;
+  --color-club-green-dark: #073522;
+  /* Cards sit between the page and the controls on them */
+  --color-card: #10573a;
+  --color-card-hover: #156143;
+  /* The footer, the deepest green on the site */
+  --color-club-green-deepest: #052a1b;
+  /* Hairlines: card edges, dividers */
+  --color-line: rgb(246 241 220 / 0.13);
+  --color-btn-text: #2a2417;
   /* Figma "primary button tx/hover" */
   --color-btn-text-hover: #000000;
   --color-grey-warm: #585650;
-  /* Secondary text: lightened from #b2b2b2 to clear WCAG AA (4.5:1) on the
-     club-green-light card surface (#176b47), where the old value was ~3.05:1. */
-  --color-grey-cool: #d9d9d9;
+  /* Secondary text, tinted toward the cream: 4.7:1 on club-green-light,
+     6.2:1 on cards, comfortably AA on the page. */
+  --color-grey-cool: #d9ddc8;
+}
+
+/* A raised panel: the default container for a block of content */
+@utility card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 1.25rem;
+}
+
+/* A sunken panel: the working area of a form-heavy step */
+@utility panel {
+  background-color: var(--color-club-green-dark);
+  border-radius: 1.5rem;
+}
+
+/* The gold call to action. Hover brightens it, a press squashes it a touch
+   with a spring, so a tap reads as a tap even before the page answers. */
+@utility btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  border-radius: 0.875rem;
+  background-color: var(--color-golden);
+  color: var(--color-btn-text);
+  font-weight: 700;
+  transition:
+    background-color 150ms,
+    transform 150ms cubic-bezier(0.34, 1.3, 0.64, 1);
+  &:hover {
+    background-color: var(--color-golden-hover);
+  }
+  &:active {
+    transform: scale(0.97);
+  }
+  &:disabled {
+    background-color: var(--color-golden);
+    cursor: not-allowed;
+    opacity: 0.45;
+    transform: none;
+  }
+}
+
+/* The quiet partner of btn-gold: a cream outline on whatever it sits on */
+@utility btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  border-radius: 0.875rem;
+  border: 1.5px solid rgb(246 241 220 / 0.36);
+  color: var(--color-creme);
+  font-weight: 600;
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    transform 150ms cubic-bezier(0.34, 1.3, 0.64, 1);
+  &:hover {
+    background-color: rgb(246 241 220 / 0.06);
+    border-color: rgb(246 241 220 / 0.6);
+  }
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+/* A selectable option (date, hour, duration, table): green until picked,
+   gold once it is, with a small spring "tick" as it changes hands */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background-color: var(--color-club-green-light);
+  color: var(--color-creme);
+  font-weight: 700;
+  transition:
+    background-color 200ms cubic-bezier(0.2, 0, 0, 1),
+    color 200ms,
+    transform 150ms cubic-bezier(0.34, 1.3, 0.64, 1);
+  &:hover:not(:disabled, [aria-pressed='true']) {
+    background-color: var(--surface-hover);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+  &[aria-pressed='true'] {
+    background-color: var(--color-golden);
+    color: var(--color-btn-text);
+    animation: chip-pick 320ms cubic-bezier(0.34, 1.3, 0.64, 1);
+  }
+  &:disabled {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1.5px rgb(246 241 220 / 0.2);
+    color: rgb(246 241 220 / 0.4);
+    cursor: not-allowed;
+  }
+}
+
+/* An option inside a segmented group (length, kind, game): flat on the
+   group's ground until picked, then gold like a chip */
+@utility segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.625rem;
+  color: var(--color-creme);
+  font-weight: 700;
+  transition:
+    background-color 200ms cubic-bezier(0.2, 0, 0, 1),
+    color 200ms,
+    transform 150ms cubic-bezier(0.34, 1.3, 0.64, 1);
+  &:hover:not(:disabled, [aria-pressed='true'], [aria-selected='true']) {
+    background-color: rgb(246 241 220 / 0.07);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+  &:is([aria-pressed='true'], [aria-selected='true']) {
+    background-color: var(--color-golden);
+    color: var(--color-btn-text);
+    animation: chip-pick 320ms cubic-bezier(0.34, 1.3, 0.64, 1);
+  }
+  &:disabled {
+    color: rgb(246 241 220 / 0.35);
+    cursor: not-allowed;
+  }
+}
+
+/* Cards that lead somewhere lift a little under the pointer */
+@utility lift {
+  transition:
+    transform 200ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 200ms;
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 0 0 1px rgb(247 173 30 / 0.55),
+      0 18px 40px rgb(0 0 0 / 0.28);
+  }
 }
 
 /* Single dark-green club theme (Figma "pyramida 2" tokens) */
@@ -44,27 +196,29 @@
 [data-theme='dark'] {
   --radius: 0.625rem; /* 10px per Figma buttons */
 
-  --background: #0b4e31;
-  --foreground: #f9f9e1;
+  --background: #0a4730;
+  --foreground: #f6f1dc;
 
   --surface: #176b47;
-  --surface-foreground: #f9f9e1;
-  --surface-secondary: #135c3d;
-  --surface-secondary-foreground: #f9f9e1;
-  --surface-tertiary: #0f5236;
-  --surface-tertiary-foreground: #f9f9e1;
+  --surface-foreground: #f6f1dc;
+  /* Hover for anything club-green-light: a step lighter, never darker */
+  --surface-hover: #1e7a52;
+  --surface-secondary: #10573a;
+  --surface-secondary-foreground: #f6f1dc;
+  --surface-tertiary: #0d4f34;
+  --surface-tertiary-foreground: #f6f1dc;
 
-  --overlay: #135c3d;
-  --overlay-foreground: #f9f9e1;
+  --overlay: #10573a;
+  --overlay-foreground: #f6f1dc;
 
   --default: #176b47;
-  --default-foreground: #f9f9e1;
+  --default-foreground: #f6f1dc;
 
-  --accent: #feaa00;
-  --accent-foreground: #373328;
-  --accent-hover: #ffb732;
+  --accent: #f7ad1e;
+  --accent-foreground: #2a2417;
+  --accent-hover: #ffbd45;
 
-  --muted: #b2b2b2;
+  --muted: #c3cab2;
   --scrollbar: #176b47;
 
   /* Filled fields per the Figma "Booking — piramida" / "profile — piramida"
@@ -74,22 +228,28 @@
      0, so the hairline never painted and the fields were invisible. Applies to
      every field, not just the phone one, so forms stay of a piece. */
   --field-background: #176b47;
-  --field-foreground: #f9f9e1;
-  --field-placeholder: #b2b2b2;
+  --field-foreground: #f6f1dc;
+  /* 4.6:1 on the field: a placeholder is read too (it was #b4bda6, 3.3:1) */
+  --field-placeholder: #d6dbcb;
   --field-border-width: 0px;
   --field-border: transparent;
   --field-shadow:
     0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.06);
 
   --segment: #176b47;
-  --segment-foreground: #f9f9e1;
+  --segment-foreground: #f6f1dc;
+
+  /* HeroUI mixes its danger red with the foreground for soft buttons and
+     error text, which comes out #ff8978: 3.7–3.8:1 on the green cards. A paler
+     red reads 5:1 there and stays clearly a warning. */
+  --danger-soft-foreground: #ffb8ab;
 
   --border: color-mix(in oklab, #dbdabc 40%, transparent);
   --separator: color-mix(in oklab, #dbdabc 30%, transparent);
-  --focus: #feaa00;
-  --link: #feaa00;
+  --focus: #f7ad1e;
+  --link: #f7ad1e;
   --backdrop: rgba(0, 0, 0, 0.6);
-  --background-inverse: #f9f9e1;
+  --background-inverse: #f6f1dc;
 }
 
 * {
@@ -110,6 +270,16 @@ body,
  * photo. macOS overlay scrollbars are zero-width, which is why it only ever
  * reproduced on Windows. A staff-only 6px tab-switch jump is not worth a
  * visible seam on the first screen every customer sees. */
+
+/* Tailwind v4's preflight leaves buttons on the default arrow; here anything
+   that can be pressed shows the hand, like a link does. In the base layer, so
+   a disabled state's `not-allowed` (and any utility) still wins. */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+}
 
 body {
   margin: 0;
@@ -144,8 +314,11 @@ body {
     box-shadow 150ms var(--ease-out);
 }
 
-/* The number input is only the text run: the box around it is the wrapper's. */
+/* The number input is only the text run: the box around it is the wrapper's.
+   min-width: 0 lets it shrink below the browser's default ~20-character width,
+   which on a phone made every form with a phone field wider than the screen. */
 .PhoneInputInput {
+  min-width: 0;
   padding: 0;
   border: 0;
   background: none;
@@ -153,6 +326,15 @@ body {
   font: inherit;
   line-height: 1.5rem;
   outline: none;
+}
+
+/* Guest-facing forms (booking, sign-in, tournament sign-up) take roomier
+   fields than the staff screens: 52px tall, 12px corners */
+.fields-roomy :is(.input, .PhoneInput) {
+  min-height: 3.25rem;
+  border-radius: 0.75rem;
+  padding-inline: 1rem;
+  font-size: 1rem;
 }
 
 .PhoneInputInput::placeholder {
@@ -184,19 +366,36 @@ body {
 
 /* The native option list is drawn by the OS, so it needs a SOLID ground of
    its own rather than inheriting whatever the platform paints behind it. */
+/* HeroUI paints a field's error, an invalid field's label and part, and the
+   required asterisk in the raw --danger (#ff383c): 2.4:1 on a card. They take
+   the readable red every other error on the site uses. */
+.field-error,
+.error-message,
+.label--invalid,
+[data-invalid='true'] .label,
+[aria-invalid='true'] .label,
+[data-slot='date-input-group-segment'][data-invalid='true'],
+.label--required::after,
+[data-required='true'] > .label::after {
+  color: var(--danger-soft-foreground);
+}
+
+/* A date field's day, month and year are separate targets: at least 24px
+   each (WCAG 2.2 target size), they were about 17×20 */
+[data-slot='date-input-group-segment'] {
+  display: inline-flex;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
 .PhoneInputCountrySelect option {
   background-color: var(--surface);
   color: var(--surface-foreground);
 }
 
-/* Script page titles ("booking", "prices"…) — Great Vibes, Latin-only, English in all locales */
-.page-title {
-  font-family: var(--font-script);
-  color: var(--color-golden);
-  text-shadow: 3px 0 4px rgba(0, 0, 0, 0.4);
-}
-
-/* Entrance animations (Reveal / StaggerItem components) — pure CSS on purpose:
+/* Entrance animations (anim-reveal, StaggerItem) — pure CSS on purpose:
    SSR used to ship these elements at opacity:0 and JS-driven variants kept them
    invisible until hydration + the lazy animation chunk arrived (~1s extra on
    slow connections). CSS starts at first paint and needs no JS at all.
@@ -224,40 +423,6 @@ body {
   from {
     opacity: 0;
     transform: translateX(-32px);
-  }
-}
-
-/* Carousel dots: the dots themselves never change — a single golden pill sits on
-   top and travels between them. The edge leading the move starts immediately
-   while the trailing edge is held back, so the pill stretches out of the dot it
-   leaves and contracts into the one it arrives at: the squash belongs to the
-   travel, not to the resting "you are here". All the geometry lives here so the
-   slot width that spaces the dots and the pill's offsets cannot drift apart. */
-.carousel-dots {
-  --dot-slot: 1.5rem;
-  --dot-size: 0.375rem;
-  position: relative;
-  display: flex;
-}
-
-.carousel-dot-pill {
-  position: absolute;
-  top: 50%;
-  height: var(--dot-size);
-  margin-top: calc(var(--dot-size) / -2);
-  border-radius: 9999px;
-  left: calc(var(--dot-index) * var(--dot-slot) + (var(--dot-slot) - var(--dot-size)) / 2);
-  right: calc(
-    (var(--dot-count) - 1 - var(--dot-index)) * var(--dot-slot) +
-      (var(--dot-slot) - var(--dot-size)) / 2
-  );
-}
-
-/* Springy confirmation pop (overshoot ≈ the old stiffness-320 spring) */
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
   }
 }
 
@@ -297,16 +462,6 @@ body {
     animation: step-in-back 0.25s ease-out backwards;
   }
 
-  .anim-pop {
-    animation: pop-in 0.35s cubic-bezier(0.34, 1.3, 0.64, 1) backwards;
-  }
-
-  .carousel-dot-pill {
-    transition:
-      left 0.3s cubic-bezier(0.4, 0, 0.2, 1) var(--dot-left-delay),
-      right 0.3s cubic-bezier(0.4, 0, 0.2, 1) var(--dot-right-delay);
-  }
-
   .anim-stagger-item {
     animation: fade-up-in 0.35s ease-out backwards;
   }
@@ -333,4 +488,225 @@ body {
   .anim-stagger-item:nth-child(n + 8) {
     animation-delay: 315ms;
   }
+}
+
+/* ---- Redesign motion --------------------------------------------------
+   Every entrance animates FROM its own first frame and ends on the element's
+   normal look (fill-mode backwards, never forwards), so when motion is off —
+   or a frame never runs — content is simply there. Timings: 150ms for hover
+   and press, 250ms for a selection, 400ms for blocks arriving, 700ms for the
+   home hero. Enter decelerates (.2,0,0,1); feedback overshoots a touch
+   (.34,1.3,.64,1). */
+
+/* No global `scroll-behavior: smooth`: the router's scroll to the top of a
+   new page and its restore on Back would glide too. Only "back to top" glides. */
+
+/* The menu sheet locks the page behind it */
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
+@keyframes chip-pick {
+  0% {
+    transform: scale(0.92);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes hero-zoom {
+  from {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes enter-right {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes bar-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes success-pop {
+  0% {
+    transform: scale(0);
+  }
+  65% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes spark {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateX(40px) scale(0.4);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateX(96px) scale(1);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 180% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+@keyframes ripple {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* The ring round a freshly picked table on the floor plan: it spreads and
+   fades once, and rests invisible */
+.anim-ripple {
+  opacity: 0;
+}
+
+/* The tick inside the success badge is drawn; it rests fully drawn */
+.check-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+
+/* Gold sparks around the success badge: invisible at rest */
+.spark {
+  position: absolute;
+  left: calc(50% - 4px);
+  top: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-golden);
+  opacity: 0;
+}
+
+.spark:nth-child(even) {
+  width: 6px;
+  height: 6px;
+  background: var(--color-golden-light);
+}
+
+/* Loading placeholders shimmer instead of spinning */
+.skeleton {
+  border-radius: 0.5rem;
+  background: linear-gradient(
+      90deg,
+      rgb(246 241 220 / 0.06) 30%,
+      rgb(246 241 220 / 0.16) 50%,
+      rgb(246 241 220 / 0.06) 70%
+    )
+    0 0 / 220% 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .anim-hero-photo {
+    animation: hero-zoom 1.8s cubic-bezier(0.2, 0, 0, 1) backwards;
+  }
+
+  .anim-enter-right {
+    animation: enter-right 0.7s cubic-bezier(0.2, 0, 0, 1) backwards;
+  }
+
+  .anim-bar-fill {
+    transform-origin: left center;
+    animation: bar-fill 0.9s cubic-bezier(0.2, 0, 0, 1) 0.6s backwards;
+  }
+
+  .anim-success-pop {
+    animation: success-pop 0.5s cubic-bezier(0.34, 1.3, 0.64, 1) 0.1s backwards;
+  }
+
+  .check-draw {
+    animation: check-draw 0.45s cubic-bezier(0.2, 0, 0, 1) 0.4s backwards;
+  }
+
+  .spark {
+    animation: spark 0.9s cubic-bezier(0.2, 0, 0, 1) 0.3s;
+  }
+
+  .skeleton {
+    animation: shimmer 1.5s linear infinite;
+  }
+
+  .anim-ripple {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ripple 0.7s cubic-bezier(0.2, 0, 0, 1) 0.2s backwards;
+  }
+
+  .menu-sheet[open] {
+    animation: enter-right 0.35s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .menu-sheet[open]::backdrop {
+    animation: fade-in 0.3s ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip[aria-pressed='true'],
+  .segment,
+  .btn-gold,
+  .btn-outline,
+  .chip,
+  .lift {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Header section links: a gold underline grows in on hover and stays on the
+   page you are on (TanStack marks the active link with data-status) */
+.nav-link {
+  padding-block: 6px;
+  color: var(--color-creme);
+  background-image: linear-gradient(var(--color-golden), var(--color-golden));
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0 2px;
+  transition:
+    background-size 250ms cubic-bezier(0.2, 0, 0, 1),
+    color 150ms;
+}
+
+.nav-link:hover {
+  background-size: 100% 2px;
+}
+
+.nav-link[data-status='active'] {
+  color: var(--color-golden);
+  background-size: 100% 2px;
 }

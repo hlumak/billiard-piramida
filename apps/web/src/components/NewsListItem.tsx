@@ -4,14 +4,15 @@ import { resolveAssetUrl } from '../lib/api';
 import { formatPublished, newsHref } from '../lib/news';
 import { m } from '../paraglide/messages.js';
 
-const CARD = 'block h-full overflow-hidden rounded-[10px] bg-club-green-light';
+const CARD = 'card flex h-full flex-col overflow-hidden';
 
 /**
- * One entry of the /news list: cover, date, headline, teaser. It is a link when
- * the card has somewhere to go (its own page, an app route or an off-site URL)
- * and a plain card that is read in place otherwise.
+ * One news card: cover, date, headline, teaser, and "read more" when there is
+ * somewhere to go — its own page, an app route or an off-site link. A card with
+ * nowhere to go is read in place and does not pretend to be a link.
  */
 export function NewsListItem({ item }: { item: NewsItemDto }) {
+  const href = newsHref(item);
   const body = (
     <>
       {item.imageUrl ? (
@@ -20,17 +21,24 @@ export function NewsListItem({ item }: { item: NewsItemDto }) {
           src={resolveAssetUrl(item.imageUrl)}
           alt=""
           loading="lazy"
-          className="h-40 w-full object-cover"
+          className="aspect-[16/7] w-full object-cover"
         />
       ) : null}
-      <div className="flex flex-col gap-1 px-4 py-3">
-        <time dateTime={item.publishedAt} className="text-xs text-grey-cool">
+      <div className="flex flex-1 flex-col gap-2.5 p-5.5 md:p-7">
+        <time
+          dateTime={item.publishedAt}
+          className="text-[13px] text-grey-cool first-letter:uppercase"
+        >
           {formatPublished(item.publishedAt)}
         </time>
-        <p className="font-semibold text-golden-light">{item.title}</p>
-        {item.body ? <p className="text-sm text-creme/85">{item.body}</p> : null}
-        {item.hasArticle ? (
-          <span className="mt-1 text-sm font-semibold text-golden-light">
+        <p className="text-[19px] leading-snug font-bold md:text-2xl">{item.title}</p>
+        {item.body ? (
+          <p className="line-clamp-3 text-sm leading-relaxed text-cream-soft md:text-base">
+            {item.body}
+          </p>
+        ) : null}
+        {href !== null ? (
+          <span className="mt-auto pt-2 text-sm font-bold text-golden-light md:text-[15px]">
             {m.news_read_more()} →
           </span>
         ) : null}
@@ -38,10 +46,9 @@ export function NewsListItem({ item }: { item: NewsItemDto }) {
     </>
   );
 
-  const href = newsHref(item);
   if (href === null) return <div className={CARD}>{body}</div>;
 
-  const interactive = `${CARD} transition-colors hover:bg-surface-hover`;
+  const interactive = `${CARD} lift text-creme`;
   return isExternalUrl(href) ? (
     <a href={href} target="_blank" rel="noreferrer" className={interactive}>
       {body}

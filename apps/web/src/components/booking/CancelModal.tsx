@@ -27,8 +27,13 @@ export function CancelModal({ booking }: { booking: BookingDto }) {
 
   return (
     <Modal isOpen={isOpen} onOpenChange={setOpen}>
-      <Button variant="danger-soft" className="w-full" onPress={() => setOpen(true)}>
-        {m.cancel_booking()}
+      <Button
+        variant="danger-soft"
+        aria-label={m.cancel_booking()}
+        className="h-12.5 w-full rounded-[14px] px-4 bg-[rgb(255_120_100/0.14)] text-[15px] font-semibold text-danger-soft-foreground hover:bg-[rgb(255_120_100/0.22)]"
+        onPress={() => setOpen(true)}
+      >
+        {m.cancel_short()}
       </Button>
       <Modal.Backdrop>
         <Modal.Container>

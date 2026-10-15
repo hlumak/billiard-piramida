@@ -26,7 +26,7 @@ export function CardFields({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="mb-2 text-sm text-grey-cool">{m.sport_card_label()}</p>
+        <p className="mb-2.5 text-sm font-semibold">{m.sport_card_label()}</p>
         <div role="group" aria-label={m.sport_card_label()} className="flex flex-wrap gap-2">
           {SPORT_CARDS.map(card => (
             <button
@@ -34,11 +34,7 @@ export function CardFields({
               type="button"
               aria-pressed={value.sportCardType === card.value}
               onClick={() => onChange({ ...value, sportCardType: card.value })}
-              className={`h-10 rounded-[10px] px-3 text-sm font-semibold transition-colors ${
-                value.sportCardType === card.value
-                  ? 'bg-golden text-btn-text'
-                  : 'bg-club-green-light text-creme hover:bg-surface-hover'
-              }`}
+              className="chip h-11 px-4 text-sm"
             >
               {card.label || m.sport_card_none()}
             </button>
@@ -60,7 +56,7 @@ export function CardFields({
       ) : null}
 
       <PartnerCardLogos />
-      <p className="text-xs text-grey-cool">{m.cards_hint()}</p>
+      <p className="text-[13px] text-grey-cool">{m.cards_hint()}</p>
     </div>
   );
 }

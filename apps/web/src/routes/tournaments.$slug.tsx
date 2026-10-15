@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { PageHeader } from '../components/AppHeader';
+import { PageLayout } from '../components/site/PageLayout';
 import { TournamentView } from '../components/tournament/TournamentView';
 import { notFoundOn404 } from '../lib/api';
 import { tournamentQuery } from '../lib/queries';
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/tournaments/$slug')({
   // Named after the tournament: this is the URL that gets shared around
   head: ({ match, loaderData }) =>
     pageHead(
-      loaderData ? `${loaderData.title} — piramida` : m.seo_title_tournaments(),
+      loaderData ? `${loaderData.title} — Piramida` : m.seo_title_tournaments(),
       loaderData?.summary ?? m.seo_desc_tournaments(),
       match.pathname
     ),
@@ -34,14 +34,18 @@ export const Route = createFileRoute('/tournaments/$slug')({
   )
 });
 
-function TournamentShell({ children }: { children: React.ReactNode }) {
+/** The announcement carries its own h1 (the tournament's name), so no page title above it. */
+function TournamentShell({
+  children,
+  showTitle = true
+}: {
+  children: React.ReactNode;
+  showTitle?: boolean;
+}) {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="tournament" />
-      <main id="main" className="mt-8 flex-1">
-        {children}
-      </main>
-    </div>
+    <PageLayout script="tournament" title={m.tournament_badge()} showTitle={showTitle}>
+      {children}
+    </PageLayout>
   );
 }
 
@@ -51,7 +55,7 @@ function TournamentPage() {
   const { data: tournament } = useSuspenseQuery(tournamentQuery(slug, getLocale()));
 
   return (
-    <TournamentShell>
+    <TournamentShell showTitle={false}>
       <TournamentView tournament={tournament} />
     </TournamentShell>
   );

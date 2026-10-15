@@ -1,11 +1,11 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { Button, Spinner } from '@heroui/react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Spinner } from '@heroui/react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { PageHeader } from '../components/AppHeader';
-import { TabList } from '../components/TabList';
-import { tabId, tabPanelId } from '../components/tab-ids';
+import { PageLayout } from '../components/site/PageLayout';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
+import { AdminShell } from '../components/admin/AdminShell';
+import type { AdminPaneId } from '../components/admin/panes';
 import { AdminBookings } from '../components/admin/AdminBookings';
 import { AdminCustomers } from '../components/admin/AdminCustomers';
 import { AdminBlacklist } from '../components/admin/AdminBlacklist';
@@ -24,34 +24,20 @@ import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 
 export const Route = createFileRoute('/admin')({
-  head: () => ({ meta: noindexMeta('admin — piramida') }),
+  head: () => ({ meta: noindexMeta('Admin — Piramida') }),
   component: AdminPage
 });
-
-const TABS = [
-  { id: 'overview', label: m.admin_tab_overview },
-  { id: 'schedule', label: m.admin_tab_schedule },
-  { id: 'stats', label: m.admin_tab_stats },
-  { id: 'bookings', label: m.admin_tab_bookings },
-  { id: 'customers', label: m.admin_tab_customers },
-  { id: 'blacklist', label: m.admin_tab_blacklist },
-  { id: 'menu', label: m.admin_tab_menu },
-  { id: 'news', label: m.admin_tab_news },
-  { id: 'tournaments', label: m.admin_tab_tournaments },
-  { id: 'settings', label: m.admin_tab_settings }
-] as const;
-
-type TabId = (typeof TABS)[number]['id'];
 
 /** What the panes need from the page: the customers → bookings hand-off. */
 interface PaneContext {
   bookingsPhone: string;
   showCustomerBookings: (phone: string) => void;
+  open: (pane: AdminPaneId) => void;
 }
 
-/** What each tab shows. A Record over TabId: a tab without a pane fails to compile. */
-const TAB_PANES: Record<TabId, (context: PaneContext) => ReactNode> = {
-  overview: () => <AdminOverview />,
+/** What each section shows. A Record over the ids: a section without a pane fails to compile. */
+const PANES: Record<AdminPaneId, (context: PaneContext) => ReactNode> = {
+  overview: ({ open }) => <AdminOverview onOpen={open} />,
   schedule: ({ showCustomerBookings }) => <AdminSchedule onShowBooking={showCustomerBookings} />,
   stats: () => <AdminStats />,
   // Keyed by the phone handed over, so a new hand-off starts a fresh search
@@ -127,71 +113,46 @@ function AdminPage() {
   // client takes over, so SSR and the hydration render agree.
   const signedIn = useFlagCookie(adminAuthFlag);
   const ready = useIsHydrated();
-  const [tab, setTab] = useState<TabId>('overview');
-  const idBase = useId();
+  const [pane, setPane] = useState<AdminPaneId>('overview');
   const [bookingsPhone, setBookingsPhone] = useState('');
 
   const showCustomerBookings = (phone: string) => {
     setBookingsPhone(phone);
-    setTab('bookings');
+    setPane('bookings');
   };
 
-  return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-6 pb-10 pt-14 lg:max-w-5xl">
-      <PageHeader title="admin" />
-      <main id="main" className="mt-8 flex-1">
-        {!ready ? (
-          <div className="flex justify-center py-16">
-            <Spinner aria-label={m.loading()} />
-          </div>
-        ) : !signedIn ? (
-          <>
-            <AdminLogin onSuccess={session.signedIn} />
-            <div className="mt-8">
-              <LocaleSwitcher />
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <TabList
-                idBase={idBase}
-                tabs={TABS.map(entry => ({ id: entry.id, label: entry.label() }))}
-                selected={tab}
-                onSelect={setTab}
-                className="flex flex-wrap gap-2"
-              />
-              <div className="flex items-center gap-3">
-                <LocaleSwitcher />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  isPending={session.isLoggingOut}
-                  onPress={session.logout}
-                >
-                  {m.admin_logout()}
-                </Button>
-              </div>
-            </div>
-            {session.logoutFailed ? (
-              <p role="alert" className="text-sm text-danger-soft-foreground">
-                {m.err_signout_failed()}
-              </p>
-            ) : null}
+  if (ready && signedIn) {
+    return (
+      <AdminShell
+        pane={pane}
+        onSelect={setPane}
+        onSearchPhone={showCustomerBookings}
+        onLogout={session.logout}
+        isLoggingOut={session.isLoggingOut}
+        logoutFailed={session.logoutFailed}
+      >
+        {/* key remounts the pane so the CSS entrance replays per section */}
+        <div key={pane} className="anim-reveal">
+          {PANES[pane]({ bookingsPhone, showCustomerBookings, open: setPane })}
+        </div>
+      </AdminShell>
+    );
+  }
 
-            {/* key remounts the pane so the CSS entrance replays per tab */}
-            <div
-              key={tab}
-              id={tabPanelId(idBase)}
-              role="tabpanel"
-              aria-labelledby={tabId(idBase, tab)}
-              className="anim-stagger-item"
-            >
-              {TAB_PANES[tab]({ bookingsPhone, showCustomerBookings })}
-            </div>
+  return (
+    <PageLayout script="admin" title={m.page_admin()} footer={false}>
+      {!ready ? (
+        <div className="flex justify-center py-16">
+          <Spinner aria-label={m.loading()} />
+        </div>
+      ) : (
+        <>
+          <AdminLogin onSuccess={session.signedIn} />
+          <div className="mt-8 flex justify-center">
+            <LocaleSwitcher />
           </div>
-        )}
-      </main>
-    </div>
+        </>
+      )}
+    </PageLayout>
   );
 }

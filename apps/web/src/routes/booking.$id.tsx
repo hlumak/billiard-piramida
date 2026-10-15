@@ -1,7 +1,7 @@
 import { Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { PageHeader } from '../components/AppHeader';
+import { PageLayout } from '../components/site/PageLayout';
 import { BookingDetails } from '../components/booking/BookingDetails';
 import { ApiError } from '../lib/api';
 import { bookingQuery, menuQuery } from '../lib/queries';
@@ -32,30 +32,30 @@ function BookingPage() {
   const { id } = Route.useParams();
   const { new: justCreated } = Route.useSearch();
   const { data: booking, isPending, error } = useQuery(bookingQuery(id));
+  // A fresh booking opens with its own "confirmed" heading instead of the title
+  // — only once it is here: while it loads or if it fails, the page keeps its title
+  const celebrate = justCreated === true && booking !== undefined && booking.phase !== 'cancelled';
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-6 pb-10 pt-14 md:max-w-2xl">
-      <PageHeader title="booking" />
-      <main id="main" className="mt-8 flex-1">
-        {isPending ? (
-          <div className="flex justify-center py-16">
-            <Spinner aria-label={m.loading()} />
-          </div>
-        ) : booking ? (
-          <BookingDetails booking={booking} justCreated={justCreated === true} />
-        ) : (
-          <div className="flex flex-col items-center gap-4 py-16">
-            <p className="text-grey-cool">
-              {error instanceof ApiError && error.status === 404
-                ? m.booking_not_found()
-                : m.err_generic()}
-            </p>
-            <Link to="/" className="font-semibold text-golden">
-              {m.go_home()}
-            </Link>
-          </div>
-        )}
-      </main>
-    </div>
+    <PageLayout script="booking" title={m.booking_title()} showTitle={!celebrate}>
+      {isPending ? (
+        <div className="flex justify-center py-16">
+          <Spinner aria-label={m.loading()} />
+        </div>
+      ) : booking ? (
+        <BookingDetails booking={booking} justCreated={justCreated === true} />
+      ) : (
+        <div className="flex flex-col items-center gap-4 py-16">
+          <p className="text-grey-cool">
+            {error instanceof ApiError && error.status === 404
+              ? m.booking_not_found()
+              : m.err_generic()}
+          </p>
+          <Link to="/" className="font-semibold text-golden">
+            {m.go_home()}
+          </Link>
+        </div>
+      )}
+    </PageLayout>
   );
 }

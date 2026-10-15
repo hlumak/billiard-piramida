@@ -29,14 +29,14 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <form
-      className="anim-reveal mx-auto mt-16 flex w-full max-w-sm flex-col gap-4"
+      className="card fields-roomy anim-reveal mx-auto flex w-full max-w-md flex-col gap-4.5 rounded-3xl p-6 md:p-7.5"
       onSubmit={event => {
         event.preventDefault();
         event.stopPropagation();
         if (token.trim()) login.mutate(token.trim());
       }}
     >
-      <h2 className="text-xl font-semibold text-creme">{m.admin_login_title()}</h2>
+      <h2 className="text-[22px] font-bold">{m.admin_login_title()}</h2>
       <TextField
         name="adminToken"
         type="password"
@@ -55,7 +55,7 @@ export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
       <Button
         type="submit"
         size="lg"
-        className="h-11.25 w-full text-lg font-bold"
+        className="btn-gold mt-1.5 h-14 w-full text-base"
         isDisabled={token.trim().length === 0}
         isPending={login.isPending}
       >

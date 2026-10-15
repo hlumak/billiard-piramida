@@ -1,7 +1,11 @@
 import { createStore } from '@tanstack/react-store';
 import { defaultGameFor, type ActivityKind, type BilliardGame, type IsoDate } from '@repo/shared';
 
-export const WIZARD_STEPS = ['date', 'time', 'table', 'food', 'details'] as const;
+/**
+ * Four steps: when (date, start and length on one screen), the spot, the
+ * bar (optional), and the guest's contacts.
+ */
+export const WIZARD_STEPS = ['when', 'table', 'food', 'details'] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
 
 export interface WizardState {
@@ -28,7 +32,7 @@ export interface WizardState {
 }
 
 const initialState: WizardState = {
-  step: 'date',
+  step: 'when',
   direction: 1,
   date: null,
   startHour: null,
@@ -40,6 +44,9 @@ const initialState: WizardState = {
   sportCardCount: 0,
   items: {}
 };
+
+/** A spot is only known free for the window it was picked in. */
+const noSpot = { tableId: null, kind: null, tableLabel: null, game: null } as const;
 
 // Module-level singleton: shared across requests during SSR. Safe only while
 // mutations happen exclusively from client events — never write to it on the server.
@@ -70,34 +77,33 @@ export function goToStep(step: WizardStep): void {
   }));
 }
 
+/** Picking the same date again keeps every later pick; a new one clears them. */
 export function selectDate(date: IsoDate): void {
-  wizardStore.setState(state => {
-    // Re-confirming the same date keeps downstream picks; a new date invalidates them
-    if (state.date === date) return { ...state, step: 'time', direction: 1 };
-    return {
-      ...state,
-      date,
-      startHour: null,
-      durationHours: 1,
-      tableId: null,
-      kind: null,
-      tableLabel: null,
-      game: null,
-      step: 'time',
-      direction: 1
-    };
-  });
+  wizardStore.setState(state =>
+    state.date === date ? state : { ...state, date, startHour: null, durationHours: 1, ...noSpot }
+  );
 }
 
+/** A new start or length may not be free on the spot picked for the old one. */
+export function selectStart(startHour: number): void {
+  wizardStore.setState(state =>
+    state.startHour === startHour ? state : { ...state, startHour, ...noSpot }
+  );
+}
+
+export function selectDuration(durationHours: number): void {
+  wizardStore.setState(state =>
+    state.durationHours === durationHours ? state : { ...state, durationHours, ...noSpot }
+  );
+}
+
+/** Date-free shortcut for a known window (the home page's free-hours strip). */
 export function selectTime(startHour: number, durationHours: number): void {
   wizardStore.setState(state => ({
     ...state,
     startHour,
     durationHours,
-    tableId: null,
-    kind: null,
-    tableLabel: null,
-    game: null,
+    ...noSpot,
     step: 'table',
     direction: 1
   }));
@@ -112,10 +118,13 @@ export function selectTable(tableId: number, kind: ActivityKind, tableLabel: str
     tableId,
     kind,
     tableLabel,
-    game: defaultGameFor(tableId),
-    step: 'food',
-    direction: 1
+    game: state.tableId === tableId ? state.game : defaultGameFor(tableId)
   }));
+}
+
+/** The picked spot went to someone else: nothing is picked any more. */
+export function clearTable(): void {
+  wizardStore.setState(state => (state.tableId === null ? state : { ...state, ...noSpot }));
 }
 
 export function selectGame(game: BilliardGame): void {
