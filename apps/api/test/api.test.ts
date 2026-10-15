@@ -357,6 +357,56 @@ test('admin endpoints require the token', async () => {
   assert.equal(badToken.statusCode, 401);
 });
 
+test("the staff bell lists bookings guests made online, not the desk's own", async () => {
+  const headers = { 'x-admin-token': 'test-admin-token' };
+  const tuesday = nextDate(2);
+  const askedFrom = new Date(Date.now() - 1000).toISOString();
+  const slot = { date: tuesday, durationHours: 1, startHour: 18 };
+
+  const online = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: { ...slot, tableId: 4, customerName: 'Online Guest', customerPhone: '+48 602 777 001' }
+  });
+  assert.equal(online.statusCode, 201);
+  const desk = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: { ...slot, tableId: 5, customerName: 'Desk Guest', customerPhone: '+48 602 777 002' }
+  });
+  assert.equal(desk.statusCode, 201);
+
+  const listed = await app.inject({
+    method: 'GET',
+    url: `/api/admin/bookings/online?since=${encodeURIComponent(askedFrom)}`,
+    headers
+  });
+  assert.equal(listed.statusCode, 200);
+  const names = listed.json().map((entry: { customerName: string }) => entry.customerName);
+  assert.ok(names.includes('Online Guest'));
+  assert.ok(!names.includes('Desk Guest'));
+  const entry = listed.json().find((row: { id: string }) => row.id === online.json().id);
+  assert.equal(entry.tableLabel, '4');
+  assert.ok(Date.parse(entry.createdAt) >= Date.parse(askedFrom));
+
+  // Nothing newer than now; a malformed time is refused; staff only
+  const later = await app.inject({
+    method: 'GET',
+    url: `/api/admin/bookings/online?since=${encodeURIComponent(new Date(Date.now() + 60_000).toISOString())}`,
+    headers
+  });
+  assert.deepEqual(later.json(), []);
+  const malformed = await app.inject({
+    method: 'GET',
+    url: '/api/admin/bookings/online?since=yesterday',
+    headers
+  });
+  assert.equal(malformed.statusCode, 400);
+  const anonymous = await app.inject({ method: 'GET', url: '/api/admin/bookings/online' });
+  assert.equal(anonymous.statusCode, 401);
+});
+
 test('admin stats, bookings and customers respond with data', async () => {
   const headers = { 'x-admin-token': 'test-admin-token' };
 

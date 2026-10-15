@@ -13,9 +13,17 @@ import {
   resolveBookingGame,
   type BilliardGame
 } from '@repo/shared';
-import { and, desc, eq, gte, ilike, lt } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, ilike, isNotNull, lt } from 'drizzle-orm';
 import { blacklist, bookings, orderItems, tables } from '../db/schema.ts';
-import { BILLIARD_GAME, BOOKING_RESPONSE, ERROR_RESPONSE, INT_ID, UUID } from '../lib/schemas.ts';
+import {
+  ACTIVITY_KIND,
+  BILLIARD_GAME,
+  BOOKING_RESPONSE,
+  BOOKING_STATUS,
+  ERROR_RESPONSE,
+  INT_ID,
+  UUID
+} from '../lib/schemas.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
 import { HOUR_MS, warsawDateOf, warsawDayRange, warsawHourOf, warsawInstant } from '../lib/time.ts';
@@ -40,6 +48,23 @@ type OpenBookingLookup =
  * Bookings at the desk: the list, walk-in bookings, cancel/restore, corrections and the food order.
  * Registered inside the admin scope (routes/admin.ts), behind its token hook.
  */
+/** The bell looks back a day; older news is in the bookings list. */
+const ONLINE_LOOKBACK_MS = 24 * HOUR_MS;
+const ONLINE_LIMIT = 50;
+
+const ONLINE_BOOKING_RESPONSE = Type.Object({
+  id: Type.String(),
+  kind: ACTIVITY_KIND,
+  game: Type.Union([BILLIARD_GAME, Type.Null()]),
+  tableLabel: Type.String(),
+  customerName: Type.String(),
+  customerPhone: Type.String(),
+  startsAt: Type.String(),
+  endsAt: Type.String(),
+  status: BOOKING_STATUS,
+  createdAt: Type.String()
+});
+
 export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
   admin.get(
     '/api/admin/bookings',
@@ -82,6 +107,52 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         .limit(limit);
 
       return toBookingDtos(admin.db, rows);
+    }
+  );
+
+  // The panel's bell: bookings guests made on the site. Only those carry a
+  // manage secret — the desk's own bookings never get one — so that is what
+  // tells them apart. Polled every half minute by every open panel, hence
+  // a narrow window and no order lines.
+  admin.get(
+    '/api/admin/bookings/online',
+    {
+      schema: {
+        querystring: Type.Object({
+          since: Type.Optional(Type.String({ format: 'date-time' }))
+        }),
+        response: { 200: Type.Array(ONLINE_BOOKING_RESPONSE), '4xx': ERROR_RESPONSE }
+      }
+    },
+    async request => {
+      const floor = Date.now() - ONLINE_LOOKBACK_MS;
+      const asked = request.query.since === undefined ? floor : Date.parse(request.query.since);
+      const since = new Date(Math.max(floor, asked));
+      const rows = await admin.db
+        .select({
+          id: bookings.id,
+          kind: tables.kind,
+          game: bookings.game,
+          tableLabel: tables.label,
+          customerName: bookings.customerName,
+          customerPhone: bookings.customerPhone,
+          startsAt: bookings.startsAt,
+          endsAt: bookings.endsAt,
+          status: bookings.status,
+          createdAt: bookings.createdAt
+        })
+        .from(bookings)
+        .innerJoin(tables, eq(tables.id, bookings.tableId))
+        .where(and(isNotNull(bookings.manageTokenHash), gt(bookings.createdAt, since)))
+        .orderBy(desc(bookings.createdAt))
+        .limit(ONLINE_LIMIT);
+      return rows.map(row =>
+        Object.assign(row, {
+          startsAt: row.startsAt.toISOString(),
+          endsAt: row.endsAt.toISOString(),
+          createdAt: row.createdAt.toISOString()
+        })
+      );
     }
   );
 

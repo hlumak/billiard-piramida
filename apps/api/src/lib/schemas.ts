@@ -138,6 +138,12 @@ export const MENU_ITEM_RESPONSE = Type.Object({
   description: Type.Union([Type.String(), Type.Null()])
 });
 
+export const BOOKING_STATUS = Type.Union([
+  Type.Literal('confirmed'),
+  Type.Literal('cancelled'),
+  Type.Literal('no_show')
+]);
+
 export const BOOKING_RESPONSE = Type.Object({
   id: Type.String(),
   tableId: Type.Integer(),
@@ -148,11 +154,7 @@ export const BOOKING_RESPONSE = Type.Object({
   customerPhone: Type.String(),
   startsAt: Type.String(),
   endsAt: Type.String(),
-  status: Type.Union([
-    Type.Literal('confirmed'),
-    Type.Literal('cancelled'),
-    Type.Literal('no_show')
-  ]),
+  status: BOOKING_STATUS,
   phase: Type.Union([
     Type.Literal('upcoming'),
     Type.Literal('active'),
