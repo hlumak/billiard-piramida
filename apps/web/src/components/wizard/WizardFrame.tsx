@@ -66,13 +66,21 @@ function ActionButton({
   className: string;
 }) {
   const advances = action.form === undefined;
+  const pending = action.pending === true;
   return (
+    // While pending it refuses presses rather than going disabled: a disabled
+    // button drops keyboard focus to <body>, and a refusal would leave the
+    // guest nowhere. A prevented click also stops Enter in a field submitting.
     <button
       type={advances ? 'button' : 'submit'}
       form={action.form}
-      onClick={action.onPress}
-      disabled={action.disabled === true || action.pending === true}
-      aria-busy={action.pending === true}
+      onClick={event => {
+        if (pending) event.preventDefault();
+        else action.onPress?.();
+      }}
+      disabled={action.disabled === true}
+      aria-disabled={pending || undefined}
+      aria-busy={pending}
       className={`btn-gold ${className}`}
     >
       {action.pending ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : null}

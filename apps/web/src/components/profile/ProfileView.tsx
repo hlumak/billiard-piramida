@@ -82,8 +82,11 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
         </div>
         <button
           type="button"
-          disabled={signOut.isPending}
-          onClick={() => signOut.mutate()}
+          // Not disabled while signing out: that would drop keyboard focus
+          aria-disabled={signOut.isPending || undefined}
+          onClick={() => {
+            if (!signOut.isPending) signOut.mutate();
+          }}
           className="btn-outline h-10 flex-none px-4 text-sm"
         >
           {m.admin_logout()}
@@ -105,7 +108,7 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
         onSubmit={event => {
           event.preventDefault();
           event.stopPropagation();
-          save.mutate(cards);
+          if (!save.isPending) save.mutate(cards);
         }}
       >
         <h2 className="text-lg font-bold text-golden">{m.profile_cards_title()}</h2>
@@ -118,7 +121,7 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
         />
         <button
           type="submit"
-          disabled={save.isPending}
+          aria-disabled={save.isPending || undefined}
           aria-busy={save.isPending}
           className="btn-gold h-13 w-full text-base"
         >

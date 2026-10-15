@@ -92,7 +92,7 @@ export function TournamentRegisterForm({
       onSubmit={event => {
         event.preventDefault();
         event.stopPropagation();
-        form.handleSubmit();
+        if (!register.isPending) form.handleSubmit();
       }}
     >
       <div>
@@ -160,7 +160,8 @@ export function TournamentRegisterForm({
 
       <button
         type="submit"
-        disabled={register.isPending}
+        // Not disabled while sending: that would drop keyboard focus
+        aria-disabled={register.isPending || undefined}
         aria-busy={register.isPending}
         className="btn-gold mt-1.5 h-14 w-full text-base"
       >

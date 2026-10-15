@@ -252,6 +252,7 @@ function LookupSection({ signedIn }: { signedIn: boolean }) {
         // metadata lazily, and the lookup goes to the separate API service
         onSubmit={async event => {
           event.preventDefault();
+          if (lookup.isPending) return;
           // The phone metadata is only needed here, on submit: load it then
           const { isValidPhone } = await import('@repo/shared/phone');
           if (!isValidPhone(phone)) {
@@ -284,7 +285,8 @@ function LookupSection({ signedIn }: { signedIn: boolean }) {
         ) : null}
         <button
           type="submit"
-          disabled={lookup.isPending}
+          // Not disabled while searching: that would drop keyboard focus
+          aria-disabled={lookup.isPending || undefined}
           aria-busy={lookup.isPending}
           className="btn-gold h-12.5 w-full text-[15px]"
         >

@@ -96,7 +96,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
         onSubmit={event => {
           event.preventDefault();
           event.stopPropagation();
-          submit.mutate();
+          if (!submit.isPending) submit.mutate();
         }}
       >
         {tab === 'register' ? (
@@ -143,7 +143,9 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
 
         <button
           type="submit"
-          disabled={!isValidPhone(phone) || password.length < 8 || submit.isPending}
+          disabled={!isValidPhone(phone) || password.length < 8}
+          // Not disabled while signing in: that would drop keyboard focus
+          aria-disabled={submit.isPending || undefined}
           aria-busy={submit.isPending}
           className="btn-gold mt-1.5 h-14 w-full text-base"
         >
