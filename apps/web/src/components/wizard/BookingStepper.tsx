@@ -1,7 +1,15 @@
 import { Fragment } from 'react';
+import { useStore } from '@tanstack/react-store';
 import { Check } from 'lucide-react';
 import { m } from '../../paraglide/messages.js';
-import { WIZARD_STEPS, goToStep, stepIndex, type WizardStep } from '../../store/booking-wizard';
+import {
+  WIZARD_STEPS,
+  furthestStep,
+  goToStep,
+  stepIndex,
+  wizardStore,
+  type WizardStep
+} from '../../store/booking-wizard';
 
 const LABELS: Record<WizardStep, () => string> = {
   when: m.step_when,
@@ -12,12 +20,15 @@ const LABELS: Record<WizardStep, () => string> = {
 
 /**
  * Where the guest is in the four steps, by name. Steps already done are
- * buttons back to themselves (the picks stay); the ones ahead are not
- * reachable from here. A phone gets the compact form: "Step 2 of 4 · Table"
- * over four bars, with the done steps' names as the way back.
+ * buttons back to themselves (the picks stay), and so are the ones ahead the
+ * guest has already been on, while the picks they need still stand; the rest
+ * ahead are not reachable from here. A phone gets the compact form: "Step 2
+ * of 4 · Table" over four bars, with the reachable steps' names as links.
  */
 export function BookingStepper({ step }: { step: WizardStep }) {
   const current = stepIndex(step);
+  const furthest = useStore(wizardStore, furthestStep);
+  const reachable = (index: number) => index !== current && index <= furthest;
 
   return (
     <nav aria-label={m.booking_steps()} className="mx-auto mb-7 w-full max-w-[760px] md:mb-9">
@@ -35,10 +46,10 @@ export function BookingStepper({ step }: { step: WizardStep }) {
             />
           ))}
         </div>
-        {/* Steps already done take the guest back to them, as on a wide screen */}
+        {/* Steps already been on take the guest to them, as on a wide screen */}
         <div className="mt-0.5 grid grid-cols-4 gap-1.5 text-[11px] font-semibold text-grey-cool">
           {WIZARD_STEPS.map((entry, index) =>
-            index < current ? (
+            reachable(index) ? (
               <button
                 key={entry}
                 type="button"
@@ -65,6 +76,8 @@ export function BookingStepper({ step }: { step: WizardStep }) {
         {WIZARD_STEPS.map((entry, index) => {
           const done = index < current;
           const isCurrent = index === current;
+          // Ahead of this step, but the guest has been there and can go back
+          const open = reachable(index);
           const badge = done ? (
             <span className="flex size-8 items-center justify-center rounded-full bg-club-green-light text-golden">
               <Check className="size-4" strokeWidth={3} aria-hidden />
@@ -74,7 +87,9 @@ export function BookingStepper({ step }: { step: WizardStep }) {
               className={`flex size-8 items-center justify-center rounded-full text-sm ${
                 isCurrent
                   ? 'bg-golden font-bold text-btn-text'
-                  : 'shadow-[inset_0_0_0_1.5px_rgb(246_241_220/0.35)]'
+                  : open
+                    ? 'shadow-[inset_0_0_0_1.5px_var(--color-golden)]'
+                    : 'shadow-[inset_0_0_0_1.5px_rgb(246_241_220/0.35)]'
               }`}
             >
               {index + 1}
@@ -94,10 +109,10 @@ export function BookingStepper({ step }: { step: WizardStep }) {
               <li
                 aria-current={isCurrent ? 'step' : undefined}
                 className={`text-[15px] ${isCurrent ? 'font-bold' : 'font-semibold'} ${
-                  done || isCurrent ? 'text-creme' : 'text-grey-cool'
+                  done || isCurrent || open ? 'text-creme' : 'text-grey-cool'
                 }`}
               >
-                {done ? (
+                {open ? (
                   <button
                     type="button"
                     onClick={() => goToStep(entry)}
