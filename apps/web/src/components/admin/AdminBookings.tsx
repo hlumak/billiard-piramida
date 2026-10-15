@@ -153,7 +153,8 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
   const [date, setDate] = useState<IsoDate | undefined>(undefined);
   const [status, setStatus] = useState<BookingStatus | undefined>(undefined);
   const [phoneInput, setPhoneInput] = useState(initialPhone);
-  const [phone, setPhone] = useState(initialPhone);
+  // Normalized from the start, so the first query searches like the later ones
+  const [phone, setPhone] = useState(() => normalizePhoneSearch(initialPhone));
 
   // Debounce the phone search so we don't refetch per keystroke
   useEffect(() => {

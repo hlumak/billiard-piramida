@@ -96,7 +96,7 @@ export interface AdminTournamentInput {
  * ("601 234 567"): drop everything but digits and "+" before the substring search.
  */
 export function normalizePhoneSearch(input: string): string {
-  return input.replace(/[^d+]/g, '');
+  return input.replace(/[^\d+]/g, '');
 }
 
 export interface CustomerListParams {
