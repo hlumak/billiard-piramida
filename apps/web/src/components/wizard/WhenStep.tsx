@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { Clock } from 'lucide-react';
@@ -142,9 +143,6 @@ function TimeSkeleton() {
 }
 
 function TimePicker({ date }: { date: IsoDate }) {
-  const startHour = useStore(wizardStore, state => state.startHour);
-  const durationHours = useStore(wizardStore, state => state.durationHours);
-
   useLiveAvailability(date);
   const {
     data: availability,
@@ -156,6 +154,12 @@ function TimePicker({ date }: { date: IsoDate }) {
 
   if (isError && !availability) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !availability) return <TimeSkeleton />;
+  return <TimeOptions availability={availability} />;
+}
+
+function TimeOptions({ availability }: { availability: AvailabilityDto }) {
+  const startHour = useStore(wizardStore, state => state.startHour);
+  const durationHours = useStore(wizardStore, state => state.durationHours);
 
   const starts = freeHours(availability);
   // Live updates can take the picked hour away (someone else books it):
@@ -167,6 +171,12 @@ function TimePicker({ date }: { date: IsoDate }) {
   // host from this start are shown but cannot be picked
   const span = Math.min(MAX_BOOKING_HOURS, availability.close - (start ?? availability.open));
   const lengths = Array.from({ length: Math.max(span, 1) }, (_, i) => i + 1);
+
+  // …and when it shortens the longest stay from the picked start, the summary
+  // beside the step must shrink with the highlighted length
+  useEffect(() => {
+    if (start !== null && duration !== durationHours) selectDuration(duration);
+  }, [start, duration, durationHours]);
 
   const pickStart = (hour: number) => {
     selectStart(hour);
