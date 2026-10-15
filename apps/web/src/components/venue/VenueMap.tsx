@@ -20,9 +20,13 @@ export function VenueMap({ className }: { className?: string }) {
         referrerPolicy="strict-origin-when-cross-origin"
         // Scripts to draw the map, popups so its own links can open out
         // (escaping the sandbox, or the new tab would be opaque too).
-        // Deliberately NO allow-same-origin: paired with allow-scripts a
-        // frame can strip its own sandbox, and none of the embed's bundles
-        // reach for storage, cookies or IndexedDB.
+        // Deliberately NO allow-same-origin: the frame runs with an empty
+        // ("null") origin, so Google's scripts get no cookies or storage of
+        // their own here. The price is console noise from inside the frame —
+        // a few of its background calls fail CORS from origin "null" — while
+        // the map, the pin and the place card still draw. Allowing it would
+        // silence that and hand the frame its cookies back: a consent
+        // question, not a bug fix.
         sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
         className="block size-full min-h-72 border-0"
       />
