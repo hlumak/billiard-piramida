@@ -136,7 +136,7 @@ export function BookingDetails({
         </section>
 
         <section className="card p-6">
-          <h2 className="text-[17px] font-bold text-golden">{m.order_title()}</h2>
+          <h2 className="text-[17px] font-bold text-golden-light">{m.order_title()}</h2>
           <dl className="mt-3.5 flex flex-col gap-2.5 text-[15px] text-cream-soft">
             <div className="flex justify-between gap-4">
               <dt>{spotRentalLabel(booking.kind)}</dt>

@@ -71,7 +71,7 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
         variant="outline"
         // Starts with the visible word, so voice control ("click Bar") still works
         aria-label={`${m.admin_order_btn()}: ${m.admin_bar_tip()}`}
-        className="h-9 gap-1.5 rounded-[10px] border-[1.5px] border-golden/70 bg-transparent px-3 text-[13px] font-bold text-golden hover:bg-golden/10"
+        className="h-9 gap-1.5 rounded-[10px] border-[1.5px] border-golden/70 bg-transparent px-3 text-[13px] font-bold text-golden-light hover:bg-golden/10"
         onPress={() => setOpen(true)}
       >
         <Coffee aria-hidden className="size-3.5" strokeWidth={2.2} />

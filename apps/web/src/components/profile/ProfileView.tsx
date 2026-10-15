@@ -111,7 +111,7 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
           if (!save.isPending) save.mutate(cards);
         }}
       >
-        <h2 className="text-lg font-bold text-golden">{m.profile_cards_title()}</h2>
+        <h2 className="text-lg font-bold text-golden-light">{m.profile_cards_title()}</h2>
         <CardFields
           value={cards}
           onChange={next => {

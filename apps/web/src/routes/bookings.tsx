@@ -164,7 +164,7 @@ function BookingGroup({
               className="card lift flex items-center gap-4 p-4 md:gap-5 md:p-5"
             >
               <BookingLine booking={booking} muted={past} />
-              <span className="flex-none text-right font-bold text-golden tabular-nums md:text-lg">
+              <span className="flex-none text-right font-bold text-golden-light tabular-nums md:text-lg">
                 {formatPln(booking.totalGrosz, intlTag())}
               </span>
               <ChevronRight
