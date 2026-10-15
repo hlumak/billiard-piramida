@@ -33,7 +33,7 @@ export interface WizardTotals {
 export function useWizardTotals(): WizardTotals {
   const state = useStore(wizardStore);
   const { rates } = useVenueConfig();
-  const { data: menu } = useQuery(menuQuery(getLocale()));
+  const menu = useOrderMenu(state.items);
   const food = orderLinesFrom(state.items, menu).reduce(
     (sum, line) => sum + line.item.priceGrosz * line.quantity,
     0
@@ -48,6 +48,19 @@ export function useWizardTotals(): WizardTotals {
   );
   const discount = discountGroszFor(state.sportCardCount, rental);
   return { rental, total: rental + food - discount, estimate: false };
+}
+
+/**
+ * The bar menu, once there is an order to price. Step 1 shows the summary
+ * too, and with nothing ordered the menu is not worth a request yet; by the
+ * time there is, the bar step has already loaded it.
+ */
+function useOrderMenu(items: WizardState['items']) {
+  const { data } = useQuery({
+    ...menuQuery(getLocale()),
+    enabled: Object.keys(items).length > 0
+  });
+  return data;
 }
 
 function cheapest(rates: RateTable): number {
@@ -132,7 +145,7 @@ function SummaryFacts({ state }: { state: WizardState }) {
 
 /** The rental, each bar line and the sport-card discount, once a spot is priced. */
 function PriceLines({ state, rental }: { state: WizardState; rental: number }) {
-  const { data: menu } = useQuery(menuQuery(getLocale()));
+  const menu = useOrderMenu(state.items);
   const lines = orderLinesFrom(state.items, menu);
   const discount = discountGroszFor(state.sportCardCount, rental);
   if (state.kind === null) return null;
