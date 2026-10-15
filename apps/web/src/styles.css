@@ -575,12 +575,9 @@ html:has(dialog[open]) {
   }
 }
 
-@keyframes shimmer {
-  from {
-    background-position: 180% 0;
-  }
-  to {
-    background-position: -80% 0;
+@keyframes placeholder-pulse {
+  50% {
+    opacity: 0.5;
   }
 }
 
@@ -625,16 +622,12 @@ html:has(dialog[open]) {
   background: var(--color-golden-light);
 }
 
-/* Loading placeholders shimmer instead of spinning */
+/* Loading placeholders pulse instead of spinning. Opacity, not a sliding
+   gradient: the compositor animates it without repainting every frame,
+   which old phones notice */
 .skeleton {
   border-radius: 0.5rem;
-  background: linear-gradient(
-      90deg,
-      rgb(246 241 220 / 0.06) 30%,
-      rgb(246 241 220 / 0.16) 50%,
-      rgb(246 241 220 / 0.06) 70%
-    )
-    0 0 / 220% 100%;
+  background-color: rgb(246 241 220 / 0.1);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -664,7 +657,7 @@ html:has(dialog[open]) {
   }
 
   .skeleton {
-    animation: shimmer 1.5s linear infinite;
+    animation: placeholder-pulse 1.5s ease-in-out infinite;
   }
 
   .anim-ripple {
