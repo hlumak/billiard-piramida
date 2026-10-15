@@ -12,9 +12,10 @@ const WIDTHS = {
 
 /**
  * Every page except home: header, the script-and-caption title, the page's
- * own content in a centred column, the compact footer and "back to top". The
- * column is a flex child of a full-height page, so the footer always reaches
- * the bottom of the window.
+ * own content in a centred column, the compact footer and "back to top" (both
+ * left out of the booking flow and the staff sign-in). The column is a flex
+ * child of a full-height page, so the footer always reaches the bottom of the
+ * window.
  */
 export function PageLayout({
   script,
@@ -54,7 +55,8 @@ export function PageLayout({
         {children}
       </main>
       {footer ? <SiteFooter /> : null}
-      <BackToTop />
+      {/* Not in the booking flow: its own bar holds the bottom of a phone's screen */}
+      {footer ? <BackToTop /> : null}
     </div>
   );
 }
