@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Ellipsis, ExternalLink, LogOut, Search, X } from 'lucide-react';
 import { hoursForDate, isClosedAllDay } from '@repo/shared';
@@ -157,6 +157,18 @@ export function AdminShell({
     sheet.current?.close();
     onSelect(next);
   };
+
+  // The sheet is phone-only (hidden from lg up). A tablet rotated past that
+  // width with it open would keep an invisible modal that makes the whole
+  // panel inert, with no Escape key to close it: close it on the way.
+  useEffect(() => {
+    const wide = window.matchMedia('(min-width: 64rem)');
+    const onChange = () => {
+      if (wide.matches) sheet.current?.close();
+    };
+    wide.addEventListener('change', onChange);
+    return () => wide.removeEventListener('change', onChange);
+  }, []);
   const sessionProps = { onLogout, isLoggingOut, logoutFailed };
 
   return (
@@ -189,10 +201,12 @@ export function AdminShell({
           <AdminNewBooking />
         </header>
 
-        <header className="sticky top-0 z-20 flex h-17 items-center gap-3 border-b border-line bg-club-green-dark px-4 lg:hidden">
+        {/* Above the schedule's sticky name column (z-20) as it scrolls under */}
+        <header className="sticky top-0 z-30 flex h-17 items-center gap-3 border-b border-line bg-club-green-dark px-4 lg:hidden">
           <BrandLogo className="h-8 w-auto" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-lg leading-tight font-bold">{current.label()}</p>
+            {/* The page's heading on a phone; the wide header's h1 is not rendered there */}
+            <h1 className="truncate text-lg leading-tight font-bold">{current.label()}</h1>
             <p className="truncate text-xs text-grey-cool first-letter:uppercase">
               {formatDayLong(today)}
             </p>
