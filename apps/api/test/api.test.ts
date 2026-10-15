@@ -1294,8 +1294,9 @@ test('guest phone lookup returns only active bookings and normalizes the query',
 
   // National-format query must match the E.164-stored number
   const found = await app.inject({
-    method: 'GET',
-    url: '/api/bookings/lookup?phone=512100100',
+    method: 'POST',
+    url: '/api/bookings/lookup',
+    payload: { phone: '512100100' },
     headers: ip
   });
   assert.equal(found.statusCode, 200);
@@ -1305,6 +1306,14 @@ test('guest phone lookup returns only active bookings and normalizes the query',
   for (const secret of ['id', 'customerName', 'customerPhone', 'manageToken']) {
     assert.equal(secret in summary, false, `lookup must not expose ${secret}`);
   }
+  // The number is never taken from a URL, where request and access logs keep it
+  // (a GET falls through to /api/bookings/:id and fails its UUID check)
+  const viaQuery = await app.inject({
+    method: 'GET',
+    url: '/api/bookings/lookup?phone=512100100',
+    headers: ip
+  });
+  assert.equal(viaQuery.statusCode, 400);
 
   // Cancelled bookings drop out of the recovery list
   await app.inject({
@@ -1313,16 +1322,18 @@ test('guest phone lookup returns only active bookings and normalizes the query',
     headers: { ...ip, 'x-booking-token': manageToken }
   });
   const afterCancel = await app.inject({
-    method: 'GET',
-    url: '/api/bookings/lookup?phone=512100100',
+    method: 'POST',
+    url: '/api/bookings/lookup',
+    payload: { phone: '512100100' },
     headers: ip
   });
   assert.equal(afterCancel.json().length, 0);
 
   // A number with no bookings returns an empty list, not an error
   const none = await app.inject({
-    method: 'GET',
-    url: '/api/bookings/lookup?phone=999888777',
+    method: 'POST',
+    url: '/api/bookings/lookup',
+    payload: { phone: '999888777' },
     headers: ip
   });
   assert.equal(none.statusCode, 200);
@@ -1334,8 +1345,9 @@ test('lookup is rate limited to 10 requests per minute', async () => {
   let limited = false;
   for (let i = 0; i < 11; i++) {
     const res = await app.inject({
-      method: 'GET',
-      url: '/api/bookings/lookup?phone=500500500',
+      method: 'POST',
+      url: '/api/bookings/lookup',
+      payload: { phone: '500500500' },
       headers: ip
     });
     if (res.statusCode === 429) {

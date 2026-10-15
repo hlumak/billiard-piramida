@@ -204,8 +204,11 @@ export const api = {
   },
   /** Bookings the signed-in account made, manageable from any device. */
   myBookings: (signal?: AbortSignal) => request<BookingDto[]>('/api/bookings/mine', { signal }),
+  /** POST so the number stays out of URLs, and so out of server logs */
   lookupBookings: (phone: string, signal?: AbortSignal) =>
-    request<BookingSummaryDto[]>(`/api/bookings/lookup?phone=${encodeURIComponent(phone)}`, {
+    request<BookingSummaryDto[]>('/api/bookings/lookup', {
+      method: 'POST',
+      body: { phone },
       signal
     }),
   createBooking: (input: CreateBookingInput) =>
