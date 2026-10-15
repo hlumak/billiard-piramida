@@ -51,46 +51,46 @@ export function HoursList({ className }: { className?: string }) {
             ? m.hours_closed()
             : `${formatHour(group.hours.open)}–${formatHour(group.hours.close)}`;
           return (
+            // Inside a <dl> a wrapper <div> may hold only <dt> and <dd>: the
+            // row's layout lives on it, and a closure note is one more <dd>
             <div
               key={group.weekdays.join('-')}
-              className={`-mx-2.5 rounded-[10px] px-2.5 py-2 ${isToday ? 'bg-golden/14' : ''}`}
+              className={`-mx-2.5 grid grid-cols-[1fr_auto] items-center gap-x-3 rounded-[10px] px-2.5 py-2 ${isToday ? 'bg-golden/14' : ''}`}
             >
-              <div className="flex items-center justify-between gap-3">
-                {/* Flex centres the smaller tag on the day's line; on the baseline
+              {/* Flex centres the smaller tag on the day's line; on the baseline
                     it sat low. ::first-letter needs a block, hence inline-block. */}
-                <dt
-                  className={`flex items-center gap-2 ${isToday ? 'font-semibold' : 'text-cream-soft'}`}
-                >
-                  <span className="inline-block first-letter:uppercase">
-                    {dayRangeLabel(group.weekdays)}
+              <dt
+                className={`flex items-center gap-2 ${isToday ? 'font-semibold' : 'text-cream-soft'}`}
+              >
+                <span className="inline-block first-letter:uppercase">
+                  {dayRangeLabel(group.weekdays)}
+                </span>
+                {isToday ? (
+                  <span className="text-xs leading-none font-bold tracking-wide text-golden-light uppercase">
+                    {m.hours_today()}
                   </span>
-                  {isToday ? (
-                    <span className="text-xs leading-none font-bold tracking-wide text-golden-light uppercase">
-                      {m.hours_today()}
-                    </span>
-                  ) : null}
-                </dt>
-                {/* A time range that wraps mid-dash reads as two times */}
-                <dd className={`whitespace-nowrap tabular-nums ${isToday ? 'font-semibold' : ''}`}>
-                  {closure ? (
-                    <>
-                      <s className="font-medium text-cream-soft">{usual}</s>{' '}
-                      {closure.allDay
-                        ? m.hours_closed()
-                        : todayLeft
-                          ? `${formatHour(todayLeft.open)}–${formatHour(todayLeft.close)}`
-                          : null}
-                    </>
-                  ) : (
-                    usual
-                  )}
-                </dd>
-              </div>
+                ) : null}
+              </dt>
+              {/* A time range that wraps mid-dash reads as two times */}
+              <dd className={`whitespace-nowrap tabular-nums ${isToday ? 'font-semibold' : ''}`}>
+                {closure ? (
+                  <>
+                    <s className="font-medium text-cream-soft">{usual}</s>{' '}
+                    {closure.allDay
+                      ? m.hours_closed()
+                      : todayLeft
+                        ? `${formatHour(todayLeft.open)}–${formatHour(todayLeft.close)}`
+                        : null}
+                  </>
+                ) : (
+                  usual
+                )}
+              </dd>
               {closure
                 ? closure.spans.map(span => (
-                    <p key={span.from} className="mt-1 text-[13px] text-golden-light">
+                    <dd key={span.from} className="col-span-2 mt-1 text-[13px] text-golden-light">
                       {closedSpanLine(span, todayHours)}
-                    </p>
+                    </dd>
                   ))
                 : null}
             </div>
