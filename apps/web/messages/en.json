@@ -327,6 +327,7 @@
   "err_food_unavailable": "A dish in your order is no longer available. Check your order and try again.",
   "err_booking_changed": "This booking has changed in the meantime. Refresh the page.",
   "err_rate_limited": "Too many attempts. Wait a minute and try again.",
+  "err_bot_check": "We couldn't confirm you're not a bot. Try again, or call us.",
   "err_booking_too_long": "A booking can last at most 8 hours.",
   "closed_today": "Closed today",
   "err_booking_too_far": "Bookings open 14 days ahead. Pick an earlier date.",

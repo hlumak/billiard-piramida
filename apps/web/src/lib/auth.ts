@@ -2,6 +2,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import type { AuthResponseDto, SportCardType, UserProfileDto } from '@repo/shared';
 import { hasFlagCookie, request } from './api';
 import { createFlagCookieStore } from './hydration';
+import { botCheckHeaders } from './bot-check';
 
 /** The session token is an HttpOnly cookie (unreadable by JS); this readable
  *  flag cookie tells the client whether a session exists, for UI gating. */
@@ -30,8 +31,12 @@ export interface ProfileUpdateInput {
 }
 
 export const authApi = {
-  register: (input: RegisterInput) =>
-    request<AuthResponseDto>('/api/auth/register', { method: 'POST', body: input }),
+  register: (input: RegisterInput, botToken?: string) =>
+    request<AuthResponseDto>('/api/auth/register', {
+      method: 'POST',
+      body: input,
+      headers: botCheckHeaders(botToken)
+    }),
   login: (phone: string, password: string) =>
     request<AuthResponseDto>('/api/auth/login', { method: 'POST', body: { phone, password } }),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),

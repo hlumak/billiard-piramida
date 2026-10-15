@@ -42,7 +42,8 @@ const BOOKING_ERRORS: Record<string, () => string> = {
   invalid_name: m.err_name_required,
   rate_limited: m.err_rate_limited,
   booking_too_far: m.err_booking_too_far,
-  too_many_bookings: m.err_too_many_bookings
+  too_many_bookings: m.err_too_many_bookings,
+  bot_check_failed: m.err_bot_check
 };
 
 /** Map booking-mutation failures to localized copy. */

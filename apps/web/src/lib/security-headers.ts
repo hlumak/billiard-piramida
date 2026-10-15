@@ -12,16 +12,19 @@ export function createNonce(): string {
 /**
  * Content-Security-Policy for an HTML page. Scripts run only from this origin
  * or carry the request's nonce (the router stamps it on its own inline
- * scripts); the page cannot be framed; the Google Maps embed on /contacts is
- * the one third-party frame.
+ * scripts) or Cloudflare's Turnstile, the bot check on the public forms; the
+ * page cannot be framed; the frames it may hold are the Google Maps embed and
+ * Turnstile's widget.
  */
+const TURNSTILE_ORIGIN = 'https://challenges.cloudflare.com';
+
 export function contentSecurityPolicy(nonce: string, pageUrl: string, apiOrigin: string): string {
   const { host } = new URL(pageUrl);
   // The API is same-origin in production; in a cross-origin setup it is named
   const api = apiOrigin ? [apiOrigin, apiOrigin.replace(/^http/, 'ws')] : [];
   return [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}'`,
+    `script-src 'self' 'nonce-${nonce}' ${TURNSTILE_ORIGIN}`,
     // Inline style attributes (computed sizes, HeroUI) — no script can ride on them
     `style-src 'self' 'unsafe-inline'`,
     // Staff can point a news picture at any https image
@@ -29,7 +32,7 @@ export function contentSecurityPolicy(nonce: string, pageUrl: string, apiOrigin:
     `font-src 'self'`,
     // Live availability: same host over ws/wss ('self' alone misses ws: in older browsers)
     `connect-src 'self' ws://${host} wss://${host} ${api.join(' ')}`.trim(),
-    `frame-src https://www.google.com`,
+    `frame-src https://www.google.com ${TURNSTILE_ORIGIN}`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
