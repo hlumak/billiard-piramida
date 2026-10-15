@@ -14,7 +14,7 @@ const LABELS: Record<WizardStep, () => string> = {
  * Where the guest is in the four steps, by name. Steps already done are
  * buttons back to themselves (the picks stay); the ones ahead are not
  * reachable from here. A phone gets the compact form: "Step 2 of 4 · Table"
- * over four bars.
+ * over four bars, with the done steps' names as the way back.
  */
 export function BookingStepper({ step }: { step: WizardStep }) {
   const current = stepIndex(step);
@@ -35,15 +35,28 @@ export function BookingStepper({ step }: { step: WizardStep }) {
             />
           ))}
         </div>
-        <div
-          aria-hidden
-          className="mt-1.5 grid grid-cols-4 gap-1.5 text-[11px] font-semibold text-grey-cool"
-        >
-          {WIZARD_STEPS.map(entry => (
-            <span key={entry} className={entry === step ? 'text-golden-light' : ''}>
-              {LABELS[entry]()}
-            </span>
-          ))}
+        {/* Steps already done take the guest back to them, as on a wide screen */}
+        <div className="mt-0.5 grid grid-cols-4 gap-1.5 text-[11px] font-semibold text-grey-cool">
+          {WIZARD_STEPS.map((entry, index) =>
+            index < current ? (
+              <button
+                key={entry}
+                type="button"
+                onClick={() => goToStep(entry)}
+                className="py-1 text-left text-cream-soft underline decoration-creme/40 underline-offset-2"
+              >
+                {LABELS[entry]()}
+              </button>
+            ) : (
+              <span
+                key={entry}
+                aria-hidden
+                className={`py-1 ${entry === step ? 'text-golden-light' : ''}`}
+              >
+                {LABELS[entry]()}
+              </span>
+            )
+          )}
         </div>
       </div>
 

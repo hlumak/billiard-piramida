@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, LoaderCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, LoaderCircle } from 'lucide-react';
 import { formatPln, sizeOf } from '@repo/shared';
 import { useStore } from '@tanstack/react-store';
 import { formatDay, formatHour, intlTag } from '../../lib/format';
@@ -8,7 +8,7 @@ import { useIsHydrated } from '../../lib/hydration';
 import { gameName, spotName } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
-import { wizardStore } from '../../store/booking-wizard';
+import { WIZARD_STEPS, goToStep, stepIndex, wizardStore } from '../../store/booking-wizard';
 import { WizardSummary, useWizardTotals } from './WizardSummary';
 
 /** Where the current step puts its call to action on a wide screen. */
@@ -104,6 +104,10 @@ export function StepActions({
 }) {
   const slot = useContext(ActionsSlot);
   const hydrated = useIsHydrated();
+  // The phone has no summary column to carry `back`: its bar steps back one
+  // step from anywhere past the first
+  const step = useStore(wizardStore, state => state.step);
+  const previous = WIZARD_STEPS[stepIndex(step) - 1];
 
   const aside = (
     <div className="mt-6 text-center">
@@ -124,6 +128,16 @@ export function StepActions({
   const phoneBar = (
     <div className="anim-reveal fixed inset-x-0 bottom-0 z-30 border-t border-creme/14 bg-club-green-dark px-5 pt-3.5 pb-[calc(1.375rem+env(safe-area-inset-bottom))] lg:hidden">
       <div className="mx-auto flex max-w-[960px] items-center gap-3.5">
+        {previous === undefined ? null : (
+          <button
+            type="button"
+            aria-label={back?.label ?? m.btn_back()}
+            onClick={() => goToStep(previous)}
+            className="btn-outline size-13 flex-none border-creme/30"
+          >
+            <ArrowLeft aria-hidden className="size-5" strokeWidth={2.4} />
+          </button>
+        )}
         {bar === 'total' ? <BarTotal /> : <BarPicks />}
         <ActionButton
           action={action}
