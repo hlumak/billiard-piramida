@@ -97,22 +97,24 @@ export function WhenStep() {
           if (closed) tag = m.hours_closed();
           else if (index === 0) tag = m.hours_today();
           else if (index === 1) tag = m.date_tomorrow();
-          // The tile's own words, where they say more than the month
-          const label = tag === parts.month ? formatDayLong(day) : `${formatDayLong(day)}, ${tag}`;
+          // Named by its own words ("czw 15 jutro") with the full date after
+          // them for a screen reader, so a voice command naming what is on
+          // the tile finds it
           return (
             <button
               key={day}
               type="button"
               aria-pressed={picked}
-              aria-label={label}
               disabled={closed}
               onClick={() => selectDate(day)}
-              className="chip h-20 w-16 flex-none flex-col gap-0.5 rounded-[14px] md:h-23 md:w-auto"
+              // relative: the screen-reader date inside is positioned, and would
+              // otherwise escape the scrolling row and widen the whole page
+              className="chip relative h-20 w-16 flex-none flex-col gap-0.5 rounded-[14px] md:h-23 md:w-auto"
             >
               <span className="text-[11px] font-semibold capitalize opacity-85 md:text-xs">
                 {parts.weekday}
-              </span>
-              <span className="text-[22px] leading-tight md:text-[26px]">{parts.day}</span>
+              </span>{' '}
+              <span className="text-[22px] leading-tight md:text-[26px]">{parts.day}</span>{' '}
               <span
                 className={`text-[10px] lowercase md:text-[11px] ${
                   picked || closed
@@ -124,6 +126,7 @@ export function WhenStep() {
               >
                 {tag}
               </span>
+              <span className="sr-only">, {formatDayLong(day)}</span>
             </button>
           );
         })}

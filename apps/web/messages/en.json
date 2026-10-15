@@ -424,7 +424,6 @@
   "home_free_hint": "Pick an hour, then your table",
   "home_free_none": "Fully booked — check the other days",
   "home_free_more": "Other days",
-  "home_free_book_at": "Book for {time}",
   "price_9ft_desc": "Pool or pyramid — your pick",
   "price_12ft_desc": "Tournament size for pyramid",
   "price_darts_desc": "On the wall between the halls",
@@ -463,7 +462,6 @@
       }
     }
   ],
-  "home_rating_label": "Rated {score} out of 5 on Google, {count} reviews",
   "tournament_starts": "Starts",
   "hours_busy": "booked",
   "rate_unit": "PLN / hour",

@@ -103,13 +103,15 @@ function Chips({ date, hourNow }: { date: IsoDate; hourNow: number | null }) {
             key={hour}
             to="/book"
             search={{ date, start: hour }}
-            aria-label={`${m.home_free_book_at({ time: formatHour(hour) })}, ${m.free_n({ n: free })}`}
-            className="chip anim-stagger-item h-15.5 w-21.5 shrink-0 flex-col rounded-[14px] hover:-translate-y-0.5 lg:w-auto lg:flex-1"
+            // relative keeps the screen-reader text inside the scrolling row
+            className="chip anim-stagger-item relative h-15.5 w-21.5 shrink-0 flex-col rounded-[14px] hover:-translate-y-0.5 lg:w-auto lg:flex-1"
           >
-            <span className="text-[17px] lg:text-lg">{formatHour(hour)}</span>
+            {/* Named by what it shows ("16:00 8 free"), then what it does */}
+            <span className="text-[17px] lg:text-lg">{formatHour(hour)}</span>{' '}
             <span className="text-[11px] font-semibold text-golden-light lg:text-xs">
               {m.free_n({ n: free })}
             </span>
+            <span className="sr-only">, {m.book_this()}</span>
           </Link>
         )
       )}

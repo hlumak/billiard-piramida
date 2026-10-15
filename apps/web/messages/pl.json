@@ -425,7 +425,6 @@
   "home_free_hint": "Wybierz godzinę, potem stół na planie",
   "home_free_none": "Wszystko zajęte — sprawdź inne dni",
   "home_free_more": "Inne dni",
-  "home_free_book_at": "Rezerwuj na {time}",
   "price_9ft_desc": "Pool lub piramida — do wyboru",
   "price_12ft_desc": "Turniejowy rozmiar do piramidy",
   "price_darts_desc": "Na ścianie między salami",
@@ -466,7 +465,6 @@
       }
     }
   ],
-  "home_rating_label": "Ocena {score} na 5 w Google, opinii: {count}",
   "tournament_starts": "Start",
   "hours_busy": "zajęte",
   "rate_unit": "PLN / godzina",

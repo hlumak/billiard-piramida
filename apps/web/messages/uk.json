@@ -447,7 +447,6 @@
   "home_free_hint": "Оберіть годину — далі стіл на плані",
   "home_free_none": "Усе зайнято — подивіться інші дні",
   "home_free_more": "Інші дні",
-  "home_free_book_at": "Забронювати на {time}",
   "price_9ft_desc": "Пул або піраміда — на ваш вибір",
   "price_12ft_desc": "Турнірний розмір для піраміди",
   "price_darts_desc": "На стіні між залами",
@@ -488,7 +487,6 @@
       }
     }
   ],
-  "home_rating_label": "Оцінка {score} з 5 у Google, відгуків: {count}",
   "tournament_starts": "Початок",
   "hours_busy": "зайнято",
   "rate_unit": "PLN / година",

@@ -70,7 +70,6 @@ function Pills() {
         href={GOOGLE_LISTING_URL}
         target="_blank"
         rel="noreferrer"
-        aria-label={m.home_rating_label({ score, count: GOOGLE_RATING.count })}
         className={`${pill} text-creme transition-colors hover:border-golden/60`}
       >
         <Star className="size-3.5 fill-golden text-golden lg:size-4" aria-hidden />
