@@ -96,6 +96,7 @@
   "btn_find": "Znajdź",
   "loading": "Ładowanie…",
   "not_found": "Nie znaleziono strony",
+  "not_found_hint": "Link może być nieaktualny albo strona została przeniesiona.",
   "booking_not_found": "Nie znaleziono rezerwacji",
   "go_home": "Strona główna",
   "admin_login_title": "Logowanie dla personelu",

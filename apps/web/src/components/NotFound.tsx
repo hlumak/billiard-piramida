@@ -7,7 +7,7 @@ export function NotFound() {
   return (
     <PageLayout script="404" title={m.not_found()} width="narrow">
       <div className="flex flex-col items-center gap-6 py-10 text-center">
-        <p className="text-cream-soft">{m.not_found()}</p>
+        <p className="text-cream-soft">{m.not_found_hint()}</p>
         <Link to="/" className="btn-gold h-12 px-6">
           {m.go_home()}
         </Link>

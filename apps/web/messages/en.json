@@ -96,6 +96,7 @@
   "btn_find": "Find",
   "loading": "Loading…",
   "not_found": "Page not found",
+  "not_found_hint": "The link may be out of date, or the page has moved.",
   "booking_not_found": "Booking not found",
   "go_home": "Go home",
   "admin_login_title": "Staff sign-in",
