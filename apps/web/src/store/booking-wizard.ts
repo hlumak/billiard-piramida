@@ -14,6 +14,9 @@ export interface WizardState {
    *  rather than being recomputed per render so the slide-in class only moves
    *  when the step does — a mid-step update (picking food) must not replay it. */
   direction: 1 | -1;
+  /** Index of the furthest step the guest has been on: going back to change
+   *  something leaves the later steps open to jump to again from the stepper */
+  reached: number;
   date: IsoDate | null;
   startHour: number | null;
   durationHours: number;
@@ -34,6 +37,7 @@ export interface WizardState {
 const initialState: WizardState = {
   step: 'when',
   direction: 1,
+  reached: 0,
   date: null,
   startHour: null,
   durationHours: 1,
@@ -73,8 +77,21 @@ export function goToStep(step: WizardStep): void {
   wizardStore.setState(state => ({
     ...state,
     step,
-    direction: stepIndex(step) < stepIndex(state.step) ? -1 : 1
+    direction: stepIndex(step) < stepIndex(state.step) ? -1 : 1,
+    reached: Math.max(state.reached, stepIndex(step))
   }));
+}
+
+/**
+ * The furthest step the stepper may jump to: one the guest has been on, as
+ * long as the picks it needs still stand — a new date drops the start, a new
+ * start or length drops the spot, and the steps after them close again.
+ */
+export function furthestStep(state: WizardState): number {
+  if (state.date === null || state.startHour === null) return stepIndex('when');
+  if (state.tableId === null || state.kind === null)
+    return Math.min(state.reached, stepIndex('table'));
+  return state.reached;
 }
 
 /** Picking the same date again keeps every later pick; a new one clears them. */
@@ -105,7 +122,8 @@ export function selectTime(startHour: number, durationHours: number): void {
     durationHours,
     ...noSpot,
     step: 'table',
-    direction: 1
+    direction: 1,
+    reached: Math.max(state.reached, stepIndex('table'))
   }));
 }
 

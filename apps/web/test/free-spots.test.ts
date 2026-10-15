@@ -6,7 +6,8 @@ const slots = (free: number[]) =>
   [16, 17, 18, 19, 20].map(hour => ({
     hour,
     available: free.includes(hour),
-    booked: !free.includes(hour)
+    booked: !free.includes(hour),
+    closed: false
   }));
 
 const tables: AvailabilityDto['tables'] = [

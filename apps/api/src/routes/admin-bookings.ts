@@ -26,6 +26,7 @@ import {
   phaseOf,
   toBookingDtos
 } from '../services/bookings.ts';
+import { isClosedFor } from '../services/closures.ts';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 
 const BOOKING_ID_PARAMS = Type.Object({ id: UUID });
@@ -276,8 +277,23 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
       const endsAt = new Date(startsAt.getTime() + durationHours * HOUR_MS);
       const discountGrosz = discountGroszFor(sportCardCount, hourlyRate * durationHours);
 
+      // Moving it, or bringing it back, must not land it in a closed time;
+      // a new name or phone on it is not judged at all
+      const recheckClosures =
+        timeChanged ||
+        tableId !== booking.tableId ||
+        (patch.status === 'confirmed' && booking.status !== 'confirmed');
+      const finalStatus = patch.status ?? booking.status;
+
       try {
-        await admin.db.transaction(async tx => {
+        const closed = await admin.db.transaction(async tx => {
+          if (
+            recheckClosures &&
+            finalStatus === 'confirmed' &&
+            (await isClosedFor(tx, tableId, startsAt, endsAt))
+          ) {
+            return true;
+          }
           await tx
             .update(bookings)
             .set({
@@ -300,7 +316,9 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
           if (booking.status === 'no_show' && patch.status === 'confirmed') {
             await tx.delete(blacklist).where(eq(blacklist.bookingId, booking.id));
           }
+          return false;
         });
+        if (closed) return reply.code(409).send({ error: 'slot_closed' });
       } catch (err) {
         // The EXCLUDE guard covers updates too: moving onto a taken slot, or
         // un-cancelling into one, lands here rather than double-booking.

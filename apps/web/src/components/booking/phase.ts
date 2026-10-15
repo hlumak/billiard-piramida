@@ -21,6 +21,7 @@ export const PHASE_STYLES: Record<BookingPhase, string> = {
 /** Booking API error codes → localized copy; anything unknown is generic. */
 const BOOKING_ERRORS: Record<string, () => string> = {
   slot_taken: m.err_slot_taken,
+  slot_closed: m.err_slot_closed,
   past_closing_time: m.err_past_closing,
   start_in_past: m.err_slot_expired,
   outside_operating_hours: m.err_outside_hours,

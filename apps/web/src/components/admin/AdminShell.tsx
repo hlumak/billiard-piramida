@@ -7,6 +7,7 @@ import { useNowMinute } from '../../lib/use-now';
 import { useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { BrandLogo } from '../BrandLogo';
+import { ClearButton } from '../ClearButton';
 import { LocaleSwitcher } from '../LocaleSwitcher';
 import { AdminNewBooking } from './AdminBookingModal';
 import { ADMIN_GROUPS, ADMIN_PANES, type AdminPaneId } from './panes';
@@ -106,6 +107,7 @@ function SessionControls({
 function PhoneSearch({ onSearch }: { onSearch: (phone: string) => void }) {
   const [value, setValue] = useState('');
   const id = useId();
+  const input = useRef<HTMLInputElement>(null);
   return (
     <form
       role="search"
@@ -120,6 +122,7 @@ function PhoneSearch({ onSearch }: { onSearch: (phone: string) => void }) {
         {m.admin_find_bookings()}
       </label>
       <input
+        ref={input}
         id={id}
         type="search"
         inputMode="tel"
@@ -128,6 +131,7 @@ function PhoneSearch({ onSearch }: { onSearch: (phone: string) => void }) {
         placeholder={m.admin_find_bookings()}
         className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-grey-cool/80"
       />
+      <ClearButton value={value} onClear={() => setValue('')} input={input} />
     </form>
   );
 }

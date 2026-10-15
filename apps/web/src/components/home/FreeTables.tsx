@@ -40,10 +40,10 @@ function freeByHour(availability: AvailabilityDto, hourNow: number | null): Hour
  * minute, so a page left open moves on by itself.
  */
 function useShownDay(): { date: IsoDate | null; today: IsoDate; hourNow: number | null } {
-  const { hours } = useVenueConfig();
+  const { hours, closures } = useVenueConfig();
   const now = useNowMinute();
   const today = warsawToday(now);
-  const date = firstOpenDay(today, warsawHour(now), hours);
+  const date = firstOpenDay(today, warsawHour(now), hours, closures);
   return { date, today, hourNow: date === today ? warsawHour(now) : null };
 }
 

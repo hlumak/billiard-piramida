@@ -3161,3 +3161,288 @@ test('black list: staff add and remove numbers by hand', async () => {
   });
   assert.equal(gone.statusCode, 404);
 });
+
+/** No other test books a Sunday: the closures below cannot trip anyone else's. */
+const SUNDAY = nextDate(0);
+
+test('closures: refused over bookings, close slots, block every way of booking into them', async () => {
+  const headers = { 'x-admin-token': 'test-admin-token' };
+  const sundayClosure = (over: Record<string, unknown>) => ({
+    startDate: SUNDAY,
+    startHour: 18,
+    endDate: SUNDAY,
+    endHour: 21,
+    tableIds: null,
+    reason: 'Приватний захід',
+    ...over
+  });
+
+  const guest = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 2,
+      date: SUNDAY,
+      startHour: 17,
+      durationHours: 2,
+      customerName: 'Closure Guest',
+      customerPhone: '+48601555001'
+    }
+  });
+  assert.equal(guest.statusCode, 201);
+  const booking = guest.json();
+
+  // The form asks first: the evening would land on that booking
+  const conflicts = await app.inject({
+    method: 'GET',
+    url: `/api/admin/closures/conflicts?startDate=${SUNDAY}&startHour=18&endDate=${SUNDAY}&endHour=21`,
+    headers
+  });
+  assert.equal(conflicts.statusCode, 200);
+  assert.deepEqual(
+    conflicts.json().map((c: { bookingId: string }) => c.bookingId),
+    [booking.id]
+  );
+  // …but not on other spots
+  const elsewhere = await app.inject({
+    method: 'GET',
+    url: `/api/admin/closures/conflicts?startDate=${SUNDAY}&startHour=18&endDate=${SUNDAY}&endHour=21&tableIds=4,5`,
+    headers
+  });
+  assert.deepEqual(elsewhere.json(), []);
+
+  // …and saving is refused while it stands
+  const refused = await app.inject({
+    method: 'POST',
+    url: '/api/admin/closures',
+    headers,
+    payload: sundayClosure({})
+  });
+  assert.equal(refused.statusCode, 409);
+  assert.equal(refused.json().error, 'closure_conflicts');
+
+  // One table can close around it
+  const table4 = await app.inject({
+    method: 'POST',
+    url: '/api/admin/closures',
+    headers,
+    payload: sundayClosure({ tableIds: [4], reason: 'Заміна сукна' })
+  });
+  assert.equal(table4.statusCode, 201);
+  const table4Closure = table4.json();
+  assert.deepEqual(
+    [table4Closure.startHour, table4Closure.endHour, table4Closure.tableIds],
+    [18, 21, [4]]
+  );
+
+  const avail = await app.inject({ method: 'GET', url: `/api/availability?date=${SUNDAY}` });
+  const slotsOf = (id: number) =>
+    avail
+      .json()
+      .tables.find((t: { tableId: number }) => t.tableId === id)
+      .slots.filter((s: { hour: number }) => s.hour >= 17 && s.hour <= 21);
+  assert.deepEqual(
+    slotsOf(4).map((s: { closed: boolean; available: boolean }) => [s.closed, s.available]),
+    [
+      [false, true],
+      [true, false],
+      [true, false],
+      [true, false],
+      [false, true]
+    ]
+  );
+  assert.ok(slotsOf(3).every((s: { closed: boolean }) => !s.closed));
+
+  // Neither a guest nor the desk books into it
+  const guestInto = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 4,
+      date: SUNDAY,
+      startHour: 17,
+      durationHours: 2,
+      customerName: 'Too Late',
+      customerPhone: '+48601555002'
+    }
+  });
+  assert.equal(guestInto.statusCode, 409);
+  assert.equal(guestInto.json().error, 'slot_closed');
+  const deskInto = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: 4,
+      date: SUNDAY,
+      startHour: 20,
+      durationHours: 1,
+      customerName: 'Desk',
+      customerPhone: '+48601555003'
+    }
+  });
+  assert.equal(deskInto.statusCode, 409);
+  assert.equal(deskInto.json().error, 'slot_closed');
+  // Nor moves a booking onto it
+  const moved = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${booking.id}`,
+    headers,
+    payload: { tableId: 4 }
+  });
+  assert.equal(moved.statusCode, 409);
+  assert.equal(moved.json().error, 'slot_closed');
+
+  // Staff cancel the guest's booking: now the whole club can close
+  const cancel = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${booking.id}/cancel`,
+    headers
+  });
+  assert.equal(cancel.statusCode, 200);
+  const club = await app.inject({
+    method: 'POST',
+    url: '/api/admin/closures',
+    headers,
+    payload: sundayClosure({ reason: '  Приватний захід  ' })
+  });
+  assert.equal(club.statusCode, 201);
+  const clubClosure = club.json();
+  assert.equal(clubClosure.reason, 'Приватний захід');
+
+  // Guests learn of the club's closure, never of a single table's
+  const config = await app.inject({ method: 'GET', url: '/api/venue-config' });
+  assert.deepEqual(
+    config.json().closures.map((c: { id: string }) => c.id),
+    [clubClosure.id]
+  );
+  const listed = await app.inject({ method: 'GET', url: '/api/admin/closures', headers });
+  assert.deepEqual(
+    listed
+      .json()
+      .map((c: { id: string }) => c.id)
+      .sort(),
+    [clubClosure.id, table4Closure.id].sort()
+  );
+
+  // Restoring the cancelled booking would put it inside the closure
+  const restore = { method: 'PATCH', headers, payload: { status: 'confirmed' } } as const;
+  const blocked = await app.inject({ ...restore, url: `/api/admin/bookings/${booking.id}` });
+  assert.equal(blocked.statusCode, 409);
+  assert.equal(blocked.json().error, 'slot_closed');
+
+  // Moved to start at 20:00, the closure frees the booking's hours
+  const edited = await app.inject({
+    method: 'PUT',
+    url: `/api/admin/closures/${clubClosure.id}`,
+    headers,
+    payload: sundayClosure({ startHour: 20 })
+  });
+  assert.equal(edited.statusCode, 200);
+  assert.equal(edited.json().startHour, 20);
+  const restored = await app.inject({ ...restore, url: `/api/admin/bookings/${booking.id}` });
+  assert.equal(restored.statusCode, 200);
+
+  // The guest can't stretch the game into it: 19–20 is free, 20–21 is not
+  const manage = { 'x-booking-token': booking.manageToken };
+  const stretched = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${booking.id}/extend`,
+    headers: manage,
+    payload: { additionalHours: 2 }
+  });
+  assert.equal(stretched.statusCode, 409);
+  assert.equal(stretched.json().error, 'slot_closed');
+  const oneMore = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${booking.id}/extend`,
+    headers: manage,
+    payload: { additionalHours: 1 }
+  });
+  assert.equal(oneMore.statusCode, 200);
+
+  // Opening again
+  for (const id of [clubClosure.id, table4Closure.id]) {
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/closures/${id}`,
+      headers
+    });
+    assert.equal(removed.statusCode, 200);
+  }
+  const gone = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/closures/${table4Closure.id}`,
+    headers
+  });
+  assert.equal(gone.statusCode, 404);
+  const reopened = await app.inject({ method: 'GET', url: '/api/venue-config' });
+  assert.deepEqual(reopened.json().closures, []);
+  const cleanup = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${booking.id}/cancel`,
+    headers
+  });
+  assert.equal(cleanup.statusCode, 200);
+});
+
+test('closures: whole days close every slot; nonsense is refused', async () => {
+  const headers = { 'x-admin-token': 'test-admin-token' };
+  // A week past SUNDAY: the DST test books the nearest one (2026-10-25)
+  const day = new Date(`${SUNDAY}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + 7);
+  const LATER_SUNDAY = day.toISOString().slice(0, 10);
+  const nextDay = new Date(`${LATER_SUNDAY}T00:00:00Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const wholeDay = {
+    startDate: LATER_SUNDAY,
+    startHour: 0,
+    endDate: nextDay.toISOString().slice(0, 10),
+    endHour: 0,
+    tableIds: null,
+    reason: null
+  };
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/closures',
+    headers,
+    payload: wholeDay
+  });
+  assert.equal(created.statusCode, 201);
+  const avail = await app.inject({ method: 'GET', url: `/api/availability?date=${LATER_SUNDAY}` });
+  for (const table of avail.json().tables) {
+    assert.ok(
+      table.slots.every((s: { closed: boolean; available: boolean }) => s.closed && !s.available)
+    );
+  }
+  const removed = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/closures/${created.json().id}`,
+    headers
+  });
+  assert.equal(removed.statusCode, 200);
+
+  const post = (payload: Record<string, unknown>) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/admin/closures',
+      headers,
+      payload: { ...wholeDay, ...payload }
+    });
+  const backwards = await post({ endDate: LATER_SUNDAY, startHour: 20, endHour: 18 });
+  assert.equal(backwards.statusCode, 422);
+  assert.equal(backwards.json().error, 'invalid_closure');
+  // Past the highest spot id the schema refuses it outright
+  const unknown = await post({ tableIds: [99] });
+  assert.equal(unknown.statusCode, 400);
+  const past = await post({
+    startDate: pastDate(0),
+    endDate: pastDate(0),
+    startHour: 15,
+    endHour: 18
+  });
+  assert.equal(past.statusCode, 422);
+  assert.equal(past.json().error, 'closure_in_past');
+  const anonymous = await app.inject({ method: 'GET', url: '/api/admin/closures' });
+  assert.equal(anonymous.statusCode, 401);
+});

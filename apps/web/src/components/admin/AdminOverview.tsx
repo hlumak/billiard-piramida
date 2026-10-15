@@ -1,6 +1,12 @@
 import { Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
-import { formatPln, type BookingDto, type TableDto } from '@repo/shared';
+import {
+  formatPln,
+  type AdminTopItemDto,
+  type BookingDto,
+  type MenuItemDto,
+  type TableDto
+} from '@repo/shared';
 import { formatPhone } from '@repo/shared/phone';
 import { adminBookingsQuery, adminStatsQuery } from '../../lib/admin-api';
 import { intlTag, warsawTime, warsawToday } from '../../lib/format';
@@ -248,6 +254,106 @@ function TablesNow({
   );
 }
 
+/** Today's confirmed bookings in start order, each with where it stands right now. */
+function TodayBookings({
+  bookings,
+  failed,
+  error,
+  onRetry,
+  now,
+  onOpenSchedule
+}: {
+  /** Undefined until the day's bookings have loaded */
+  bookings: BookingDto[] | undefined;
+  failed: boolean;
+  error: unknown;
+  onRetry: () => void;
+  now: number;
+  onOpenSchedule: () => void;
+}) {
+  let body;
+  if (bookings === undefined && failed) {
+    body = (
+      <div className="border-t border-line">
+        <QueryError error={error} onRetry={onRetry} />
+      </div>
+    );
+  } else if (bookings === undefined) {
+    body = (
+      <div className="flex justify-center border-t border-line py-10">
+        <Spinner aria-label={m.loading()} />
+      </div>
+    );
+  } else if (bookings.length === 0) {
+    body = (
+      <p className="border-t border-line px-5.5 py-8 text-grey-cool">{m.admin_today_empty()}</p>
+    );
+  } else {
+    body = (
+      <ul>
+        {bookings.map(booking => (
+          <TodayRow key={booking.id} booking={booking} now={now} />
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <section className="card anim-stagger-item overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-4 md:px-5.5 md:py-5">
+        <h2 className="text-lg font-bold">{m.admin_today()}</h2>
+        <button
+          type="button"
+          onClick={onOpenSchedule}
+          className="text-sm font-semibold text-golden-light hover:text-golden"
+        >
+          {m.admin_schedule_link()} →
+        </button>
+      </div>
+      {body}
+    </section>
+  );
+}
+
+/** What sold best at the bar over the last 30 days, as bars against the best seller. */
+function TopBarItems({
+  items,
+  menu
+}: {
+  items: AdminTopItemDto[];
+  menu: MenuItemDto[] | undefined;
+}) {
+  const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
+  const topMax = Math.max(1, ...items.map(item => item.totalQuantity));
+  return (
+    <section className="card anim-stagger-item p-4.5 md:px-5.5 md:py-5">
+      <h2 className="text-lg font-bold">{m.admin_top_bar()}</h2>
+      <p className="mt-0.5 text-[13px] text-grey-cool">{m.admin_last_30()}</p>
+      {items.length === 0 ? (
+        <p className="mt-3.5 text-sm text-grey-cool">{m.admin_no_results()}</p>
+      ) : (
+        <ul className="mt-3.5 flex flex-col gap-3 text-sm">
+          {items.map(item => (
+            <li key={item.foodItemId}>
+              <div className="flex justify-between gap-3">
+                <span>{nameBySlug.get(item.slug) ?? item.slug}</span>
+                <span className="font-bold text-golden-light tabular-nums">
+                  × {item.totalQuantity}
+                </span>
+              </div>
+              <div aria-hidden className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-creme/12">
+                <div
+                  className="anim-bar-fill h-full rounded-full bg-golden"
+                  style={{ width: `${(item.totalQuantity / topMax) * 100}%` }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /**
  * The desk's first screen: today in numbers, today's bookings with what each
  * is doing right now, every table at a glance, and what sells at the bar.
@@ -276,14 +382,12 @@ export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void 
   }
 
   const money = (grosz: number) => formatPln(grosz, intlTag());
-  const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
   const confirmed = [...(dayBookings ?? [])].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const playing = confirmed.filter(
     booking => Date.parse(booking.startsAt) <= now && now < Date.parse(booking.endsAt)
   );
   const ahead = confirmed.filter(booking => Date.parse(booking.startsAt) > now);
   const darts = confirmed.filter(booking => booking.kind === 'darts').length;
-  const topMax = Math.max(1, ...stats.topItems.map(item => item.totalQuantity));
   const loaded = dayBookings !== undefined;
 
   return (
@@ -317,70 +421,19 @@ export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void 
       </div>
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="card anim-stagger-item overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-4 md:px-5.5 md:py-5">
-            <h2 className="text-lg font-bold">{m.admin_today()}</h2>
-            <button
-              type="button"
-              onClick={() => onOpen('schedule')}
-              className="text-sm font-semibold text-golden-light hover:text-golden"
-            >
-              {m.admin_schedule_link()} →
-            </button>
-          </div>
-          {!loaded && dayFailed ? (
-            <div className="border-t border-line">
-              <QueryError error={dayError} onRetry={() => refetchDay()} />
-            </div>
-          ) : !loaded ? (
-            <div className="flex justify-center border-t border-line py-10">
-              <Spinner aria-label={m.loading()} />
-            </div>
-          ) : confirmed.length === 0 ? (
-            <p className="border-t border-line px-5.5 py-8 text-grey-cool">
-              {m.admin_today_empty()}
-            </p>
-          ) : (
-            <ul>
-              {confirmed.map(booking => (
-                <TodayRow key={booking.id} booking={booking} now={now} />
-              ))}
-            </ul>
-          )}
-        </section>
+        <TodayBookings
+          bookings={loaded ? confirmed : undefined}
+          failed={dayFailed}
+          error={dayError}
+          onRetry={() => refetchDay()}
+          now={now}
+          onOpenSchedule={() => onOpen('schedule')}
+        />
 
         <div className="flex flex-col gap-5">
           {/* Only with today's bookings in: without them every table would read free */}
           {spots && loaded ? <TablesNow spots={spots} bookings={confirmed} now={now} /> : null}
-          <section className="card anim-stagger-item p-4.5 md:px-5.5 md:py-5">
-            <h2 className="text-lg font-bold">{m.admin_top_bar()}</h2>
-            <p className="mt-0.5 text-[13px] text-grey-cool">{m.admin_last_30()}</p>
-            {stats.topItems.length === 0 ? (
-              <p className="mt-3.5 text-sm text-grey-cool">{m.admin_no_results()}</p>
-            ) : (
-              <ul className="mt-3.5 flex flex-col gap-3 text-sm">
-                {stats.topItems.map(item => (
-                  <li key={item.foodItemId}>
-                    <div className="flex justify-between gap-3">
-                      <span>{nameBySlug.get(item.slug) ?? item.slug}</span>
-                      <span className="font-bold text-golden-light tabular-nums">
-                        × {item.totalQuantity}
-                      </span>
-                    </div>
-                    <div
-                      aria-hidden
-                      className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-creme/12"
-                    >
-                      <div
-                        className="anim-bar-fill h-full rounded-full bg-golden"
-                        style={{ width: `${(item.totalQuantity / topMax) * 100}%` }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <TopBarItems items={stats.topItems} menu={menu} />
         </div>
       </div>
     </div>

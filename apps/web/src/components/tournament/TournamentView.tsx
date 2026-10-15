@@ -26,15 +26,17 @@ function Fact({
   icon: Icon,
   label,
   value,
+  className = '',
   children
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
+  className?: string;
   children?: React.ReactNode;
 }) {
   return (
-    <div className="card anim-stagger-item p-5 md:p-5.5">
+    <div className={`card anim-stagger-item p-5 md:p-5.5 ${className}`}>
       <div className="flex gap-3.5">
         <Icon aria-hidden className="mt-0.5 size-5.5 flex-none text-golden" />
         <div className="min-w-0 flex-1">
@@ -48,10 +50,10 @@ function Fact({
 }
 
 /** Seats taken against the roster the bracket needs, as a bar with the split under it. */
-function Roster({ tournament }: { tournament: TournamentDto }) {
+function Roster({ tournament, className }: { tournament: TournamentDto; className: string }) {
   const { taken, target, fraction, label } = rosterProgress(tournament);
   return (
-    <Fact icon={Users} label={m.tournament_players_label()} value={label}>
+    <Fact icon={Users} label={m.tournament_players_label()} value={label} className={className}>
       {fraction === null || target === null ? null : (
         <div
           role="progressbar"
@@ -85,6 +87,11 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
   const { entryFeeGrosz, registrationDeadline, registrationState, minPlayers } = tournament;
   const [registered, setRegistered] = useState(false);
   const open = registrationState === 'open';
+  // The roster, with its bar, and the date (the longest value) each take a
+  // row; the deadline and the fee share the last. Side by side with the
+  // roster, the one-line facts were cards of empty space, and three abreast
+  // the date broke over three lines.
+  const lastSpan = registrationDeadline === null ? 'sm:col-span-2' : '';
 
   return (
     <div>
@@ -116,8 +123,9 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
           right column across both rows and stays in view (sticky) */}
       <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-[auto_1fr] lg:gap-x-10 lg:gap-y-0">
         <div className="grid gap-4 sm:grid-cols-2 lg:col-start-1">
-          <Roster tournament={tournament} />
+          <Roster tournament={tournament} className="sm:col-span-2" />
           <Fact
+            className="sm:col-span-2"
             icon={CalendarDays}
             label={m.tournament_when()}
             // No date yet is information, not a gap: it says what has to happen first
@@ -131,6 +139,7 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
             />
           ) : null}
           <Fact
+            className={lastSpan}
             icon={Banknote}
             label={m.tournament_fee()}
             // null is "not priced yet", which is not the same as free — saying

@@ -6,7 +6,7 @@ import { adminApi, adminMenuQuery } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { intlTag } from '../../lib/format';
 import { categoryLabel } from '../../lib/menu';
-import { parseZloty } from '../../lib/money';
+import { parseZloty, plnUnit } from '../../lib/money';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
@@ -48,14 +48,24 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Input
-            aria-label={m.admin_price_label()}
-            aria-invalid={parsedPrice === null}
-            value={price}
-            onChange={event => setPrice(event.target.value)}
-            inputMode="decimal"
-            className="w-20"
-          />
+          {/* A bare number beside the row's buttons read as a count: the
+              unit inside the field says it is the price */}
+          <div className="relative w-28">
+            <Input
+              aria-label={m.admin_price_label()}
+              aria-invalid={parsedPrice === null}
+              value={price}
+              onChange={event => setPrice(event.target.value)}
+              inputMode="decimal"
+              className="w-full pr-12 tabular-nums"
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-grey-cool"
+            >
+              {plnUnit(intlTag())}
+            </span>
+          </div>
           {priceChanged ? (
             <Button
               size="sm"

@@ -12,7 +12,7 @@ import { getLocale } from '../../paraglide/runtime.js';
 import { ApiError, api } from '../../lib/api';
 import { profileQuery } from '../../lib/auth';
 import { isFullName } from '../../lib/names';
-import { availabilityQuery, bookingQuery, menuQuery } from '../../lib/queries';
+import { availabilityQuery, bookingQuery, menuQuery, venueConfigQuery } from '../../lib/queries';
 import { rememberBooking } from '../../lib/recent-bookings';
 import { useSubmitOnce } from '../../lib/use-submit-once';
 import { PhoneField } from '../PhoneField';
@@ -68,10 +68,15 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
       if (error instanceof ApiError && error.code === 'unknown_food_item') {
         void queryClient.invalidateQueries({ queryKey: menuQuery(getLocale()).queryKey });
       }
-      // Someone else got there first: the grid is stale, and the table step
-      // should show the spot taken when the guest goes back to it
+      // Someone else got there first, or staff closed the time: the grid is
+      // stale, and the time and table steps should show it when the guest
+      // goes back to them
       if (error instanceof ApiError && error.code === 'slot_taken') {
         void queryClient.invalidateQueries({ queryKey: availabilityQuery(input.date).queryKey });
+      }
+      if (error instanceof ApiError && error.code === 'slot_closed') {
+        void queryClient.invalidateQueries({ queryKey: availabilityQuery(input.date).queryKey });
+        void queryClient.invalidateQueries({ queryKey: venueConfigQuery().queryKey });
       }
     }
   });

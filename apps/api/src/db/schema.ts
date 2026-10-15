@@ -164,6 +164,31 @@ export const venueHours = pgTable(
   ]
 );
 
+/**
+ * Time the club, or some of its spots, takes no bookings: a private event, a
+ * holiday, a table having its cloth changed. On top of the weekly hours, never
+ * instead of them. Bookings and closures check each other under one advisory
+ * lock (services/closures.ts), so neither can slip in under the other.
+ */
+export const closures = pgTable(
+  'closures',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    /** The spots it closes; null closes the whole club */
+    tableIds: integer('table_ids').array(),
+    /** Shown to guests when the whole club is closed */
+    reason: text('reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  t => [
+    // Every reader asks for the ones not over yet
+    index('closures_ends_at_idx').on(t.endsAt),
+    check('closures_ends_after_start', sql`${t.endsAt} > ${t.startsAt}`)
+  ]
+);
+
 export const foodItems = pgTable(
   'food_items',
   {

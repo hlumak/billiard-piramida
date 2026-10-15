@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import {
+  closedSpansOn,
+  closureSpanOn,
   hallOf,
   hoursForDate,
   sizeOf,
   type BookingDto,
+  type ClosedSpan,
   type IsoDate,
   type TableDto
 } from '@repo/shared';
 import { useVenueConfig } from '../../lib/venue-config';
 import { formatPhone } from '@repo/shared/phone';
-import { adminBookingsQuery } from '../../lib/admin-api';
+import { adminBookingsQuery, adminClosuresQuery } from '../../lib/admin-api';
+import { closedSpanText } from '../../lib/closures';
 import { tablesQuery } from '../../lib/queries';
 import { activityName, gameName, spotName } from '../../lib/spots';
 import { availabilityLive } from '../../lib/availability-live';
@@ -24,6 +28,7 @@ import { PHASE_LABELS } from '../booking/phase';
 import { AdminDatePicker } from './AdminDatePicker';
 import { useNowMinute } from '../../lib/use-now';
 import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
+import { AdminClosureModal } from './AdminClosures';
 
 /** (tableId, hour) → the confirmed booking covering that hour. Bookings are
  *  hour-aligned and never cross midnight; one may end at 24 (see bookingHours). */
@@ -111,13 +116,71 @@ function FreeCell({ label, past, onPick }: { label: string; past: boolean; onPic
   );
 }
 
+/** Hours staff have closed: hatched, with the reason for the desk to read. */
+function ClosedCell({ span, reason }: { span: number; reason: string | null }) {
+  return (
+    <div
+      style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
+      className="relative z-10 flex h-12.5 min-w-0 flex-col justify-center rounded-[10px] border border-creme/22 bg-[repeating-linear-gradient(135deg,rgb(246_241_220/0.09)_0_6px,transparent_6px_12px)] px-3"
+    >
+      <span className="truncate text-[13px] font-bold">{m.admin_closed()}</span>
+      {reason ? <span className="truncate text-xs text-grey-cool">{reason}</span> : null}
+    </div>
+  );
+}
+
+type RowCell =
+  | { kind: 'booking'; hour: number; span: number; booking: BookingDto }
+  | { kind: 'closed'; hour: number; span: number; reason: string | null }
+  | { kind: 'free'; hour: number };
+
+/** One spot's day, left to right: each booking and each closed stretch as a
+ *  single cell spanning its hours, every other hour a cell of its own. */
+function rowCells(
+  spotId: number,
+  open: number,
+  close: number,
+  occupancy: Map<string, BookingDto>,
+  closed: ClosedSpan[]
+): RowCell[] {
+  const closureAt = (hour: number) => closed.find(span => span.from <= hour && hour < span.to);
+  const cells: RowCell[] = [];
+  for (let hour = open; hour < close;) {
+    const booking = occupancy.get(`${spotId}:${hour}`);
+    const run = booking ? undefined : closureAt(hour);
+    if (booking) {
+      const endHour = bookingHours(booking).end;
+      // A booking can outlast the grid when staff have since moved closing
+      // time earlier: clamp, or it would push every following row out of place
+      cells.push({ kind: 'booking', hour, span: Math.min(endHour, close) - hour, booking });
+      hour = endHour;
+    } else if (run) {
+      // Up to the end of the closure, the grid, or a booking, whichever comes first
+      let end = hour + 1;
+      while (end < close && closureAt(end) && !occupancy.has(`${spotId}:${end}`)) end++;
+      cells.push({ kind: 'closed', hour, span: end - hour, reason: run.reason });
+      hour = end;
+    } else {
+      cells.push({ kind: 'free', hour });
+      hour++;
+    }
+  }
+  return cells;
+}
+
+function blockTone(booking: BookingDto, now: number): BlockTone {
+  if (Date.parse(booking.endsAt) <= now) return 'done';
+  return Date.parse(booking.startsAt) <= now ? 'playing' : 'planned';
+}
+
 /** One spot's row: free hours are buttons that seed a new booking; a booking
- *  renders as a single block spanning all its hours. */
+ *  renders as a single block spanning all its hours, a closure as one too. */
 function SpotRow({
   spot,
   open,
   close,
   occupancy,
+  closed,
   now,
   isPastDate,
   isToday,
@@ -128,6 +191,8 @@ function SpotRow({
   open: number;
   close: number;
   occupancy: Map<string, BookingDto>;
+  /** This spot's closed hours on the day: its own closures and the club's */
+  closed: ClosedSpan[];
   now: number;
   isPastDate: boolean;
   isToday: boolean;
@@ -138,39 +203,30 @@ function SpotRow({
   const isPastHour = (hour: number) => isPastDate || (nowHour !== null && hour < nowHour);
   const name = spotName(spot.kind, spot.label);
 
-  const cells = [];
-  for (let hour = open; hour < close;) {
-    const booking = occupancy.get(`${spot.id}:${hour}`);
-    if (booking) {
-      const endHour = bookingHours(booking).end;
-      const started = Date.parse(booking.startsAt) <= now;
-      const ended = Date.parse(booking.endsAt) <= now;
-      cells.push(
+  const cells = rowCells(spot.id, open, close, occupancy, closed).map(cell => {
+    if (cell.kind === 'booking') {
+      return (
         <BookingCell
-          key={hour}
-          booking={booking}
-          // A booking can outlast the grid when staff have since moved closing
-          // time earlier: clamp, or it would push every following row out of place
-          span={Math.min(endHour, close) - hour}
-          tone={ended ? 'done' : started ? 'playing' : 'planned'}
+          key={cell.hour}
+          booking={cell.booking}
+          span={cell.span}
+          tone={blockTone(cell.booking, now)}
           onShowBooking={onShowBooking}
         />
       );
-      hour = endHour;
-    } else {
-      // The loop mutates `hour`, so the click closure must capture a copy
-      const slotHour = hour;
-      cells.push(
-        <FreeCell
-          key={slotHour}
-          label={`${name}, ${formatHour(slotHour)} — ${m.admin_free()}`}
-          past={isPastHour(slotHour)}
-          onPick={() => onPickSlot(slotHour)}
-        />
-      );
-      hour++;
     }
-  }
+    if (cell.kind === 'closed') {
+      return <ClosedCell key={cell.hour} span={cell.span} reason={cell.reason} />;
+    }
+    return (
+      <FreeCell
+        key={cell.hour}
+        label={`${name}, ${formatHour(cell.hour)} — ${m.admin_free()}`}
+        past={isPastHour(cell.hour)}
+        onPick={() => onPickSlot(cell.hour)}
+      />
+    );
+  });
 
   return (
     <>
@@ -229,6 +285,8 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
   // Rows come from the venue's real spots, so seeding a new dartboard shows up
   // here without a code change.
   const { data: spots = [] } = useQuery(tablesQuery());
+  const { data: closures = [] } = useQuery(adminClosuresQuery());
+  const [closing, setClosing] = useState<number | null>(null);
 
   // Same live signal the public wizard uses: any create/extend/cancel on this
   // date refreshes the grid instantly.
@@ -238,6 +296,8 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
         queryClient.invalidateQueries({
           queryKey: adminBookingsQuery({ date: changed, status: 'confirmed' }).queryKey
         });
+        // A closure set from another screen pings the same dates
+        queryClient.invalidateQueries({ queryKey: adminClosuresQuery().queryKey });
       }),
     [date, queryClient]
   );
@@ -246,6 +306,31 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
   const today = warsawToday(now);
   const isToday = date === today;
   const { open, close } = hoursForDate(date, useVenueConfig().hours);
+  // What is closed today, said once above the grid: the hatching shows where
+  const dayClosures = closures.flatMap(closure => {
+    const span = closureSpanOn(closure, date);
+    if (!span) return [];
+    const from = Math.max(span.from, open);
+    const to = Math.min(span.to, close);
+    if (from >= to) return [];
+    const where =
+      closure.tableIds === null
+        ? m.admin_closure_whole_club()
+        : closure.tableIds
+            .map(id => {
+              const spot = spots.find(s => s.id === id);
+              return spot ? spotName(spot.kind, spot.label) : String(id);
+            })
+            .join(', ');
+    return [
+      {
+        id: closure.id,
+        text: closedSpanText({ from, to }, { open, close }),
+        where,
+        reason: closure.reason
+      }
+    ];
+  });
   const hours = Array.from({ length: Math.max(close - open, 0) }, (_, i) => open + i);
   const occupancy = occupancyOf(bookings ?? []);
 
@@ -293,6 +378,14 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
           <ChevronRight aria-hidden className="size-5" />
         </button>
         <AdminDatePicker value={date} onChange={next => setDate(next ?? warsawToday())} />
+        <button
+          type="button"
+          onClick={() => setClosing(Date.now())}
+          className="btn-outline flex h-10 items-center gap-2 border-creme/25 px-3.5 text-sm"
+        >
+          <Lock aria-hidden className="size-4" />
+          {m.admin_closure_add()}
+        </button>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-grey-cool lg:ml-auto">
           <li className="flex items-center gap-1.5">
             <span
@@ -309,8 +402,33 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
             <span aria-hidden className={`${legendSwatch} bg-creme/12`} />
             {PHASE_LABELS.finished().toLocaleLowerCase(getLocale())}
           </li>
+          <li className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={`${legendSwatch} border border-creme/22 bg-[repeating-linear-gradient(135deg,rgb(246_241_220/0.18)_0_3px,transparent_3px_6px)]`}
+            />
+            {m.admin_closed().toLocaleLowerCase(getLocale())}
+          </li>
         </ul>
       </div>
+
+      {dayClosures.length > 0 ? (
+        <ul className="flex flex-col gap-1.5 rounded-2xl border border-golden/45 bg-club-green-dark px-4.5 py-3.5">
+          {dayClosures.map(closure => (
+            <li key={closure.id} className="flex items-start gap-3 text-[15px]">
+              <Lock aria-hidden className="mt-1 size-4.5 flex-none text-golden" />
+              <span>
+                <strong>{closure.text}</strong>
+                <span className="text-cream-soft">
+                  {' '}
+                  · {closure.where}
+                  {closure.reason ? ` · ${closure.reason}` : ''}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {isError && !bookings ? (
         <QueryError error={error} onRetry={() => refetch()} />
@@ -347,6 +465,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
                     open={open}
                     close={close}
                     occupancy={occupancy}
+                    closed={closedSpansOn(date, closures, spot.id)}
                     now={now}
                     isPastDate={date < today}
                     isToday={isToday}
@@ -370,6 +489,19 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
           </div>
         </div>
       )}
+
+      {closing !== null ? (
+        <AdminClosureModal
+          key={closing}
+          closure={null}
+          date={date}
+          isOpen
+          onOpenChange={isOpen => {
+            if (!isOpen) setClosing(null);
+          }}
+          onShowBooking={onShowBooking}
+        />
+      ) : null}
 
       {prefill ? (
         <AdminBookingModal

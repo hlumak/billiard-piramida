@@ -6,7 +6,9 @@ import {
   MIN_BOOKING_HOURS,
   addDays,
   hoursForDate,
+  isHourClosed,
   isClosedAllDay,
+  type ClosureDto,
   type DayHours,
   type IsoDate,
   type VenueConfigDto,
@@ -26,7 +28,8 @@ import { venueConfigQuery } from './queries';
  */
 export const FALLBACK_VENUE_CONFIG: VenueConfigDto = {
   rates: DEFAULT_HOURLY_RATE_GROSZ,
-  hours: DEFAULT_WEEKLY_HOURS
+  hours: DEFAULT_WEEKLY_HOURS,
+  closures: []
 };
 
 export function useVenueConfig(): VenueConfigDto {
@@ -36,14 +39,23 @@ export function useVenueConfig(): VenueConfigDto {
 
 /**
  * The first day in the booking window with an hour still to start: today
- * only while its last start hour is ahead, then the next day the club opens.
+ * only while it has a start hour ahead, then the next day the club opens —
+ * skipping hours (and days) staff have closed.
  */
-export function firstOpenDay(today: IsoDate, hourNow: number, hours: WeeklyHours): IsoDate | null {
+export function firstOpenDay(
+  today: IsoDate,
+  hourNow: number,
+  hours: WeeklyHours,
+  closures: readonly ClosureDto[]
+): IsoDate | null {
   for (let i = 0; i < BOOKING_DAYS_AHEAD; i++) {
     const day = addDays(today, i);
-    const dayHours = hoursForDate(day, hours);
-    const over = i === 0 && hourNow >= dayHours.close - MIN_BOOKING_HOURS;
-    if (!isClosedAllDay(dayHours) && !over) return day;
+    const { open, close } = hoursForDate(day, hours);
+    for (let hour = open; hour <= close - MIN_BOOKING_HOURS; hour++) {
+      // Today keeps only the hours still ahead, as it always did
+      if (i === 0 && hour <= hourNow) continue;
+      if (!isHourClosed(day, hour, closures)) return day;
+    }
   }
   return null;
 }

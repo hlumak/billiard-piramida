@@ -138,6 +138,7 @@ function formReducer(state: FormState, action: FormAction): FormState {
 function submitErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.code === 'slot_taken') return m.err_slot_taken();
+    if (err.code === 'slot_closed') return m.err_slot_closed();
     if (err.code === 'invalid_phone') return m.err_phone_invalid();
     if (err.code === 'outside_operating_hours') return m.err_past_closing();
   }
@@ -175,6 +176,8 @@ function isFreeForWindow(
   for (let h = startHour; h < startHour + duration; h++) {
     const slot = slotByHour.get(h);
     if (!slot) return false;
+    // A closure binds the desk too: the API refuses it as well
+    if (slot.closed) return false;
     if (slot.booked && !(held !== null && h >= held.start && h < held.end)) return false;
   }
   return true;
