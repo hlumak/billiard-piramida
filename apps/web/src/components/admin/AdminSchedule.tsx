@@ -129,6 +129,50 @@ function ClosedCell({ span, reason }: { span: number; reason: string | null }) {
   );
 }
 
+type RowCell =
+  | { kind: 'booking'; hour: number; span: number; booking: BookingDto }
+  | { kind: 'closed'; hour: number; span: number; reason: string | null }
+  | { kind: 'free'; hour: number };
+
+/** One spot's day, left to right: each booking and each closed stretch as a
+ *  single cell spanning its hours, every other hour a cell of its own. */
+function rowCells(
+  spotId: number,
+  open: number,
+  close: number,
+  occupancy: Map<string, BookingDto>,
+  closed: ClosedSpan[]
+): RowCell[] {
+  const closureAt = (hour: number) => closed.find(span => span.from <= hour && hour < span.to);
+  const cells: RowCell[] = [];
+  for (let hour = open; hour < close;) {
+    const booking = occupancy.get(`${spotId}:${hour}`);
+    const run = booking ? undefined : closureAt(hour);
+    if (booking) {
+      const endHour = bookingHours(booking).end;
+      // A booking can outlast the grid when staff have since moved closing
+      // time earlier: clamp, or it would push every following row out of place
+      cells.push({ kind: 'booking', hour, span: Math.min(endHour, close) - hour, booking });
+      hour = endHour;
+    } else if (run) {
+      // Up to the end of the closure, the grid, or a booking, whichever comes first
+      let end = hour + 1;
+      while (end < close && closureAt(end) && !occupancy.has(`${spotId}:${end}`)) end++;
+      cells.push({ kind: 'closed', hour, span: end - hour, reason: run.reason });
+      hour = end;
+    } else {
+      cells.push({ kind: 'free', hour });
+      hour++;
+    }
+  }
+  return cells;
+}
+
+function blockTone(booking: BookingDto, now: number): BlockTone {
+  if (Date.parse(booking.endsAt) <= now) return 'done';
+  return Date.parse(booking.startsAt) <= now ? 'playing' : 'planned';
+}
+
 /** One spot's row: free hours are buttons that seed a new booking; a booking
  *  renders as a single block spanning all its hours, a closure as one too. */
 function SpotRow({
@@ -159,52 +203,30 @@ function SpotRow({
   const isPastHour = (hour: number) => isPastDate || (nowHour !== null && hour < nowHour);
   const name = spotName(spot.kind, spot.label);
 
-  const cells = [];
-  for (let hour = open; hour < close;) {
-    const booking = occupancy.get(`${spot.id}:${hour}`);
-    if (booking) {
-      const endHour = bookingHours(booking).end;
-      const started = Date.parse(booking.startsAt) <= now;
-      const ended = Date.parse(booking.endsAt) <= now;
-      cells.push(
+  const cells = rowCells(spot.id, open, close, occupancy, closed).map(cell => {
+    if (cell.kind === 'booking') {
+      return (
         <BookingCell
-          key={hour}
-          booking={booking}
-          // A booking can outlast the grid when staff have since moved closing
-          // time earlier: clamp, or it would push every following row out of place
-          span={Math.min(endHour, close) - hour}
-          tone={ended ? 'done' : started ? 'playing' : 'planned'}
+          key={cell.hour}
+          booking={cell.booking}
+          span={cell.span}
+          tone={blockTone(cell.booking, now)}
           onShowBooking={onShowBooking}
         />
       );
-      hour = endHour;
-    } else if (closed.some(span => span.from <= hour && hour < span.to)) {
-      const run = closed.find(span => span.from <= hour && hour < span.to);
-      // Up to the end of the closure, the grid, or a booking, whichever comes first
-      let end = hour + 1;
-      while (
-        end < close &&
-        closed.some(span => span.from <= end && end < span.to) &&
-        !occupancy.has(`${spot.id}:${end}`)
-      ) {
-        end++;
-      }
-      cells.push(<ClosedCell key={hour} span={end - hour} reason={run?.reason ?? null} />);
-      hour = end;
-    } else {
-      // The loop mutates `hour`, so the click closure must capture a copy
-      const slotHour = hour;
-      cells.push(
-        <FreeCell
-          key={slotHour}
-          label={`${name}, ${formatHour(slotHour)} — ${m.admin_free()}`}
-          past={isPastHour(slotHour)}
-          onPick={() => onPickSlot(slotHour)}
-        />
-      );
-      hour++;
     }
-  }
+    if (cell.kind === 'closed') {
+      return <ClosedCell key={cell.hour} span={cell.span} reason={cell.reason} />;
+    }
+    return (
+      <FreeCell
+        key={cell.hour}
+        label={`${name}, ${formatHour(cell.hour)} — ${m.admin_free()}`}
+        past={isPastHour(cell.hour)}
+        onPick={() => onPickSlot(cell.hour)}
+      />
+    );
+  });
 
   return (
     <>

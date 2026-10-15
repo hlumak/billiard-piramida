@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Button, Description, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { AlertTriangle, Check, Plus } from 'lucide-react';
 import {
   MAX_CLOSURE_REASON_LENGTH,
   addDays,
   hoursForDate,
   isWholeDays,
+  type ClosureConflictDto,
   type ClosureDto,
   type IsoDate,
   type TableDto
@@ -172,6 +173,160 @@ function HourSelect({
   );
 }
 
+const segment = (active: boolean) =>
+  `h-10 rounded-[10px] px-4 text-sm font-bold transition-colors ${
+    active ? 'bg-golden text-btn-text' : 'text-creme hover:bg-creme/8'
+  }`;
+
+/** The whole club, or the spots ticked from the venue's list. */
+function ClosureScope({
+  scope,
+  tableIds,
+  spots,
+  onChange
+}: {
+  scope: Draft['scope'];
+  tableIds: number[];
+  spots: TableDto[];
+  onChange: (patch: Partial<Pick<Draft, 'scope' | 'tableIds'>>) => void;
+}) {
+  const toggleSpot = (id: number) =>
+    onChange({
+      tableIds: tableIds.includes(id) ? tableIds.filter(t => t !== id) : [...tableIds, id]
+    });
+
+  return (
+    <fieldset>
+      <legend className="text-sm font-bold">{m.admin_closure_what()}</legend>
+      <div className="mt-2 inline-flex gap-1 rounded-xl bg-club-green-dark p-1">
+        <button
+          type="button"
+          aria-pressed={scope === 'club'}
+          onClick={() => onChange({ scope: 'club' })}
+          className={segment(scope === 'club')}
+        >
+          {m.admin_closure_whole_club()}
+        </button>
+        <button
+          type="button"
+          aria-pressed={scope === 'spots'}
+          onClick={() => onChange({ scope: 'spots' })}
+          className={segment(scope === 'spots')}
+        >
+          {m.admin_closure_some_spots()}
+        </button>
+      </div>
+      {scope === 'spots' ? (
+        <div
+          role="group"
+          aria-label={m.admin_closure_some_spots()}
+          className="mt-3 flex flex-wrap gap-2"
+        >
+          {spots.map(spot => {
+            const on = tableIds.includes(spot.id);
+            return (
+              <button
+                key={spot.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggleSpot(spot.id)}
+                className={`h-10 min-w-22 rounded-[10px] border-[1.5px] px-3 text-sm font-semibold transition-colors ${
+                  on
+                    ? 'border-golden bg-golden/16 text-golden-light'
+                    : 'border-creme/25 text-creme hover:border-creme/45'
+                }`}
+              >
+                {spotName(spot.kind, spot.label)}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      {scope === 'spots' && tableIds.length === 0 ? (
+        <p className="mt-2 text-[13px] text-grey-cool">{m.admin_closure_pick_spot()}</p>
+      ) : null}
+    </fieldset>
+  );
+}
+
+/**
+ * The bookings the closure would land on, each with a way to pull it up, or
+ * a word that there are none. Says nothing while the form is incomplete.
+ */
+function ClosureConflicts({
+  conflicts,
+  blocking,
+  complete,
+  spots,
+  startDate,
+  endDate,
+  onShowBooking
+}: {
+  conflicts: UseQueryResult<ClosureConflictDto[]>;
+  /** The conflicts that hold up saving: none while the form is incomplete */
+  blocking: ClosureConflictDto[];
+  complete: boolean;
+  spots: TableDto[];
+  startDate: IsoDate;
+  endDate: IsoDate;
+  onShowBooking: (phone: string) => void;
+}) {
+  if (complete && conflicts.isError) {
+    return <QueryError error={conflicts.error} onRetry={() => conflicts.refetch()} />;
+  }
+  if (blocking.length === 0) {
+    return complete && conflicts.isSuccess && !conflicts.isPlaceholderData ? (
+      <p className="flex items-center gap-2.5 text-sm text-cream-soft">
+        <Check aria-hidden className="size-4.5 text-golden" strokeWidth={2.6} />
+        {m.admin_closure_no_conflicts()}
+      </p>
+    ) : null;
+  }
+  return (
+    <div
+      role="alert"
+      className="rounded-2xl border border-[#f4a99c]/45 bg-[rgb(240_128_112/0.1)] p-4"
+    >
+      <p className="flex items-center gap-2.5 font-bold text-danger-soft-foreground">
+        <AlertTriangle aria-hidden className="size-4.5" />
+        {m.admin_closure_conflicts({ n: blocking.length })}
+      </p>
+      <p className="mt-1.5 text-[13px] text-cream-soft">{m.admin_closure_conflicts_hint()}</p>
+      <ul className="mt-3 flex flex-col gap-1.5">
+        {blocking.map(conflict => {
+          const spot = spots.find(s => s.id === conflict.tableId);
+          const day = warsawDate(conflict.startsAt);
+          return (
+            <li
+              key={conflict.bookingId}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-club-green p-2.5"
+            >
+              <span className="text-sm font-bold tabular-nums">
+                {day === startDate && day === endDate ? '' : `${formatDay(day)} `}
+                {warsawTime(conflict.startsAt)}–{warsawTime(conflict.endsAt)}
+              </span>
+              <span className="min-w-0 flex-1 text-sm">
+                <span className="font-semibold">{conflict.customerName}</span>
+                {spot ? ` · ${spotName(spot.kind, spot.label)}` : ''}
+                <span className="block text-xs text-golden-light">
+                  {formatPhone(conflict.customerPhone)}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => onShowBooking(conflict.customerPhone)}
+                className="h-9 rounded-[10px] px-3 text-sm font-semibold text-golden-light hover:bg-creme/8"
+              >
+                {m.admin_closure_show_booking()} →
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * New or changed closure. While the form is filled in it asks which bookings
  * the closure would land on and lists them; saving waits until there are
@@ -225,17 +380,10 @@ export function AdminClosureModal({
     }
   });
 
-  const toggleSpot = (id: number) =>
-    update({
-      tableIds: draft.tableIds.includes(id)
-        ? draft.tableIds.filter(t => t !== id)
-        : [...draft.tableIds, id]
-    });
-
-  const segment = (active: boolean) =>
-    `h-10 rounded-[10px] px-4 text-sm font-bold transition-colors ${
-      active ? 'bg-golden text-btn-text' : 'text-creme hover:bg-creme/8'
-    }`;
+  const showBooking = (phone: string) => {
+    onOpenChange(false);
+    onShowBooking(phone);
+  };
 
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
@@ -250,56 +398,12 @@ export function AdminClosureModal({
             </Modal.Header>
             <Modal.Body>
               <div className="flex flex-col gap-5">
-                <fieldset>
-                  <legend className="text-sm font-bold">{m.admin_closure_what()}</legend>
-                  <div className="mt-2 inline-flex gap-1 rounded-xl bg-club-green-dark p-1">
-                    <button
-                      type="button"
-                      aria-pressed={draft.scope === 'club'}
-                      onClick={() => update({ scope: 'club' })}
-                      className={segment(draft.scope === 'club')}
-                    >
-                      {m.admin_closure_whole_club()}
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={draft.scope === 'spots'}
-                      onClick={() => update({ scope: 'spots' })}
-                      className={segment(draft.scope === 'spots')}
-                    >
-                      {m.admin_closure_some_spots()}
-                    </button>
-                  </div>
-                  {draft.scope === 'spots' ? (
-                    <div
-                      role="group"
-                      aria-label={m.admin_closure_some_spots()}
-                      className="mt-3 flex flex-wrap gap-2"
-                    >
-                      {spots.map(spot => {
-                        const on = draft.tableIds.includes(spot.id);
-                        return (
-                          <button
-                            key={spot.id}
-                            type="button"
-                            aria-pressed={on}
-                            onClick={() => toggleSpot(spot.id)}
-                            className={`h-10 min-w-22 rounded-[10px] border-[1.5px] px-3 text-sm font-semibold transition-colors ${
-                              on
-                                ? 'border-golden bg-golden/16 text-golden-light'
-                                : 'border-creme/25 text-creme hover:border-creme/45'
-                            }`}
-                          >
-                            {spotName(spot.kind, spot.label)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                  {draft.scope === 'spots' && draft.tableIds.length === 0 ? (
-                    <p className="mt-2 text-[13px] text-grey-cool">{m.admin_closure_pick_spot()}</p>
-                  ) : null}
-                </fieldset>
+                <ClosureScope
+                  scope={draft.scope}
+                  tableIds={draft.tableIds}
+                  spots={spots}
+                  onChange={update}
+                />
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
@@ -376,63 +480,15 @@ export function AdminClosureModal({
                   <Description>{m.admin_closure_reason_hint()}</Description>
                 </TextField>
 
-                {complete && conflicts.isError ? (
-                  <QueryError error={conflicts.error} onRetry={() => conflicts.refetch()} />
-                ) : blocking.length > 0 ? (
-                  <div
-                    role="alert"
-                    className="rounded-2xl border border-[#f4a99c]/45 bg-[rgb(240_128_112/0.1)] p-4"
-                  >
-                    <p className="flex items-center gap-2.5 font-bold text-danger-soft-foreground">
-                      <AlertTriangle aria-hidden className="size-4.5" />
-                      {m.admin_closure_conflicts({ n: blocking.length })}
-                    </p>
-                    <p className="mt-1.5 text-[13px] text-cream-soft">
-                      {m.admin_closure_conflicts_hint()}
-                    </p>
-                    <ul className="mt-3 flex flex-col gap-1.5">
-                      {blocking.map(conflict => {
-                        const spot = spots.find(s => s.id === conflict.tableId);
-                        const day = warsawDate(conflict.startsAt);
-                        return (
-                          <li
-                            key={conflict.bookingId}
-                            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-club-green p-2.5"
-                          >
-                            <span className="text-sm font-bold tabular-nums">
-                              {day === draft.startDate && day === draft.endDate
-                                ? ''
-                                : `${formatDay(day)} `}
-                              {warsawTime(conflict.startsAt)}–{warsawTime(conflict.endsAt)}
-                            </span>
-                            <span className="min-w-0 flex-1 text-sm">
-                              <span className="font-semibold">{conflict.customerName}</span>
-                              {spot ? ` · ${spotName(spot.kind, spot.label)}` : ''}
-                              <span className="block text-xs text-golden-light">
-                                {formatPhone(conflict.customerPhone)}
-                              </span>
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onOpenChange(false);
-                                onShowBooking(conflict.customerPhone);
-                              }}
-                              className="h-9 rounded-[10px] px-3 text-sm font-semibold text-golden-light hover:bg-creme/8"
-                            >
-                              {m.admin_closure_show_booking()} →
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ) : complete && conflicts.isSuccess && !conflicts.isPlaceholderData ? (
-                  <p className="flex items-center gap-2.5 text-sm text-cream-soft">
-                    <Check aria-hidden className="size-4.5 text-golden" strokeWidth={2.6} />
-                    {m.admin_closure_no_conflicts()}
-                  </p>
-                ) : null}
+                <ClosureConflicts
+                  conflicts={conflicts}
+                  blocking={blocking}
+                  complete={complete}
+                  spots={spots}
+                  startDate={draft.startDate}
+                  endDate={draft.endDate}
+                  onShowBooking={showBooking}
+                />
 
                 {save.isError ? (
                   <p role="alert" className="text-sm text-danger-soft-foreground">

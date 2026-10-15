@@ -11,6 +11,7 @@ import {
   isClosedAllDay,
   type AvailabilityDto,
   type ClosedSpan,
+  type DayHours,
   type IsoDate
 } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
@@ -90,6 +91,23 @@ function longestFrom(availability: AvailabilityDto, start: number): number {
     best = Math.max(best, run);
   }
   return Math.min(best, MAX_BOOKING_HOURS);
+}
+
+/**
+ * What cuts the stay short from the picked start: the closure it runs into,
+ * or closing time when that comes before the longest booking allowed.
+ */
+function durationHint(
+  stopRun: ClosedSpan | undefined,
+  start: number | null,
+  span: number,
+  day: DayHours
+): string | null {
+  if (stopRun) return closedSpanText(stopRun, day);
+  if (start !== null && span < MAX_BOOKING_HOURS) {
+    return m.when_until_close({ time: formatHour(day.close) });
+  }
+  return null;
 }
 
 const sectionHead = 'flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2';
@@ -218,6 +236,106 @@ function TimePicker({ date }: { date: IsoDate }) {
   return <TimeOptions availability={availability} loading={isPlaceholderData} />;
 }
 
+/** The hours a stay can start at; closed ones struck through, their reasons below. */
+function StartHours({
+  hours,
+  closedHours,
+  closedLines,
+  picked,
+  onPick
+}: {
+  hours: number[];
+  closedHours: number[];
+  closedLines: string[];
+  picked: number | null;
+  onPick: (hour: number) => void;
+}) {
+  return (
+    <>
+      <div
+        role="group"
+        aria-label={m.time_start()}
+        className="mt-2.5 grid grid-cols-3 gap-2 md:mt-3 md:flex md:flex-wrap md:gap-2.5"
+      >
+        {hours.map(hour => {
+          const closed = closedHours.includes(hour);
+          return (
+            <button
+              key={hour}
+              type="button"
+              aria-pressed={picked === hour}
+              disabled={closed}
+              aria-label={closed ? `${formatHour(hour)}, ${m.hours_closed()}` : undefined}
+              onClick={() => onPick(hour)}
+              className="chip h-12.5 text-base tabular-nums disabled:line-through md:w-24"
+            >
+              {formatHour(hour)}
+            </button>
+          );
+        })}
+      </div>
+      {closedLines.length > 0 ? (
+        <div className="mt-3.5 flex items-start gap-2.5 rounded-[14px] border border-golden/35 bg-golden/10 px-3.5 py-3 text-sm">
+          <Lock aria-hidden className="mt-0.5 size-4 flex-none text-golden" strokeWidth={2.2} />
+          <p>
+            {closedLines.map(line => (
+              <span key={line} className="block">
+                {line}
+              </span>
+            ))}
+          </p>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/** How long to stay; lengths no spot can host from the picked start are shown but not pickable. */
+function DurationOptions({
+  lengths,
+  picked,
+  longest,
+  hint
+}: {
+  lengths: number[];
+  picked: number;
+  longest: number;
+  hint: string | null;
+}) {
+  // Across the full width: one row of up to four; more go in two even rows,
+  // so a Saturday's eight still fit beside the summary
+  let columns = 'sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none';
+  if (lengths.length > 6) columns = 'sm:grid-cols-4';
+  else if (lengths.length > 4) columns = 'sm:grid-cols-3';
+  return (
+    <>
+      <div className={`mt-6.5 md:mt-7.5 ${sectionHead}`}>
+        <h3 className={sectionTitle}>{m.time_duration()}</h3>
+        {hint ? <span className="text-sm text-grey-cool">{hint}</span> : null}
+      </div>
+      <div
+        role="group"
+        aria-label={m.time_duration()}
+        className={`mt-2.5 grid grid-cols-3 gap-1 rounded-[14px] bg-card p-1.25 md:mt-3 ${columns}`}
+      >
+        {lengths.map(n => (
+          <button
+            key={n}
+            type="button"
+            aria-pressed={picked === n}
+            disabled={n > longest}
+            onClick={() => selectDuration(n)}
+            className="segment h-11 px-5 text-[15px]"
+          >
+            {m.hours_n({ n })}
+          </button>
+        ))}
+      </div>
+      <p className="mt-3 text-[13px] text-grey-cool">{m.min_booking_note()}</p>
+    </>
+  );
+}
+
 function TimeOptions({
   availability,
   loading
@@ -291,86 +409,22 @@ function TimeOptions({
           <p className="py-8 text-center text-grey-cool">{m.no_slots_for_date()}</p>
         ) : (
           <>
-            <div
-              role="group"
-              aria-label={m.time_start()}
-              className="mt-2.5 grid grid-cols-3 gap-2 md:mt-3 md:flex md:flex-wrap md:gap-2.5"
-            >
-              {shownHours.map(hour => {
-                const closed = closedHours.includes(hour);
-                return (
-                  <button
-                    key={hour}
-                    type="button"
-                    aria-pressed={start === hour}
-                    disabled={closed}
-                    aria-label={closed ? `${formatHour(hour)}, ${m.hours_closed()}` : undefined}
-                    onClick={() => pickStart(hour)}
-                    className="chip h-12.5 text-base tabular-nums disabled:line-through md:w-24"
-                  >
-                    {formatHour(hour)}
-                  </button>
-                );
-              })}
-            </div>
-            {closedLines.length > 0 ? (
-              <div className="mt-3.5 flex items-start gap-2.5 rounded-[14px] border border-golden/35 bg-golden/10 px-3.5 py-3 text-sm">
-                <Lock
-                  aria-hidden
-                  className="mt-0.5 size-4 flex-none text-golden"
-                  strokeWidth={2.2}
-                />
-                <p>
-                  {closedLines.map(line => (
-                    <span key={line} className="block">
-                      {line}
-                    </span>
-                  ))}
-                </p>
-              </div>
-            ) : null}
+            <StartHours
+              hours={shownHours}
+              closedHours={closedHours}
+              closedLines={closedLines}
+              picked={start}
+              onPick={pickStart}
+            />
 
             {/* Only closed hours left: nothing to measure a stay from */}
             {starts.length > 0 ? (
-              <>
-                <div className={`mt-6.5 md:mt-7.5 ${sectionHead}`}>
-                  <h3 className={sectionTitle}>{m.time_duration()}</h3>
-                  {stopRun ? (
-                    <span className="text-sm text-grey-cool">{closedSpanText(stopRun, day)}</span>
-                  ) : start !== null && span < MAX_BOOKING_HOURS ? (
-                    <span className="text-sm text-grey-cool">
-                      {m.when_until_close({ time: formatHour(availability.close) })}
-                    </span>
-                  ) : null}
-                </div>
-                {/* Across the full width: one row of up to four; more go in two
-              even rows, so a Saturday's eight still fit beside the summary */}
-                <div
-                  role="group"
-                  aria-label={m.time_duration()}
-                  className={`mt-2.5 grid grid-cols-3 gap-1 rounded-[14px] bg-card p-1.25 md:mt-3 ${
-                    lengths.length > 6
-                      ? 'sm:grid-cols-4'
-                      : lengths.length > 4
-                        ? 'sm:grid-cols-3'
-                        : 'sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none'
-                  }`}
-                >
-                  {lengths.map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      aria-pressed={duration === n}
-                      disabled={n > longest}
-                      onClick={() => selectDuration(n)}
-                      className="segment h-11 px-5 text-[15px]"
-                    >
-                      {m.hours_n({ n })}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-3 text-[13px] text-grey-cool">{m.min_booking_note()}</p>
-              </>
+              <DurationOptions
+                lengths={lengths}
+                picked={duration}
+                longest={longest}
+                hint={durationHint(stopRun, start, span, day)}
+              />
             ) : null}
           </>
         )}
