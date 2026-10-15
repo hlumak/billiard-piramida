@@ -5,7 +5,7 @@ import { hoursForDate, isClosedAllDay } from '@repo/shared';
 import { BrandLogo } from '../BrandLogo';
 import { LocaleSwitcher } from '../LocaleSwitcher';
 import { formatHour, warsawToday } from '../../lib/format';
-import { VENUE } from '../../lib/venue';
+import { VENUE, VENUE_PHONE_HREF } from '../../lib/venue';
 import { useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { MENU_LINKS } from './nav';
@@ -85,7 +85,7 @@ export function MenuContent({
             <p className="mt-1 truncate text-[13px] text-grey-cool">{VENUE.street}</p>
           </div>
           <a
-            href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
+            href={VENUE_PHONE_HREF}
             aria-label={`${m.call_us()}: ${VENUE.phone}`}
             className="flex size-11 shrink-0 items-center justify-center rounded-xl border-[1.5px] border-golden text-golden transition-colors hover:bg-golden/10"
           >

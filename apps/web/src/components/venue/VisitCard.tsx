@@ -1,12 +1,14 @@
-import { Clock, MapPin, Navigation, Phone } from 'lucide-react';
-import { VENUE, VENUE_DIRECTIONS_URL } from '../../lib/venue';
+import { Clock, MapPin, Phone } from 'lucide-react';
+import { VENUE } from '../../lib/venue';
 import { m } from '../../paraglide/messages.js';
 import { HoursList } from './HoursList';
+import { VisitActions } from './VisitActions';
 
 /**
  * Address, phone and opening hours with the two things a visitor does next:
- * get directions, or call. The home page's "find us" and the booking
- * confirmation both use it beside the map.
+ * get directions, or call. The home page's "find us" and the contacts page
+ * both use it beside the map; the booking page has its own "how to get here"
+ * that ends on the same actions.
  */
 export function VisitCard({ className }: { className?: string }) {
   return (
@@ -34,26 +36,7 @@ export function VisitCard({ className }: { className?: string }) {
           <HoursList className="mt-2" />
         </div>
       </div>
-      {/* Stacked, full width: side by side the directions label wrapped on a
-          narrow column and pushed its icon off to the edge */}
-      <div className="mt-auto flex flex-col gap-2.5">
-        <a
-          href={VENUE_DIRECTIONS_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-gold h-12.5 whitespace-nowrap text-[15px]"
-        >
-          <Navigation className="size-4.5" aria-hidden />
-          {m.map_directions()}
-        </a>
-        <a
-          href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
-          className="btn-outline h-12.5 whitespace-nowrap text-[15px]"
-        >
-          <Phone className="size-4.5" aria-hidden />
-          {m.call_us()}
-        </a>
-      </div>
+      <VisitActions />
     </div>
   );
 }

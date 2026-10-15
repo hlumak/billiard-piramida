@@ -13,6 +13,9 @@ export const VENUE = {
 
 export const VENUE_ADDRESS = `${VENUE.street}, ${VENUE.postalCode} ${VENUE.city}`;
 
+/** The phone as a tel: link — the spaces are for reading, not for dialling. */
+export const VENUE_PHONE_HREF = `tel:${VENUE.phone.replaceAll(' ', '')}`;
+
 /**
  * Google's embed for the club's own Maps listing. The place id inside the `pb`
  * blob is "Klub Bilardowy Piramida" itself, which is the whole reason this

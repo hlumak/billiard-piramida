@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { BrandLogo } from '../BrandLogo';
 import { LocaleSwitcher } from '../LocaleSwitcher';
 import { weekdayName, warsawToday } from '../../lib/format';
-import { VENUE, VENUE_ADDRESS } from '../../lib/venue';
+import { VENUE, VENUE_ADDRESS, VENUE_PHONE_HREF } from '../../lib/venue';
 import { groupWeeklyHours, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { FOOTER_CLUB_LINKS, FOOTER_PLAYER_LINKS } from './nav';
@@ -66,7 +66,7 @@ export function SiteFooter({ variant = 'compact' }: { variant?: 'full' | 'compac
           <span>
             © {year} Piramida · {VENUE.street}, {VENUE.city} ·{' '}
             <a
-              href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
+              href={VENUE_PHONE_HREF}
               className="whitespace-nowrap transition-colors hover:text-golden"
             >
               {VENUE.phone}
@@ -101,7 +101,7 @@ function FullFooter({ year }: { year: string }) {
           </p>
           <span>{VENUE_ADDRESS}</span>
           <a
-            href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
+            href={VENUE_PHONE_HREF}
             className="text-cream-soft transition-colors hover:text-golden"
           >
             {VENUE.phone}
