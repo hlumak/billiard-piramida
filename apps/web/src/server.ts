@@ -3,6 +3,7 @@ import handler from '@tanstack/react-start/server-entry';
 import { paraglideMiddleware } from './paraglide/server.js';
 import { baseLocale, cookieName, isLocale } from './paraglide/runtime.js';
 import { PUBLIC_API_URL } from './lib/api';
+import { canonicalPath } from './lib/canonical-path';
 import { REQUEST_CONTEXT_KEY, type RequestContext } from './lib/request-context';
 import { contentSecurityPolicy, createNonce, withSecurityHeaders } from './lib/security-headers';
 
@@ -44,6 +45,11 @@ export default {
       [request.headers.get('x-forwarded-for'), (request as { ip?: string }).ip]
         .filter(Boolean)
         .join(', ') || undefined;
+
+    const canonical = page ? canonicalPath(new URL(request.url)) : null;
+    if (canonical !== null) {
+      return new Response(null, { status: 308, headers: { location: canonical } });
+    }
 
     const chosen = page ? chosenLocaleRedirect(request) : null;
     if (chosen !== null) return chosen;
