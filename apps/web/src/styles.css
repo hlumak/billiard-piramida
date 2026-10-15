@@ -308,8 +308,11 @@ body {
     box-shadow 150ms var(--ease-out);
 }
 
-/* The number input is only the text run: the box around it is the wrapper's. */
+/* The number input is only the text run: the box around it is the wrapper's.
+   min-width: 0 lets it shrink below the browser's default ~20-character width,
+   which on a phone made every form with a phone field wider than the screen. */
 .PhoneInputInput {
+  min-width: 0;
   padding: 0;
   border: 0;
   background: none;

@@ -29,7 +29,7 @@ function ProfilePage() {
       ) : hasToken ? (
         <ProfileView onSignedOut={() => userAuthFlag.clear()} />
       ) : (
-        <div className="anim-reveal mx-auto grid max-w-[880px] items-start gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,440px)] md:gap-10">
+        <div className="anim-reveal mx-auto grid max-w-[880px] grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,440px)] md:gap-10">
           <section className="md:order-first md:pt-4">
             <h2 className="text-xl font-bold md:text-2xl">{m.auth_benefits_title()}</h2>
             <ul className="mt-4 flex flex-col gap-3.5">

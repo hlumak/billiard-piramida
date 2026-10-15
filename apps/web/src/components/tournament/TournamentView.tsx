@@ -114,7 +114,7 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
       {/* Facts, sign-up, details: in that order on a phone, so the card is not
           buried under the description; on a wide screen the card takes the
           right column across both rows and stays in view (sticky) */}
-      <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-[auto_1fr] lg:gap-x-10 lg:gap-y-0">
+      <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:grid-rows-[auto_1fr] lg:gap-x-10 lg:gap-y-0">
         <div className="grid gap-4 sm:grid-cols-2 lg:col-start-1">
           <Roster tournament={tournament} />
           <Fact
