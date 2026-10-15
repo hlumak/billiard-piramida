@@ -15,7 +15,7 @@ import { spotDescription, spotName } from '../../lib/spots';
 import { useNowMinute } from '../../lib/use-now';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
-import { PHASE_LABELS } from '../booking/phase';
+import { PHASE_LABELS, PHASE_STYLES } from '../booking/phase';
 import { QueryError } from '../QueryError';
 import { AdminEditBooking } from './AdminBookingModal';
 import { AdminBookingOrder } from './AdminBookingOrder';
@@ -37,7 +37,7 @@ function duration(minutes: number): string {
 type Tone = 'playing' | 'soon' | 'later' | 'done';
 
 const TONES: Record<Tone, string> = {
-  playing: 'bg-golden text-btn-text',
+  playing: PHASE_STYLES.active,
   soon: 'border border-golden/70 text-golden',
   later: 'bg-creme/10 text-cream-soft',
   done: 'bg-creme/8 text-grey-cool'

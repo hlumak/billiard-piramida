@@ -24,7 +24,7 @@ import { addDays, bookingHours, formatHour, warsawHour, warsawToday } from '../.
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { QueryError } from '../QueryError';
-import { PHASE_LABELS } from '../booking/phase';
+import { PHASE_LABELS, PHASE_STYLES } from '../booking/phase';
 import { AdminDatePicker } from './AdminDatePicker';
 import { useNowMinute } from '../../lib/use-now';
 import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
@@ -46,7 +46,7 @@ function occupancyOf(bookings: BookingDto[]): Map<string, BookingDto> {
 type BlockTone = 'playing' | 'planned' | 'done';
 
 const BLOCK_TONES: Record<BlockTone, string> = {
-  playing: 'bg-golden text-btn-text hover:bg-golden-hover',
+  playing: `${PHASE_STYLES.active} hover:bg-golden-hover`,
   planned: 'border border-golden/60 bg-club-green-light text-creme hover:bg-surface-hover',
   done: 'bg-creme/8 text-grey-cool hover:bg-creme/12'
 };

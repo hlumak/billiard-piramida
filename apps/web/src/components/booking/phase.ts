@@ -10,6 +10,11 @@ export const PHASE_LABELS: Record<BookingPhase, () => string> = {
   no_show: m.phase_no_show
 };
 
+/**
+ * A booking's status colours, guest and staff screens alike. The desk's live
+ * tones (AdminOverview, AdminSchedule) build on `active` for "playing now";
+ * their other tones read the clock, not the phase, and are their own.
+ */
 export const PHASE_STYLES: Record<BookingPhase, string> = {
   upcoming: 'border border-golden/60 text-golden-light',
   active: 'bg-golden text-btn-text',
