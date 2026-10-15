@@ -9,6 +9,11 @@ test('a first and a last name pass, in any script', () => {
   expect(isFullName('Anna Maria de Souza')).toBe(true);
 });
 
+test('decomposed letters count as the letters they make', () => {
+  expect(isFullName('Андрій Шевченко'.normalize('NFD'))).toBe(true);
+  expect(isFullName('Łucja Żółć'.normalize('NFD'))).toBe(true);
+});
+
 test('one word, initials or stray symbols do not', () => {
   expect(isFullName('Олег')).toBe(false);
   expect(isFullName('')).toBe(false);
