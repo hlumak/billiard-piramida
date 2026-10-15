@@ -4,6 +4,14 @@
 #   docker compose --profile app up -d --build the whole site in containers:
 #                                              migrations, API, web, nginx on :8080
 # Values come from .env next to this file (see .env.example).
+# Docker keeps a container's output forever by default (json-file, no cap):
+# rotate it, so the request logs, with visitor addresses in them, neither fill
+# the disk nor pile up for good. Up to 5 × 10 MB per service.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
 x-database-url: &database-url postgres://${POSTGRES_USER:-piramida}:${POSTGRES_PASSWORD:-piramida}@postgres:5432/${POSTGRES_DB:-piramida}
 
 services:
@@ -30,6 +38,7 @@ services:
       retries: 10
     security_opt:
       - no-new-privileges:true
+    logging: *logging
 
   migrate:
     profiles: [app]
@@ -46,6 +55,7 @@ services:
     restart: 'no'
     security_opt:
       - no-new-privileges:true
+    logging: *logging
 
   api:
     profiles: [app]
@@ -70,6 +80,7 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    logging: *logging
 
   web:
     profiles: [app]
@@ -92,6 +103,7 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    logging: *logging
 
   nginx:
     profiles: [app]
@@ -114,6 +126,7 @@ services:
       retries: 3
     security_opt:
       - no-new-privileges:true
+    logging: *logging
 
 volumes:
   pgdata:
