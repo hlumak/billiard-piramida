@@ -1851,12 +1851,15 @@ test('the global limit allows 100 requests a minute per visitor, staff exempt', 
 
     // Staff at the desk share the club's address with guests: a valid
     // session is not counted, so the panel keeps working…
-    const staff = { ...headers, cookie: `admin_token=${issueAdminSession('test-admin-token')}` };
+    const staffHeaders = {
+      ...headers,
+      cookie: `admin_token=${issueAdminSession('test-admin-token')}`
+    };
     for (let i = 0; i < 5; i++) {
       const res = await defaults.inject({
         method: 'GET',
         url: '/api/venue-config',
-        headers: staff
+        headers: staffHeaders
       });
       assert.equal(res.statusCode, 200);
     }
