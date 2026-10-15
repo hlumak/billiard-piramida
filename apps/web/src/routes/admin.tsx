@@ -49,7 +49,7 @@ const PANES: Record<AdminPaneId, (context: PaneContext) => ReactNode> = {
   menu: () => <AdminMenu />,
   news: () => <AdminNews />,
   tournaments: () => <AdminTournaments />,
-  settings: () => <AdminVenueConfig />
+  settings: ({ showCustomerBookings }) => <AdminVenueConfig onShowBooking={showCustomerBookings} />
 };
 
 /**

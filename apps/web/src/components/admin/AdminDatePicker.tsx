@@ -6,21 +6,26 @@ import { m } from '../../paraglide/messages.js';
 
 /**
  * Club-themed date filter: HeroUI DatePicker (theme vars style the field and
- * calendar) with a clear button so "no filter" stays reachable.
+ * calendar) with a clear button so "no filter" stays reachable — unless the
+ * field must always hold a date (`clearable={false}`).
  */
 export function AdminDatePicker({
   value,
-  onChange
+  onChange,
+  label = m.summary_date(),
+  clearable = true
 }: {
   value: IsoDate | undefined;
   onChange: (date: IsoDate | undefined) => void;
+  label?: string;
+  clearable?: boolean;
 }) {
   const parsed: DateValue | null = value ? parseDate(value) : null;
 
   return (
     <div className="flex items-center gap-1">
       <DatePicker
-        aria-label={m.summary_date()}
+        aria-label={label}
         value={parsed}
         onChange={next => {
           const iso = next?.toString();
@@ -60,7 +65,7 @@ export function AdminDatePicker({
           </Calendar>
         </DatePicker.Popover>
       </DatePicker>
-      {value !== undefined ? (
+      {clearable && value !== undefined ? (
         <Button
           isIconOnly
           size="sm"

@@ -10,6 +10,8 @@ import type {
   AdminTournamentDto,
   AdminTournamentRegistrationDto,
   BookingDto,
+  ClosureConflictDto,
+  ClosureDto,
   BilliardGame,
   BookingStatus,
   IsoDate,
@@ -196,6 +198,29 @@ export const adminApi = {
     request<UploadedImageDto>('/api/admin/images/from-post', { method: 'POST', body: { url } }),
   venueConfig: (signal?: AbortSignal) =>
     request<VenueConfigDto>('/api/admin/venue-config', { signal }),
+  closures: (signal?: AbortSignal) => request<ClosureDto[]>('/api/admin/closures', { signal }),
+  /** Bookings a closure would land on — asked while the form is filled in */
+  closureConflicts: (input: ClosureInput, signal?: AbortSignal) => {
+    const params = new URLSearchParams({
+      startDate: input.startDate,
+      startHour: String(input.startHour),
+      endDate: input.endDate,
+      endHour: String(input.endHour)
+    });
+    if (input.tableIds !== null) params.set('tableIds', input.tableIds.join(','));
+    return request<ClosureConflictDto[]>(`/api/admin/closures/conflicts?${params}`, { signal });
+  },
+  createClosure: (input: ClosureInput) =>
+    request<ClosureDto>('/api/admin/closures', { method: 'POST', body: input }),
+  updateClosure: (id: string, input: ClosureInput) =>
+    request<ClosureDto>(`/api/admin/closures/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: input
+    }),
+  deleteClosure: (id: string) =>
+    request<{ deleted: boolean }>(`/api/admin/closures/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    }),
   /** Closures are their own resource; the settings form saves rates and hours */
   saveVenueConfig: (config: Omit<VenueConfigDto, 'closures'>) =>
     request<VenueConfigDto>('/api/admin/venue-config', { method: 'PUT', body: config }),
@@ -261,6 +286,22 @@ export const adminNewsQuery = () =>
   queryOptions({
     queryKey: ['admin', 'news'],
     queryFn: ({ signal }) => adminApi.news(signal)
+  });
+
+/** What staff send for a closure: everything but the id the server gives it. */
+export type ClosureInput = Omit<ClosureDto, 'id'>;
+
+export const adminClosuresQuery = () =>
+  queryOptions({
+    queryKey: ['admin', 'closures'],
+    queryFn: ({ signal }) => adminApi.closures(signal)
+  });
+
+export const adminClosureConflictsQuery = (input: ClosureInput) =>
+  queryOptions({
+    queryKey: ['admin', 'closures', 'conflicts', { ...input, reason: null }],
+    queryFn: ({ signal }) => adminApi.closureConflicts(input, signal),
+    placeholderData: keepPreviousData
   });
 
 export const adminVenueConfigQuery = () =>

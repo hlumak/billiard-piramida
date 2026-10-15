@@ -15,6 +15,7 @@ import { parseZloty } from '../../lib/money';
 import { WEEKDAY_DISPLAY_ORDER } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
+import { AdminClosures } from './AdminClosures';
 
 const RATE_ROWS: { tier: RateTier; label: () => string }[] = [
   { tier: '9ft', label: m.admin_rate_9ft },
@@ -81,7 +82,7 @@ function HourSelect({
  * Repricing never touches money already quoted — a booking carries the rate it
  * was written at — which is what the hint under the rates says out loud.
  */
-export function AdminVenueConfig() {
+export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: string) => void }) {
   const queryClient = useQueryClient();
   const { data: config, isPending, isError, error, refetch } = useQuery(adminVenueConfigQuery());
   const [draft, setDraft] = useState<{ rates: RateDraft; hours: WeeklyHours } | null>(null);
@@ -135,6 +136,10 @@ export function AdminVenueConfig() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Saved on its own, unlike the form below: a closure is a thing staff
+          add on the day, not part of the club's standing settings */}
+      <AdminClosures onShowBooking={onShowBooking} />
+
       <section className="card p-5">
         <h3 className="mb-3 font-semibold text-golden-light">{m.admin_rates_title()}</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
