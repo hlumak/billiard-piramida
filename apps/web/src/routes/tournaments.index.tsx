@@ -11,8 +11,10 @@ import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
 export const Route = createFileRoute('/tournaments/')({
-  // SSR + hover-preload: the list is server data and the page is indexable
-  loader: ({ context }) => context.queryClient.ensureQueryData(tournamentsQuery(getLocale())),
+  // SSR + hover-preload: the list is server data and the page is indexable.
+  // A failed fetch is the list's to say (with a retry), not a 500 for the page.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(tournamentsQuery(getLocale())).catch(() => null),
   head: ({ match }) =>
     pageHead(m.seo_title_tournaments(), m.seo_desc_tournaments(), match.pathname),
   component: TournamentsPage

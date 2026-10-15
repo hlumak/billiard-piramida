@@ -15,8 +15,10 @@ import { pageHead } from '../lib/seo';
 import { getLocale } from '../paraglide/runtime.js';
 
 export const Route = createFileRoute('/prices')({
-  // SSR + hover-preload: menu is stable server data
-  loader: ({ context }) => context.queryClient.ensureQueryData(menuQuery(getLocale())),
+  // SSR + hover-preload: menu is stable server data. A failed fetch is the bar
+  // section's to say (with a retry): the rates above it need no fetch at all.
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData(menuQuery(getLocale())).catch(() => null),
   head: ({ match }) => pageHead(m.seo_title_prices(), m.seo_desc_prices(), match.pathname),
   component: PricesPage
 });
