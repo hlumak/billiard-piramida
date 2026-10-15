@@ -1986,13 +1986,20 @@ test('the public forms need a solved bot check once Turnstile is configured', as
       headers: { 'x-turnstile-token': 'good-booking' }
     });
     assert.equal(wrongAction.statusCode, 403);
-    // …its own does
+    // …its own does, once: Siteverify accepts a token again, this server does not
     const passed = await guarded.inject({
       method: 'POST',
       ...register,
       headers: { 'x-turnstile-token': 'good-register' }
     });
     assert.equal(passed.statusCode, 201);
+    const replayed = await guarded.inject({
+      method: 'POST',
+      ...register,
+      headers: { 'x-turnstile-token': 'good-register' }
+    });
+    assert.equal(replayed.statusCode, 403);
+    assert.equal(replayed.json().error, 'bot_check_failed');
   } finally {
     await guarded.close();
   }
