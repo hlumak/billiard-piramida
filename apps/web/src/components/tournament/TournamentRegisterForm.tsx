@@ -7,6 +7,7 @@ import { isValidPhone } from '@repo/shared/phone';
 import { ApiError, api } from '../../lib/api';
 import { profileQuery } from '../../lib/auth';
 import { tournamentQuery, tournamentsQuery } from '../../lib/queries';
+import { useSubmitOnce } from '../../lib/use-submit-once';
 import { rosterProgress } from '../../lib/tournaments';
 import { PhoneField } from '../PhoneField';
 import { m } from '../../paraglide/messages.js';
@@ -46,10 +47,12 @@ export function TournamentRegisterForm({
   const queryClient = useQueryClient();
   const locale = getLocale();
   const { data: profile } = useQuery(profileQuery());
+  const once = useSubmitOnce();
 
   const register = useMutation({
     mutationFn: (value: { name: string; phone: string }) =>
       api.registerForTournament(tournament.slug, locale, value),
+    onError: () => once.release(),
     onSuccess: result => {
       onRegistered();
       // The response carries the tournament with its counters already updated,
@@ -66,7 +69,8 @@ export function TournamentRegisterForm({
     defaultValues: { name: profile?.name ?? '', phone: profile?.phone ?? '' },
     onSubmit: ({ value }) => {
       register.mutate({ name: value.name.trim(), phone: value.phone.trim() });
-    }
+    },
+    onSubmitInvalid: () => once.release()
   });
 
   const { placesLeft } = rosterProgress(tournament);
@@ -92,7 +96,8 @@ export function TournamentRegisterForm({
       onSubmit={event => {
         event.preventDefault();
         event.stopPropagation();
-        if (!register.isPending) form.handleSubmit();
+        // A second request would answer "already on the roster" over the success
+        if (once.claim()) form.handleSubmit();
       }}
     >
       <div>

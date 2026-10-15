@@ -14,6 +14,7 @@ import { profileQuery } from '../../lib/auth';
 import { isFullName } from '../../lib/names';
 import { availabilityQuery, bookingQuery, menuQuery } from '../../lib/queries';
 import { rememberBooking } from '../../lib/recent-bookings';
+import { useSubmitOnce } from '../../lib/use-submit-once';
 import { PhoneField } from '../PhoneField';
 import { mutationErrorText } from '../booking/phase';
 import { goToStep, resetWizard, setSportCardCount, wizardStore } from '../../store/booking-wizard';
@@ -39,6 +40,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
   const { data: profile } = useQuery(profileQuery());
 
   const orderLines = orderLinesFrom(items, menu);
+  const once = useSubmitOnce();
 
   const createBooking = useMutation({
     mutationFn: api.createBooking,
@@ -61,6 +63,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
       resetWizard();
     },
     onError: (error, input) => {
+      once.release();
       // The menu moved on under the guest: refresh it so the order shows the truth
       if (error instanceof ApiError && error.code === 'unknown_food_item') {
         void queryClient.invalidateQueries({ queryKey: menuQuery(getLocale()).queryKey });
@@ -81,6 +84,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
     // The confirm button sits away from the fields (beside the summary, or in
     // the phone's bottom bar), so take the guest to what needs fixing
     onSubmitInvalid: () => {
+      once.release();
       requestAnimationFrame(() => {
         document.querySelector<HTMLElement>(`#${FORM_ID} [aria-invalid=true]`)?.focus();
       });
@@ -128,7 +132,8 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
         onSubmit={event => {
           event.preventDefault();
           event.stopPropagation();
-          form.handleSubmit();
+          // Success leaves the page, so only a refusal reopens the form
+          if (once.claim()) form.handleSubmit();
         }}
       >
         <form.Field

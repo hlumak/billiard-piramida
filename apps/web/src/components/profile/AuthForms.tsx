@@ -9,6 +9,7 @@ import { TabList } from '../TabList';
 import { tabId, tabPanelId } from '../tab-ids';
 import { ApiError } from '../../lib/api';
 import { authApi, storeSession, type RegisterInput } from '../../lib/auth';
+import { useSubmitOnce } from '../../lib/use-submit-once';
 import { m } from '../../paraglide/messages.js';
 
 const EMPTY_CARDS: CardsState = { sportCardType: null, sportCardNumber: '' };
@@ -55,11 +56,13 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   const [name, setName] = useState('');
   const [cards, setCards] = useState<CardsState>(EMPTY_CARDS);
 
+  const once = useSubmitOnce();
   const submit = useMutation({
     mutationFn: async () =>
       tab === 'login'
         ? authApi.login(phone.trim(), password)
         : authApi.register(registerInput({ phone, password, name, cards })),
+    onError: () => once.release(),
     onSuccess: auth => {
       storeSession(queryClient, auth);
       onSignedIn();
@@ -96,7 +99,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
         onSubmit={event => {
           event.preventDefault();
           event.stopPropagation();
-          if (!submit.isPending) submit.mutate();
+          if (once.claim()) submit.mutate();
         }}
       >
         {tab === 'register' ? (
