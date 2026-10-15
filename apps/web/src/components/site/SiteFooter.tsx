@@ -68,7 +68,6 @@ function FooterColumn({
  * a short page never shows a band of the page colour under it.
  */
 export function SiteFooter({ variant = 'compact' }: { variant?: 'full' | 'compact' }) {
-  const hoursLine = useHoursLine();
   const year = warsawToday().slice(0, 4);
 
   if (variant === 'compact') {
@@ -83,7 +82,11 @@ export function SiteFooter({ variant = 'compact' }: { variant?: 'full' | 'compac
       </footer>
     );
   }
+  return <FullFooter year={year} />;
+}
 
+function FullFooter({ year }: { year: string }) {
+  const hoursLine = useHoursLine();
   return (
     <footer className="mt-24 flex-1 bg-club-green-deepest md:mt-30">
       <div className="mx-auto grid w-full max-w-[1240px] gap-10 px-5 pt-14 md:px-10 lg:grid-cols-[4fr_2fr_2fr_4fr]">
