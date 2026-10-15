@@ -38,7 +38,14 @@ export function BackToTop() {
       // Out of the tab order while it is hidden, so keyboard users never land on it
       tabIndex={visible ? 0 : -1}
       aria-hidden={!visible}
-      onClick={() => window.scrollTo({ top: 0 })}
+      onClick={() =>
+        window.scrollTo({
+          top: 0,
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'instant'
+            : 'smooth'
+        })
+      }
       className={`btn-gold fixed right-4 bottom-6 z-30 size-13 rounded-full shadow-[0_12px_28px_rgb(0_0_0/0.35)] transition-[opacity,translate,scale,background-color] duration-300 md:right-8 md:bottom-8 md:size-14 ${
         visible ? 'opacity-100' : 'pointer-events-none translate-y-6 scale-80 opacity-0'
       }`}
