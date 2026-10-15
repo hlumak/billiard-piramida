@@ -3,9 +3,14 @@
  * without an account (booking, sign-up, tournament seat). The browser solves
  * the widget and sends its token in a header; only this server ever talks to
  * Siteverify, with the secret, and the token counts only when Cloudflare says
- * it was solved for the same action on one of our hostnames. Tokens are
- * single-use, so a replayed one fails at Siteverify.
+ * it was solved for the same action on one of our hostnames.
+ *
+ * Cloudflare documents tokens as single-use, but its Siteverify answered
+ * success to the same token again and again (checked live on 2026-10-16), so
+ * the one-use rule is enforced here: SpentTokens below.
  */
+
+import { createHash } from 'node:crypto';
 
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
@@ -81,6 +86,33 @@ export async function verifyTurnstile(
     return { ok: false, reason: 'hostname_mismatch' };
   }
   return { ok: true };
+}
+
+/** A token stays valid for five minutes after it is solved. */
+const TOKEN_LIFETIME_MS = 5 * 60_000;
+
+/**
+ * Tokens already presented, kept (as hashes) for as long as they could still
+ * pass Siteverify. A token is claimed before it is verified, so two requests
+ * racing with one token cannot both get through, and a token that failed
+ * stays spent too. In memory: one API process, and a restart only forgets
+ * tokens that expire within five minutes anyway.
+ */
+export class SpentTokens {
+  private readonly expiresAt = new Map<string, number>();
+
+  /** True the first time a token is seen, false on every later attempt. */
+  claim(token: string, now = Date.now()): boolean {
+    for (const [hash, expiry] of this.expiresAt) {
+      // Insertion order is expiry order, so the first live entry ends the sweep
+      if (expiry > now) break;
+      this.expiresAt.delete(hash);
+    }
+    const hash = createHash('sha256').update(token).digest('base64url');
+    if (this.expiresAt.has(hash)) return false;
+    this.expiresAt.set(hash, now + TOKEN_LIFETIME_MS);
+    return true;
+  }
 }
 
 /** Cloudflare's dummy secrets (always pass / always fail / already spent). */

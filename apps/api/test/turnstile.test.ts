@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isTestingSecret, verifyTurnstile, type TurnstileOptions } from '../src/lib/turnstile.ts';
+import {
+  isTestingSecret,
+  SpentTokens,
+  verifyTurnstile,
+  type TurnstileOptions
+} from '../src/lib/turnstile.ts';
 
 /** A stand-in for Siteverify that answers `body` and records what it was sent. */
 function siteverify(body: unknown) {
@@ -79,4 +84,15 @@ test('answers from Cloudflare test keys count only where allowed', async () => {
   assert.ok(isTestingSecret('1x0000000000000000000000000000000AA'));
   assert.ok(isTestingSecret('2x0000000000000000000000000000000AA'));
   assert.ok(!isTestingSecret('0x4AAAAAAA-real-looking-secret'));
+});
+
+test('a token counts once, and is forgotten only after it could no longer pass', () => {
+  const spent = new SpentTokens();
+  const now = 1_000_000;
+  assert.equal(spent.claim('tok', now), true);
+  assert.equal(spent.claim('tok', now + 1), false);
+  assert.equal(spent.claim('other', now + 1), true);
+  assert.equal(spent.claim('tok', now + 4 * 60_000), false);
+  // Past its five minutes Siteverify would refuse it anyway
+  assert.equal(spent.claim('tok', now + 5 * 60_000 + 1), true);
 });

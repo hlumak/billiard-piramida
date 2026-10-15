@@ -25,6 +25,7 @@ import { users } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import {
+  SpentTokens,
   TURNSTILE_HEADER,
   verifyTurnstile,
   type TurnstileAction,
@@ -214,15 +215,15 @@ export async function buildApp({
     }
   });
 
+  const spentTokens = new SpentTokens();
   app.decorate('requireHuman', (action: TurnstileAction) => async (request, reply) => {
     if (turnstile === undefined) return undefined;
     const header = request.headers[TURNSTILE_HEADER];
-    const verdict = await verifyTurnstile(
-      turnstile,
-      typeof header === 'string' ? header : undefined,
-      action,
-      request.ip
-    );
+    const token = typeof header === 'string' && header !== '' ? header : undefined;
+    const verdict =
+      token !== undefined && !spentTokens.claim(token)
+        ? ({ ok: false, reason: 'token_reused' } as const)
+        : await verifyTurnstile(turnstile, token, action, request.ip);
     if (verdict.ok) return undefined;
     request.log.info({ action, reason: verdict.reason }, 'bot check failed');
     return reply.code(403).send({ error: 'bot_check_failed' });
