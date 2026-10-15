@@ -153,6 +153,7 @@
   "admin_create_btn": "Create",
   "admin_search_phone": "Search by phone",
   "admin_find_bookings": "Find bookings by phone",
+  "search_clear": "Clear search",
   "admin_extend_1h": "+1 h",
   "admin_customer_bookings": "Customer bookings",
   "admin_in_menu": "In menu",

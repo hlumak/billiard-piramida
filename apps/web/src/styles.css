@@ -279,6 +279,12 @@ body,
   [role='button']:not([aria-disabled='true']) {
     cursor: pointer;
   }
+
+  /* The browser's own clear cross is a blue glyph lost on the green field;
+     search fields draw theirs (ClearButton) in the site's style */
+  input[type='search']::-webkit-search-cancel-button {
+    appearance: none;
+  }
 }
 
 body {

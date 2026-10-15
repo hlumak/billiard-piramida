@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { Search } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,6 +30,7 @@ import { menuQuery } from '../../lib/queries';
 import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
 import { gameName, spotName } from '../../lib/spots';
+import { ClearButton } from '../ClearButton';
 import { QueryError } from '../QueryError';
 import { PHASE_LABELS, PHASE_STYLES, mutationErrorText } from '../booking/phase';
 import { AdminDatePicker } from './AdminDatePicker';
@@ -160,6 +161,8 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
   const [date, setDate] = useState<IsoDate | undefined>(undefined);
   const [status, setStatus] = useState<BookingStatus | undefined>(undefined);
   const [phoneInput, setPhoneInput] = useState(initialPhone);
+  const searchId = useId();
+  const searchInput = useRef<HTMLInputElement>(null);
   // Normalized from the start, so the first query searches like the later ones
   const [phone, setPhone] = useState(() => normalizePhoneSearch(initialPhone));
 
@@ -211,10 +214,16 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
             </button>
           ))}
         </div>
-        <label className="flex h-11 min-w-55 max-w-80 flex-1 items-center gap-2.5 rounded-xl bg-club-green-light px-3.5 focus-within:ring-2 focus-within:ring-golden">
+        {/* A div with its own label, not a wrapping <label>: the clear button
+            inside one would join the field's name */}
+        <div className="flex h-11 min-w-55 max-w-80 flex-1 items-center gap-2.5 rounded-xl bg-club-green-light px-3.5 focus-within:ring-2 focus-within:ring-golden">
           <Search aria-hidden className="size-4.5 flex-none text-grey-cool" />
-          <span className="sr-only">{m.admin_search_phone()}</span>
+          <label htmlFor={searchId} className="sr-only">
+            {m.admin_search_phone()}
+          </label>
           <input
+            ref={searchInput}
+            id={searchId}
             type="search"
             inputMode="tel"
             placeholder={m.admin_search_phone()}
@@ -222,7 +231,8 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
             onChange={event => setPhoneInput(event.target.value)}
             className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-grey-cool/80"
           />
-        </label>
+          <ClearButton value={phoneInput} onClear={() => setPhoneInput('')} input={searchInput} />
+        </div>
       </div>
 
       {isError && !bookings ? (
