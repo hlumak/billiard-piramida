@@ -18,7 +18,7 @@ export const Route = createFileRoute('/news/$slug')({
   // Named after the story, with its cover as the preview: this URL gets shared
   head: ({ match, loaderData }) =>
     pageHead(
-      loaderData ? `${loaderData.title} — piramida` : m.seo_title_news(),
+      loaderData ? `${loaderData.title} — Piramida` : m.seo_title_news(),
       loaderData?.body ?? m.seo_desc_news(),
       match.pathname,
       loaderData?.imageUrl ?? undefined

@@ -17,7 +17,7 @@ export const Route = createFileRoute('/tournaments/$slug')({
   // Named after the tournament: this is the URL that gets shared around
   head: ({ match, loaderData }) =>
     pageHead(
-      loaderData ? `${loaderData.title} — piramida` : m.seo_title_tournaments(),
+      loaderData ? `${loaderData.title} — Piramida` : m.seo_title_tournaments(),
       loaderData?.summary ?? m.seo_desc_tournaments(),
       match.pathname
     ),

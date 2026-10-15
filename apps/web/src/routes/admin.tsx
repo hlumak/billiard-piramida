@@ -24,7 +24,7 @@ import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 
 export const Route = createFileRoute('/admin')({
-  head: () => ({ meta: noindexMeta('admin — piramida') }),
+  head: () => ({ meta: noindexMeta('Admin — Piramida') }),
   component: AdminPage
 });
 
