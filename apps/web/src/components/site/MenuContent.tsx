@@ -8,16 +8,7 @@ import { formatHour, warsawToday } from '../../lib/format';
 import { VENUE } from '../../lib/venue';
 import { useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
-
-/** The menu sheet's own order: the visitor's bookings first, the profile last. */
-const MENU_LINKS = [
-  { to: '/bookings', label: () => m.nav_my_bookings() },
-  { to: '/tournaments', label: () => m.menu_tournaments() },
-  { to: '/news', label: () => m.menu_news() },
-  { to: '/prices', label: () => m.menu_prices() },
-  { to: '/contacts', label: () => m.nav_contacts() },
-  { to: '/profile', label: () => m.nav_profile() }
-] as const;
+import { MENU_LINKS } from './nav';
 
 /**
  * What the phone menu holds: the booking call to action, every section, today's
