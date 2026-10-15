@@ -29,7 +29,9 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
   const tournamentsOpen = tournaments?.some(t => t.registrationState === 'open') ?? false;
 
   const openSheet = (event: MouseEvent) => {
-    if (sheet.current === null) return;
+    // A modified or middle click still means "open /menu in a new tab"
+    const newTab = event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey;
+    if (sheet.current === null || newTab) return;
     event.preventDefault();
     sheet.current.showModal();
     setOpen(true);
@@ -63,7 +65,9 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0 lg:gap-3">
-          <div className="hidden xl:block">
+          {/* Below xl the gold "book" button takes its room, and the footer has
+              one; the booking page has neither, so it shows from lg there */}
+          <div className={pathname === '/book' ? 'hidden lg:block' : 'hidden xl:block'}>
             <LocaleSwitcher />
           </div>
           <Link to="/profile" aria-label={m.nav_profile()} className={iconButton}>
