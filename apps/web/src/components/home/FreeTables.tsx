@@ -91,7 +91,7 @@ function Chips({ date, hourNow }: { date: IsoDate; hourNow: number | null }) {
         free === 0 ? (
           <span
             key={hour}
-            className="flex h-15.5 w-21.5 shrink-0 flex-col items-center justify-center rounded-[14px] text-creme/45 shadow-[inset_0_0_0_1.5px_rgb(246_241_220/0.22)] lg:w-auto lg:flex-1"
+            className="flex h-15.5 w-21.5 shrink-0 flex-col items-center justify-center rounded-[14px] text-creme/70 shadow-[inset_0_0_0_1.5px_rgb(246_241_220/0.22)] lg:w-auto lg:flex-1"
           >
             <span className="text-[17px] font-bold lg:text-lg">{formatHour(hour)}</span>
             <span className="text-[11px] font-semibold lg:text-xs">{m.hours_busy()}</span>

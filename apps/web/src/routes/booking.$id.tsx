@@ -33,7 +33,8 @@ function BookingPage() {
   const { new: justCreated } = Route.useSearch();
   const { data: booking, isPending, error } = useQuery(bookingQuery(id));
   // A fresh booking opens with its own "confirmed" heading instead of the title
-  const celebrate = justCreated === true && booking?.phase !== 'cancelled';
+  // — only once it is here: while it loads or if it fails, the page keeps its title
+  const celebrate = justCreated === true && booking !== undefined && booking.phase !== 'cancelled';
 
   return (
     <PageLayout script="booking" title={m.booking_title()} showTitle={!celebrate}>

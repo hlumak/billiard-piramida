@@ -94,12 +94,14 @@ export function WhenStep() {
           if (closed) tag = m.hours_closed();
           else if (index === 0) tag = m.hours_today();
           else if (index === 1) tag = m.date_tomorrow();
+          // The tile's own words, where they say more than the month
+          const label = tag === parts.month ? formatDayLong(day) : `${formatDayLong(day)}, ${tag}`;
           return (
             <button
               key={day}
               type="button"
               aria-pressed={picked}
-              aria-label={formatDayLong(day)}
+              aria-label={label}
               disabled={closed}
               onClick={() => selectDate(day)}
               className="chip h-20 w-16 flex-none flex-col gap-0.5 rounded-[14px] md:h-23 md:w-auto"

@@ -4,7 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { MapPin, Navigation, Phone } from 'lucide-react';
 import { formatPln, hoursForDate, MAX_BOOKING_HOURS, sizeOf, type BookingDto } from '@repo/shared';
 import { useVenueConfig } from '../../lib/venue-config';
-import { bookingHours, intlTag, warsawDate, warsawTime } from '../../lib/format';
+import { bookingHours, formatDayLong, intlTag, warsawDate, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { gameName, spotName, spotRentalLabel } from '../../lib/spots';
 import { VENUE, VENUE_DIRECTIONS_URL } from '../../lib/venue';
@@ -109,6 +109,8 @@ export function BookingDetails({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
                 <p className="text-2xl font-bold tabular-nums md:text-[28px]">
+                  {/* The date badge beside it is a picture to a screen reader */}
+                  <span className="sr-only">{formatDayLong(date)}, </span>
                   {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)}
                 </p>
                 <span
