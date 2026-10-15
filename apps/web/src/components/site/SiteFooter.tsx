@@ -75,7 +75,13 @@ export function SiteFooter({ variant = 'compact' }: { variant?: 'full' | 'compac
       <footer className="mt-24 flex-1 border-t border-line">
         <div className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 px-5 py-6 text-[13px] text-grey-cool md:px-10">
           <span>
-            © {year} Piramida · {VENUE.street}, {VENUE.city} · {VENUE.phone}
+            © {year} Piramida · {VENUE.street}, {VENUE.city} ·{' '}
+            <a
+              href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
+              className="whitespace-nowrap transition-colors hover:text-golden"
+            >
+              {VENUE.phone}
+            </a>
           </span>
           <LocaleSwitcher />
         </div>
