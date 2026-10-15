@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { Clock } from 'lucide-react';
 import {
@@ -158,20 +158,31 @@ function TimeSkeleton() {
 
 function TimePicker({ date }: { date: IsoDate }) {
   useLiveAvailability(date);
+  // Another day keeps the last day's hours on screen (dimmed, not pickable)
+  // until its own arrive: swapping them for the skeleton collapsed the step
+  // and unmounted its actions, so the page jumped and the bar re-animated
   const {
     data: availability,
     isPending,
+    isPlaceholderData,
     isError,
     error,
     refetch
-  } = useQuery(availabilityQuery(date));
+  } = useQuery({ ...availabilityQuery(date), placeholderData: keepPreviousData });
 
   if (isError && !availability) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !availability) return <TimeSkeleton />;
-  return <TimeOptions availability={availability} />;
+  return <TimeOptions availability={availability} loading={isPlaceholderData} />;
 }
 
-function TimeOptions({ availability }: { availability: AvailabilityDto }) {
+function TimeOptions({
+  availability,
+  loading
+}: {
+  availability: AvailabilityDto;
+  /** The hours are still the previous day's */
+  loading: boolean;
+}) {
   const startHour = useStore(wizardStore, state => state.startHour);
   const durationHours = useStore(wizardStore, state => state.durationHours);
 
@@ -207,76 +218,82 @@ function TimeOptions({ availability }: { availability: AvailabilityDto }) {
 
   return (
     <>
-      <div className={`mt-6.5 md:mt-7.5 ${sectionHead}`}>
-        <h3 className={sectionTitle}>{m.time_start()}</h3>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-creme/8 px-2.5 py-1 text-xs text-cream-soft md:px-3 md:text-sm">
-          <Clock aria-hidden className="size-3.5 text-golden" strokeWidth={2.2} />
-          {m.when_open_hours({
-            open: formatHour(availability.open),
-            close: formatHour(availability.close)
-          })}
-        </span>
+      <div
+        aria-busy={loading}
+        inert={loading}
+        className={`transition-opacity duration-200 ${loading ? 'opacity-50' : ''}`}
+      >
+        <div className={`mt-6.5 md:mt-7.5 ${sectionHead}`}>
+          <h3 className={sectionTitle}>{m.time_start()}</h3>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-creme/8 px-2.5 py-1 text-xs text-cream-soft md:px-3 md:text-sm">
+            <Clock aria-hidden className="size-3.5 text-golden" strokeWidth={2.2} />
+            {m.when_open_hours({
+              open: formatHour(availability.open),
+              close: formatHour(availability.close)
+            })}
+          </span>
+        </div>
+
+        {starts.length === 0 ? (
+          <p className="py-8 text-center text-grey-cool">{m.no_slots_for_date()}</p>
+        ) : (
+          <>
+            <div
+              role="group"
+              aria-label={m.time_start()}
+              className="mt-2.5 grid grid-cols-3 gap-2 md:mt-3 md:flex md:flex-wrap md:gap-2.5"
+            >
+              {starts.map(hour => (
+                <button
+                  key={hour}
+                  type="button"
+                  aria-pressed={start === hour}
+                  onClick={() => pickStart(hour)}
+                  className="chip h-12.5 text-base tabular-nums md:w-24"
+                >
+                  {formatHour(hour)}
+                </button>
+              ))}
+            </div>
+
+            <div className={`mt-6.5 md:mt-7.5 ${sectionHead}`}>
+              <h3 className={sectionTitle}>{m.time_duration()}</h3>
+              {start !== null && span < MAX_BOOKING_HOURS ? (
+                <span className="text-sm text-grey-cool">
+                  {m.when_until_close({ time: formatHour(availability.close) })}
+                </span>
+              ) : null}
+            </div>
+            {/* Across the full width: one row of up to four; more go in two
+              even rows, so a Saturday's eight still fit beside the summary */}
+            <div
+              role="group"
+              aria-label={m.time_duration()}
+              className={`mt-2.5 grid grid-cols-3 gap-1 rounded-[14px] bg-card p-1.25 md:mt-3 ${
+                lengths.length > 6
+                  ? 'sm:grid-cols-4'
+                  : lengths.length > 4
+                    ? 'sm:grid-cols-3'
+                    : 'sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none'
+              }`}
+            >
+              {lengths.map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  aria-pressed={duration === n}
+                  disabled={n > longest}
+                  onClick={() => selectDuration(n)}
+                  className="segment h-11 px-5 text-[15px]"
+                >
+                  {m.hours_n({ n })}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-[13px] text-grey-cool">{m.min_booking_note()}</p>
+          </>
+        )}
       </div>
-
-      {starts.length === 0 ? (
-        <p className="py-8 text-center text-grey-cool">{m.no_slots_for_date()}</p>
-      ) : (
-        <>
-          <div
-            role="group"
-            aria-label={m.time_start()}
-            className="mt-2.5 grid grid-cols-3 gap-2 md:mt-3 md:flex md:flex-wrap md:gap-2.5"
-          >
-            {starts.map(hour => (
-              <button
-                key={hour}
-                type="button"
-                aria-pressed={start === hour}
-                onClick={() => pickStart(hour)}
-                className="chip h-12.5 text-base tabular-nums md:w-24"
-              >
-                {formatHour(hour)}
-              </button>
-            ))}
-          </div>
-
-          <div className={`mt-6.5 md:mt-7.5 ${sectionHead}`}>
-            <h3 className={sectionTitle}>{m.time_duration()}</h3>
-            {start !== null && span < MAX_BOOKING_HOURS ? (
-              <span className="text-sm text-grey-cool">
-                {m.when_until_close({ time: formatHour(availability.close) })}
-              </span>
-            ) : null}
-          </div>
-          {/* One row of up to four; more go in two even rows, so a Saturday's
-              eight still fit beside the summary */}
-          <div
-            role="group"
-            aria-label={m.time_duration()}
-            className={`mt-2.5 grid grid-cols-3 gap-1 rounded-[14px] bg-card p-1.25 sm:inline-grid md:mt-3 ${
-              lengths.length > 6
-                ? 'sm:grid-cols-4'
-                : lengths.length > 4
-                  ? 'sm:grid-cols-3'
-                  : 'sm:grid-flow-col sm:grid-cols-none'
-            }`}
-          >
-            {lengths.map(n => (
-              <button
-                key={n}
-                type="button"
-                aria-pressed={duration === n}
-                disabled={n > longest}
-                onClick={() => selectDuration(n)}
-                className="segment h-11 px-5 text-[15px] sm:min-w-25"
-              >
-                {m.hours_n({ n })}
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 text-[13px] text-grey-cool">{m.min_booking_note()}</p>
-        </>
-      )}
 
       <StepActions
         action={{
