@@ -10,6 +10,8 @@ import { tabId, tabPanelId } from '../tab-ids';
 import { ApiError } from '../../lib/api';
 import { authApi, storeSession, type RegisterInput } from '../../lib/auth';
 import { useSubmitOnce } from '../../lib/use-submit-once';
+import { useBotCheck } from '../../lib/bot-check';
+import { BotCheckWidget } from '../BotCheckWidget';
 import { m } from '../../paraglide/messages.js';
 
 const EMPTY_CARDS: CardsState = { sportCardType: null, sportCardNumber: '' };
@@ -44,6 +46,7 @@ function authErrors(error: Error | null): { phone: string | null; form: string |
   const code = error instanceof ApiError ? error.code : null;
   if (code === 'phone_taken') return { phone: m.auth_err_phone_taken(), form: null };
   if (code === 'invalid_phone') return { phone: m.err_phone_invalid(), form: null };
+  if (code === 'bot_check_failed') return { phone: null, form: m.err_bot_check() };
   const unauthorized = error instanceof ApiError && error.status === 401;
   return { phone: null, form: unauthorized ? m.auth_err_invalid() : m.err_generic() };
 }
@@ -57,12 +60,18 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   const [cards, setCards] = useState<CardsState>(EMPTY_CARDS);
 
   const once = useSubmitOnce();
+  // Sign-up only: signing in is already limited per address and per number
+  const botCheck = useBotCheck('register');
   const submit = useMutation({
     mutationFn: async () =>
       tab === 'login'
         ? authApi.login(phone.trim(), password)
-        : authApi.register(registerInput({ phone, password, name, cards })),
-    onError: () => once.release(),
+        : authApi.register(registerInput({ phone, password, name, cards }), await botCheck.token()),
+    onError: () => {
+      once.release();
+      // The token was spent on this attempt; the next one needs a fresh solve
+      if (tab === 'register') botCheck.reset();
+    },
     onSuccess: auth => {
       storeSession(queryClient, auth);
       onSignedIn();
@@ -143,6 +152,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
         </TextField>
 
         {tab === 'register' ? <CardFields value={cards} onChange={setCards} /> : null}
+        {tab === 'register' ? <BotCheckWidget check={botCheck} /> : null}
 
         <button
           type="submit"

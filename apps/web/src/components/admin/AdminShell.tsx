@@ -10,6 +10,7 @@ import { BrandLogo } from '../BrandLogo';
 import { ClearButton } from '../ClearButton';
 import { LocaleSwitcher } from '../LocaleSwitcher';
 import { AdminNewBooking } from './AdminBookingModal';
+import { BookingAlerts } from './BookingAlerts';
 import { ADMIN_GROUPS, ADMIN_PANES, type AdminPaneId } from './panes';
 
 interface ShellProps {
@@ -207,6 +208,7 @@ export function AdminShell({
             </p>
           </div>
           <PhoneSearch onSearch={onSearchPhone} />
+          <BookingAlerts onShowBooking={onSearchPhone} />
           <AdminNewBooking />
         </header>
 
@@ -220,6 +222,7 @@ export function AdminShell({
               {formatDayLong(today)}
             </p>
           </div>
+          <BookingAlerts onShowBooking={onSearchPhone} />
           <AdminNewBooking />
         </header>
 

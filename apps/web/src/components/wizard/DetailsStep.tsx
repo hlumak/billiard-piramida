@@ -15,6 +15,8 @@ import { isFullName } from '../../lib/names';
 import { availabilityQuery, bookingQuery, menuQuery, venueConfigQuery } from '../../lib/queries';
 import { rememberBooking } from '../../lib/recent-bookings';
 import { useSubmitOnce } from '../../lib/use-submit-once';
+import { useBotCheck } from '../../lib/bot-check';
+import { BotCheckWidget } from '../BotCheckWidget';
 import { PhoneField } from '../PhoneField';
 import { mutationErrorText } from '../booking/phase';
 import { goToStep, resetWizard, setSportCardCount, wizardStore } from '../../store/booking-wizard';
@@ -41,9 +43,11 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
   const orderLines = orderLinesFrom(items, menu);
   const once = useSubmitOnce();
+  const botCheck = useBotCheck('booking');
 
   const createBooking = useMutation({
-    mutationFn: api.createBooking,
+    mutationFn: async (input: Parameters<typeof api.createBooking>[0]) =>
+      api.createBooking(input, await botCheck.token()),
     onSuccess: async ({ manageToken, ...booking }, input) => {
       // The secret comes back this once: keep it, and put it in the page's
       // link (fragment, never sent to a server) so a bookmark manages it too
@@ -64,6 +68,8 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
     },
     onError: (error, input) => {
       once.release();
+      // The token was spent on this attempt; the next one needs a fresh solve
+      botCheck.reset();
       // The menu moved on under the guest: refresh it so the order shows the truth
       if (error instanceof ApiError && error.code === 'unknown_food_item') {
         void queryClient.invalidateQueries({ queryKey: menuQuery(getLocale()).queryKey });
@@ -191,6 +197,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
             />
           )}
         </form.Field>
+        <BotCheckWidget check={botCheck} />
       </form>
 
       <SportCardPicker

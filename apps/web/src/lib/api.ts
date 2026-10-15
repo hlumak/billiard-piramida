@@ -17,6 +17,7 @@ import type {
 import { notFound } from '@tanstack/react-router';
 import { manageTokenFor } from './recent-bookings';
 import { currentRequestContext } from './request-context';
+import { botCheckHeaders } from './bot-check';
 
 /**
  * API origin.
@@ -193,10 +194,15 @@ export const api = {
       signal
     }),
   // Holds a seat; the entry fee is still paid at the reception desk
-  registerForTournament: (slug: string, locale: string, input: TournamentRegistrationInput) =>
+  registerForTournament: (
+    slug: string,
+    locale: string,
+    input: TournamentRegistrationInput,
+    botToken?: string
+  ) =>
     request<TournamentRegistrationResultDto>(
       `/api/tournaments/${encodeURIComponent(slug)}/register?locale=${locale}`,
-      { method: 'POST', body: input }
+      { method: 'POST', body: input, headers: botCheckHeaders(botToken) }
     ),
   booking: (id: string, signal?: AbortSignal) => {
     const [path, headers] = bookingPath(id);
@@ -211,8 +217,12 @@ export const api = {
       body: { phone },
       signal
     }),
-  createBooking: (input: CreateBookingInput) =>
-    request<CreatedBookingDto>('/api/bookings', { method: 'POST', body: input }),
+  createBooking: (input: CreateBookingInput, botToken?: string) =>
+    request<CreatedBookingDto>('/api/bookings', {
+      method: 'POST',
+      body: input,
+      headers: botCheckHeaders(botToken)
+    }),
   extendBooking: (id: string, additionalHours: number) => {
     const [path, headers] = bookingPath(id, '/extend');
     return request<BookingDto>(path, { method: 'POST', headers, body: { additionalHours } });

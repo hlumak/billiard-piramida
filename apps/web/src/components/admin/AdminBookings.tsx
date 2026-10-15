@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Spinner } from '@heroui/react';
 import { Search } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -46,9 +46,40 @@ const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[
 ];
 
 const small =
-  'h-9 rounded-[10px] px-3 text-[13px] font-semibold transition-colors disabled:opacity-50';
+  'h-9 rounded-[10px] px-3 text-[13px] font-semibold transition-colors aria-busy:cursor-wait aria-busy:opacity-50';
 const quiet = `${small} border border-creme/25 text-creme hover:bg-creme/6`;
 const danger = `${small} border border-[#ff9b8a]/60 text-danger-soft-foreground hover:bg-[rgb(255_120_100/0.12)]`;
+
+/**
+ * A row action that stays focusable while its request runs: `disabled` would
+ * drop keyboard focus to the page mid-request. Busy, it ignores clicks and
+ * says so to screen readers instead.
+ */
+function RowButton({
+  pending,
+  onPress,
+  className,
+  children
+}: {
+  pending: boolean;
+  onPress: () => void;
+  className: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-disabled={pending || undefined}
+      aria-busy={pending || undefined}
+      onClick={() => {
+        if (!pending) onPress();
+      }}
+      className={className}
+    >
+      {children}
+    </button>
+  );
+}
 
 function RowActions({ booking }: { booking: BookingDto }) {
   const queryClient = useQueryClient();
@@ -96,56 +127,39 @@ function RowActions({ booking }: { booking: BookingDto }) {
             corrected, and a cancelled one is restored from the same modal. */}
         <AdminEditBooking booking={booking} />
         {canExtend ? (
-          <button
-            type="button"
-            disabled={extend.isPending}
-            onClick={() => extend.mutate()}
-            className={quiet}
-          >
+          <RowButton pending={extend.isPending} onPress={() => extend.mutate()} className={quiet}>
             {m.admin_extend_1h()}
-          </button>
+          </RowButton>
         ) : null}
         {live ? (
-          <button
-            type="button"
-            disabled={cancel.isPending}
-            onClick={() => cancel.mutate()}
-            className={danger}
-          >
+          <RowButton pending={cancel.isPending} onPress={() => cancel.mutate()} className={danger}>
             {m.cancel_short()}
-          </button>
+          </RowButton>
         ) : null}
         {started ? (
-          <button
-            type="button"
-            disabled={noShow.isPending}
-            onClick={() => {
+          <RowButton
+            pending={noShow.isPending}
+            onPress={() => {
               if (window.confirm(m.admin_no_show_confirm())) noShow.mutate();
             }}
             className={danger}
           >
             {m.admin_no_show_btn()}
-          </button>
+          </RowButton>
         ) : null}
         {booking.phase === 'cancelled' ? (
-          <button
-            type="button"
-            disabled={restore.isPending}
-            onClick={() => restore.mutate()}
+          <RowButton
+            pending={restore.isPending}
+            onPress={() => restore.mutate()}
             className={`btn-gold ${small}`}
           >
             {m.admin_restore_btn()}
-          </button>
+          </RowButton>
         ) : null}
         {booking.phase === 'no_show' ? (
-          <button
-            type="button"
-            disabled={restore.isPending}
-            onClick={() => restore.mutate()}
-            className={quiet}
-          >
+          <RowButton pending={restore.isPending} onPress={() => restore.mutate()} className={quiet}>
             {m.admin_came_after_all()}
-          </button>
+          </RowButton>
         ) : null}
       </div>
       {actionError ? (

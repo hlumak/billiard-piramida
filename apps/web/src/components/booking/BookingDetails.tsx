@@ -1,16 +1,17 @@
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { MapPin, Navigation, Phone } from 'lucide-react';
+import { MapPin, Phone } from 'lucide-react';
 import { formatPln, hoursForDate, MAX_BOOKING_HOURS, sizeOf, type BookingDto } from '@repo/shared';
 import { useVenueConfig } from '../../lib/venue-config';
 import { bookingHours, formatDayLong, intlTag, warsawDate, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
-import { gameName, spotName, spotRentalLabel } from '../../lib/spots';
-import { VENUE, VENUE_DIRECTIONS_URL } from '../../lib/venue';
+import { spotDescription, spotRentalLabel } from '../../lib/spots';
+import { VENUE } from '../../lib/venue';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { VenueMap } from '../venue/VenueMap';
+import { VisitActions } from '../venue/VisitActions';
 import { AddFoodModal } from './AddFoodModal';
 import { DateBadge } from '../DateBadge';
 import { CancelModal } from './CancelModal';
@@ -45,16 +46,12 @@ export function BookingDetails({
 
   const canManage = booking.phase === 'upcoming' || booking.phase === 'active';
   const celebrate = justCreated && booking.phase !== 'cancelled';
-  const size = sizeOf(booking.tableId);
-  const spot = [
-    spotName(booking.kind, booking.tableLabel),
-    size,
+  const spot = spotDescription(booking.kind, booking.tableLabel, {
+    size: sizeOf(booking.tableId),
     // Absent on a dartboard, and on rentals taken before the club began
     // recording it — either way there is nothing truthful to show
-    booking.game ? gameName(booking.game) : null
-  ]
-    .filter(Boolean)
-    .join(' · ');
+    game: booking.game
+  });
   const money = (grosz: number) => formatPln(grosz, intlTag());
 
   return (
@@ -184,24 +181,7 @@ export function BookingDetails({
                 <Phone aria-hidden className="size-5 flex-none text-golden" />
                 <span className="font-semibold">{VENUE.phone}</span>
               </div>
-              <div className="mt-auto flex flex-col gap-2.5 pt-2">
-                <a
-                  href={VENUE_DIRECTIONS_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-gold lift h-12.5 text-[15px] whitespace-nowrap"
-                >
-                  <Navigation aria-hidden className="size-4.5" />
-                  {m.map_directions()}
-                </a>
-                <a
-                  href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
-                  className="btn-outline h-12.5 text-[15px] whitespace-nowrap"
-                >
-                  <Phone aria-hidden className="size-4.5" />
-                  {m.call_us()}
-                </a>
-              </div>
+              <VisitActions lift className="pt-2" />
             </div>
             <VenueMap className="min-h-70" />
           </section>

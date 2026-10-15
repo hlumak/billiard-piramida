@@ -2,21 +2,10 @@ import { Link } from '@tanstack/react-router';
 import { BrandLogo } from '../BrandLogo';
 import { LocaleSwitcher } from '../LocaleSwitcher';
 import { weekdayName, warsawToday } from '../../lib/format';
-import { VENUE, VENUE_ADDRESS } from '../../lib/venue';
+import { VENUE, VENUE_ADDRESS, VENUE_PHONE_HREF } from '../../lib/venue';
 import { groupWeeklyHours, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
-
-const PLAYER_LINKS = [
-  { to: '/book', label: () => m.menu_booking() },
-  { to: '/bookings', label: () => m.nav_my_bookings() },
-  { to: '/prices', label: () => m.menu_prices() }
-] as const;
-
-const CLUB_LINKS = [
-  { to: '/tournaments', label: () => m.menu_tournaments() },
-  { to: '/news', label: () => m.menu_news() },
-  { to: '/contacts', label: () => m.nav_contacts() }
-] as const;
+import { FOOTER_CLUB_LINKS, FOOTER_PLAYER_LINKS } from './nav';
 
 /** "пн–чт 16–21 · пт 16–23 · сб–нд 15–23" from the live opening hours. */
 function useHoursLine(): string {
@@ -77,7 +66,7 @@ export function SiteFooter({ variant = 'compact' }: { variant?: 'full' | 'compac
           <span>
             © {year} Piramida · {VENUE.street}, {VENUE.city} ·{' '}
             <a
-              href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
+              href={VENUE_PHONE_HREF}
               className="whitespace-nowrap transition-colors hover:text-golden"
             >
               {VENUE.phone}
@@ -103,8 +92,8 @@ function FullFooter({ year }: { year: string }) {
           </p>
         </div>
         <div className="grid grid-cols-2 gap-6 lg:contents">
-          <FooterColumn title={m.footer_players()} links={PLAYER_LINKS} />
-          <FooterColumn title={m.footer_club()} links={CLUB_LINKS} />
+          <FooterColumn title={m.footer_players()} links={FOOTER_PLAYER_LINKS} />
+          <FooterColumn title={m.footer_club()} links={FOOTER_CLUB_LINKS} />
         </div>
         <div className="flex flex-col gap-2.5 text-[15px] text-cream-soft">
           <p className="mb-1.5 text-xs font-bold uppercase tracking-[0.18em] text-golden-light">
@@ -112,7 +101,7 @@ function FullFooter({ year }: { year: string }) {
           </p>
           <span>{VENUE_ADDRESS}</span>
           <a
-            href={`tel:${VENUE.phone.replaceAll(' ', '')}`}
+            href={VENUE_PHONE_HREF}
             className="text-cream-soft transition-colors hover:text-golden"
           >
             {VENUE.phone}

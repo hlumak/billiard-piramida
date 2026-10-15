@@ -58,9 +58,12 @@ COPY apps/web apps/web
 # The public site URL is baked into canonical/og/JSON-LD at build time; a
 # release build refuses to run without a real one. The API URL stays empty:
 # the browser calls /api/… on the site's own origin, through nginx.
+# The Turnstile site key is public too; empty builds forms without the widget.
 ARG VITE_SITE_URL
+ARG VITE_TURNSTILE_SITE_KEY
 ENV RELEASE_BUILD=1 \
   VITE_SITE_URL=${VITE_SITE_URL} \
+  VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY} \
   VITE_API_URL=
 RUN pnpm --filter @repo/web build
 # Every client asset the server-rendered HTML names must exist in the client

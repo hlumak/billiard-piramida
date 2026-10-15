@@ -75,7 +75,7 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
   app.post(
     '/api/auth/register',
     {
-      preHandler: guard,
+      preHandler: [guard, app.requireHuman('register')],
       // Password-touching endpoint: tighter than the global 100/min limit
       config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {

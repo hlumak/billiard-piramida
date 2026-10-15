@@ -5,9 +5,8 @@ import { formatPln, sizeOf } from '@repo/shared';
 import { useStore } from '@tanstack/react-store';
 import { formatDay, formatHour, intlTag } from '../../lib/format';
 import { useIsHydrated } from '../../lib/hydration';
-import { gameName, spotName } from '../../lib/spots';
+import { spotDescription } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
-import { getLocale } from '../../paraglide/runtime.js';
 import { WIZARD_STEPS, goToStep, stepIndex, wizardStore } from '../../store/booking-wizard';
 import { WizardSummary, useWizardTotals } from './WizardSummary';
 
@@ -176,13 +175,11 @@ function BarPicks() {
 
   let title: string | null = null;
   if (state.tableLabel !== null && state.kind !== null) {
-    title = [
-      spotName(state.kind, state.tableLabel),
-      state.tableId === null ? null : sizeOf(state.tableId),
-      state.game ? gameName(state.game).toLocaleLowerCase(getLocale()) : null
-    ]
-      .filter(Boolean)
-      .join(' · ');
+    title = spotDescription(state.kind, state.tableLabel, {
+      size: state.tableId === null ? null : sizeOf(state.tableId),
+      game: state.game,
+      lowercaseGame: true
+    });
   } else if (state.date !== null) {
     title = time ? `${formatDay(state.date)} · ${time}` : formatDay(state.date);
   }

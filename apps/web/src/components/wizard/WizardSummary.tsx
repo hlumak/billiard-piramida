@@ -10,7 +10,7 @@ import {
 } from '@repo/shared';
 import { formatDayLong, formatHour, intlTag } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
-import { gameName, spotName, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
+import { gameName, spotDescription, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
@@ -77,10 +77,9 @@ function timeRange(state: WizardState): string {
 
 function spotText(state: WizardState): string | null {
   if (state.tableLabel === null || state.kind === null) return null;
-  const size = state.tableId === null ? null : sizeOf(state.tableId);
-  return size
-    ? `${spotName(state.kind, state.tableLabel)} · ${size}`
-    : spotName(state.kind, state.tableLabel);
+  return spotDescription(state.kind, state.tableLabel, {
+    size: state.tableId === null ? null : sizeOf(state.tableId)
+  });
 }
 
 /** The game row: a toggle where the table offers a choice, the plain fact where it does not. */

@@ -8,6 +8,8 @@ import { ApiError, api } from '../../lib/api';
 import { profileQuery } from '../../lib/auth';
 import { tournamentQuery, tournamentsQuery } from '../../lib/queries';
 import { useSubmitOnce } from '../../lib/use-submit-once';
+import { useBotCheck } from '../../lib/bot-check';
+import { BotCheckWidget } from '../BotCheckWidget';
 import { rosterProgress } from '../../lib/tournaments';
 import { PhoneField } from '../PhoneField';
 import { m } from '../../paraglide/messages.js';
@@ -25,6 +27,8 @@ function errorMessage(error: unknown): string {
       return m.tournament_err_closed();
     case 'invalid_phone':
       return m.err_phone_invalid();
+    case 'bot_check_failed':
+      return m.err_bot_check();
     default:
       return m.err_generic();
   }
@@ -48,11 +52,16 @@ export function TournamentRegisterForm({
   const locale = getLocale();
   const { data: profile } = useQuery(profileQuery());
   const once = useSubmitOnce();
+  const botCheck = useBotCheck('tournament');
 
   const register = useMutation({
-    mutationFn: (value: { name: string; phone: string }) =>
-      api.registerForTournament(tournament.slug, locale, value),
-    onError: () => once.release(),
+    mutationFn: async (value: { name: string; phone: string }) =>
+      api.registerForTournament(tournament.slug, locale, value, await botCheck.token()),
+    onError: () => {
+      once.release();
+      // The token was spent on this attempt; the next one needs a fresh solve
+      botCheck.reset();
+    },
     onSuccess: result => {
       onRegistered();
       // The response carries the tournament with its counters already updated,
@@ -163,6 +172,7 @@ export function TournamentRegisterForm({
         </p>
       ) : null}
 
+      <BotCheckWidget check={botCheck} />
       <button
         type="submit"
         // Not disabled while sending: that would drop keyboard focus

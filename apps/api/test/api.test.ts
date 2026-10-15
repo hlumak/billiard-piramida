@@ -17,6 +17,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 import { buildApp } from '../src/app.ts';
 import { LOCAL_DATABASE_URL } from '../src/lib/config.ts';
+import { issueAdminSession } from '../src/lib/admin-session.ts';
 import { createDb } from '../src/db/client.ts';
 import { bookings, tournamentRegistrations, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
@@ -354,6 +355,56 @@ test('admin endpoints require the token', async () => {
     headers: { 'x-admin-token': 'wrong' }
   });
   assert.equal(badToken.statusCode, 401);
+});
+
+test("the staff bell lists bookings guests made online, not the desk's own", async () => {
+  const headers = { 'x-admin-token': 'test-admin-token' };
+  const tuesday = nextDate(2);
+  const askedFrom = new Date(Date.now() - 1000).toISOString();
+  const slot = { date: tuesday, durationHours: 1, startHour: 18 };
+
+  const online = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: { ...slot, tableId: 4, customerName: 'Online Guest', customerPhone: '+48 602 777 001' }
+  });
+  assert.equal(online.statusCode, 201);
+  const desk = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: { ...slot, tableId: 5, customerName: 'Desk Guest', customerPhone: '+48 602 777 002' }
+  });
+  assert.equal(desk.statusCode, 201);
+
+  const listed = await app.inject({
+    method: 'GET',
+    url: `/api/admin/bookings/online?since=${encodeURIComponent(askedFrom)}`,
+    headers
+  });
+  assert.equal(listed.statusCode, 200);
+  const names = listed.json().map((entry: { customerName: string }) => entry.customerName);
+  assert.ok(names.includes('Online Guest'));
+  assert.ok(!names.includes('Desk Guest'));
+  const entry = listed.json().find((row: { id: string }) => row.id === online.json().id);
+  assert.equal(entry.tableLabel, '4');
+  assert.ok(Date.parse(entry.createdAt) >= Date.parse(askedFrom));
+
+  // Nothing newer than now; a malformed time is refused; staff only
+  const later = await app.inject({
+    method: 'GET',
+    url: `/api/admin/bookings/online?since=${encodeURIComponent(new Date(Date.now() + 60_000).toISOString())}`,
+    headers
+  });
+  assert.deepEqual(later.json(), []);
+  const malformed = await app.inject({
+    method: 'GET',
+    url: '/api/admin/bookings/online?since=yesterday',
+    headers
+  });
+  assert.equal(malformed.statusCode, 400);
+  const anonymous = await app.inject({ method: 'GET', url: '/api/admin/bookings/online' });
+  assert.equal(anonymous.statusCode, 401);
 });
 
 test('admin stats, bookings and customers respond with data', async () => {
@@ -1830,26 +1881,120 @@ test('guests book at most 14 days ahead and hold at most 3 upcoming bookings per
   assert.equal((await book(thursday, 4, '+48 602 111 334')).statusCode, 201);
 });
 
-test('the global limit leaves room for quick browsing, but still applies', async () => {
-  // Production defaults: a burst like thirty fast page loads (about five
-  // requests each) from one visitor must not be refused — the old ceiling of
-  // 100 a minute refused the 101st
-  const defaults = await buildApp({ databaseUrl: TEST_URL, logger: false, uploadsDir });
+test('the global limit allows 100 requests a minute per visitor, staff exempt', async () => {
+  // Production defaults: twenty quick page loads (about five requests each)
+  // from one visitor pass, the next request is refused
+  const defaults = await buildApp({
+    databaseUrl: TEST_URL,
+    logger: false,
+    uploadsDir,
+    adminToken: 'test-admin-token'
+  });
   try {
     const headers = { 'x-forwarded-for': '198.51.100.77' };
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 100; i++) {
       const res = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers });
       assert.notEqual(res.statusCode, 429, `request ${i + 1} of a page-load burst was refused`);
     }
-    // …while a flood is still cut off
-    let limited = false;
-    for (let i = 0; i < 600 && !limited; i++) {
-      const res = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers });
-      if (res.statusCode === 429) limited = true;
+    const flood = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers });
+    assert.equal(flood.statusCode, 429);
+
+    // Staff at the desk share the club's address with guests: a valid
+    // session is not counted, so the panel keeps working…
+    const staffHeaders = {
+      ...headers,
+      cookie: `admin_token=${issueAdminSession('test-admin-token')}`
+    };
+    for (let i = 0; i < 5; i++) {
+      const res = await defaults.inject({
+        method: 'GET',
+        url: '/api/venue-config',
+        headers: staffHeaders
+      });
+      assert.equal(res.statusCode, 200);
     }
-    assert.ok(limited, 'expected a 429 once one address floods the API');
+    // …while a forged or expired one is
+    const forged = { ...headers, cookie: 'admin_token=9999999999999.forged' };
+    const res = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers: forged });
+    assert.equal(res.statusCode, 429);
   } finally {
     await defaults.close();
+  }
+});
+
+test('the public forms need a solved bot check once Turnstile is configured', async () => {
+  const solvedFor = new Map<string, string>([
+    ['good-booking', 'booking'],
+    ['good-register', 'register']
+  ]);
+  const siteverify = (async (_url: string | URL | Request, init: RequestInit = {}) => {
+    const action = solvedFor.get((init.body as URLSearchParams).get('response') ?? '');
+    return new Response(
+      JSON.stringify(
+        action ? { success: true, action, hostname: 'billiard-piramida.pl' } : { success: false }
+      )
+    );
+  }) as typeof fetch;
+  const guarded = await buildApp({
+    databaseUrl: TEST_URL,
+    logger: false,
+    uploadsDir,
+    jwtSecret: 'test-jwt-secret',
+    rateLimitMax: 1000,
+    bookingCreateLimit: 1000,
+    turnstile: {
+      secret: 'test',
+      hostnames: ['billiard-piramida.pl'],
+      acceptTestingKeys: false,
+      fetch: siteverify
+    }
+  });
+  try {
+    const forms = [
+      {
+        url: '/api/bookings',
+        payload: {
+          tableId: 1,
+          date: MONDAY,
+          startHour: 18,
+          durationHours: 1,
+          customerName: 'Bot Check',
+          customerPhone: '+48 602 111 336'
+        }
+      },
+      {
+        url: '/api/auth/register',
+        payload: { phone: '+48 602 111 337', name: 'Bot Check', password: 'secret-pass-1' }
+      },
+      {
+        url: '/api/tournaments/seat-counting-cup/register',
+        payload: { name: 'Bot Check', phone: '+48 602 111 338' }
+      }
+    ];
+    for (const form of forms) {
+      for (const headers of [{}, { 'x-turnstile-token': 'unsolved' }]) {
+        const res = await guarded.inject({ method: 'POST', ...form, headers });
+        assert.equal(res.statusCode, 403, `${form.url} without a solved token`);
+        assert.equal(res.json().error, 'bot_check_failed');
+      }
+    }
+    // A token solved for another form does not open this one…
+    const register = forms[1]!;
+    const wrongAction = await guarded.inject({
+      method: 'POST',
+      ...register,
+      headers: { 'x-turnstile-token': 'good-booking' }
+    });
+    assert.equal(wrongAction.statusCode, 403);
+    // …its own does
+    const passed = await guarded.inject({
+      method: 'POST',
+      ...register,
+      headers: { 'x-turnstile-token': 'good-register' }
+    });
+    assert.equal(passed.statusCode, 201);
+  } finally {
+    await guarded.close();
   }
 });
 

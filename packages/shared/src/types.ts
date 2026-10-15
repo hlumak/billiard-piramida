@@ -164,6 +164,25 @@ export interface AuthResponseDto {
 /** Derived from the DTOs (Pick, not re-declared) so drift breaks the build. */
 export interface NewOrderItem extends Pick<OrderItemDto, 'foodItemId' | 'quantity'> {}
 
+/**
+ * A booking a guest made on the site (not at the desk): what the staff
+ * panel's bell lists and alerts about.
+ */
+export interface AdminOnlineBookingDto extends Pick<
+  BookingDto,
+  | 'id'
+  | 'kind'
+  | 'game'
+  | 'tableLabel'
+  | 'customerName'
+  | 'customerPhone'
+  | 'startsAt'
+  | 'endsAt'
+  | 'status'
+> {
+  createdAt: string;
+}
+
 /** A customer aggregated from their bookings — there are no accounts, phone is the key. */
 export interface AdminCustomerDto {
   phone: BookingDto['customerPhone'];

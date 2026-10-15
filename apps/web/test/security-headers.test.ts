@@ -8,7 +8,8 @@ import {
 describe('security headers', () => {
   test('pages get a nonce-based CSP that forbids framing', async () => {
     const csp = contentSecurityPolicy('abc123', 'https://club.example/news', '');
-    expect(csp).toContain(`script-src 'self' 'nonce-abc123'`);
+    expect(csp).toContain(`script-src 'self' 'nonce-abc123' https://challenges.cloudflare.com;`);
+    expect(csp).toContain(`frame-src https://www.google.com https://challenges.cloudflare.com;`);
     expect(csp).toContain(`frame-ancestors 'none'`);
     expect(csp).toContain('wss://club.example');
     expect(csp).not.toContain('unsafe-eval');

@@ -10,6 +10,11 @@ export const PHASE_LABELS: Record<BookingPhase, () => string> = {
   no_show: m.phase_no_show
 };
 
+/**
+ * A booking's status colours, guest and staff screens alike. The desk's live
+ * tones (AdminOverview, AdminSchedule) build on `active` for "playing now";
+ * their other tones read the clock, not the phase, and are their own.
+ */
 export const PHASE_STYLES: Record<BookingPhase, string> = {
   upcoming: 'border border-golden/60 text-golden-light',
   active: 'bg-golden text-btn-text',
@@ -37,7 +42,8 @@ const BOOKING_ERRORS: Record<string, () => string> = {
   invalid_name: m.err_name_required,
   rate_limited: m.err_rate_limited,
   booking_too_far: m.err_booking_too_far,
-  too_many_bookings: m.err_too_many_bookings
+  too_many_bookings: m.err_too_many_bookings,
+  bot_check_failed: m.err_bot_check
 };
 
 /** Map booking-mutation failures to localized copy. */
