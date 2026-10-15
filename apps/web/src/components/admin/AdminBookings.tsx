@@ -18,7 +18,14 @@ import {
   type AdminBookingFilters
 } from '../../lib/admin-api';
 import { formatPhone } from '@repo/shared/phone';
-import { bookingHours, formatDay, intlTag, warsawDate, warsawTime } from '../../lib/format';
+import {
+  bookingHours,
+  formatDay,
+  intlTag,
+  warsawDate,
+  warsawTime,
+  warsawToday
+} from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
@@ -174,6 +181,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
     error,
     refetch
   } = useQuery(adminBookingsQuery(filters));
+  const thisYear = warsawToday().slice(0, 4);
   // Localized dish names for the order summary (items carry only a slug)
   const { data: menu } = useQuery(menuQuery(getLocale()));
   const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
@@ -259,6 +267,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
               <tbody>
                 {bookings.map(booking => {
                   const voided = booking.phase === 'cancelled' || booking.phase === 'no_show';
+                  const day = warsawDate(booking.startsAt);
                   return (
                     <tr
                       key={booking.id}
@@ -266,7 +275,8 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
                     >
                       <td className="whitespace-nowrap lg:py-3.5 lg:pr-3 lg:pl-5">
                         <span className="block font-bold first-letter:uppercase">
-                          {formatDay(warsawDate(booking.startsAt))}
+                          {/* The unfiltered list reaches back into earlier years */}
+                          {formatDay(day, { withYear: !day.startsWith(thisYear) })}
                         </span>
                         <span className="text-grey-cool tabular-nums">
                           {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)}

@@ -61,12 +61,14 @@ function utcDate(isoDate: IsoDate): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
-/** "чт, 17 лип." — weekday + day + month for a YYYY-MM-DD, locale-aware. */
-export function formatDay(isoDate: IsoDate): string {
+/** "чт, 17 лип." — weekday + day + month for a YYYY-MM-DD, locale-aware; with
+ *  `withYear`, "чт, 17 лип. 2025 р." for a list that spans years. */
+export function formatDay(isoDate: IsoDate, { withYear = false } = {}): string {
   return formatter(intlTag(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
+    ...(withYear ? { year: 'numeric' } : {}),
     timeZone: 'UTC'
   }).format(utcDate(isoDate));
 }
