@@ -69,8 +69,7 @@ export function TournamentRegisterForm({
     }
   });
 
-  const { taken, target } = rosterProgress(tournament);
-  const placesLeft = target === null ? null : Math.max(target - taken, 0);
+  const { placesLeft } = rosterProgress(tournament);
   const surface = 'card rounded-3xl border-golden/45 p-6 md:p-7.5';
 
   if (register.isSuccess) {
@@ -98,7 +97,7 @@ export function TournamentRegisterForm({
     >
       <div>
         <h2 className="text-[22px] font-bold">{m.tournament_register_title()}</h2>
-        {placesLeft !== null && placesLeft > 0 ? (
+        {placesLeft !== null ? (
           <p className="mt-1.5 text-sm text-grey-cool">
             {m.tournament_seats_left({ n: placesLeft })}
           </p>

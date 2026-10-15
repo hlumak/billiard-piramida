@@ -48,11 +48,16 @@ export interface RosterProgress {
   /** 0–1 for the meter; null when there is nothing to measure against */
   fraction: number | null;
   label: string;
+  /** Seats still free under the club's cap; null with no cap (the minimum
+   *  is a floor, not a limit) or once the cap is reached */
+  placesLeft: number | null;
 }
 
 export function rosterProgress(tournament: TournamentDto): RosterProgress {
   const taken = tournament.confirmedCount + tournament.pendingCount;
   const target = rosterTarget(tournament);
+  const { maxPlayers } = tournament;
+  const placesLeft = maxPlayers === null ? 0 : maxPlayers - taken;
   return {
     taken,
     target,
@@ -61,7 +66,8 @@ export function rosterProgress(tournament: TournamentDto): RosterProgress {
     label:
       target === null
         ? m.tournament_players_open({ n: taken })
-        : m.tournament_players({ n: taken, total: target })
+        : m.tournament_players({ n: taken, total: target }),
+    placesLeft: placesLeft > 0 ? placesLeft : null
   };
 }
 

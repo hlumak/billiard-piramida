@@ -43,8 +43,7 @@ export function TournamentSpotlight({
   tournament: TournamentDto;
   className?: string;
 }) {
-  const { taken, target, fraction, label } = rosterProgress(tournament);
-  const placesLeft = target === null ? null : Math.max(target - taken, 0);
+  const { taken, target, fraction, label, placesLeft } = rosterProgress(tournament);
   const days = tournament.startsOn === null ? null : daysUntil(tournament.startsOn);
   const when = whenLabel(tournament);
   const fee = tournament.entryFeeGrosz;
@@ -83,7 +82,7 @@ export function TournamentSpotlight({
       <div className="mt-4 lg:mt-5.5">
         <div className="flex justify-between gap-3 text-[13px] lg:text-sm">
           <span className="font-semibold">{label}</span>
-          {placesLeft !== null && placesLeft > 0 ? (
+          {placesLeft !== null ? (
             <span className="font-bold text-golden-light">
               {m.tournament_seats_left({ n: placesLeft })}
             </span>

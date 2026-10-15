@@ -26,8 +26,7 @@ export function TournamentBadge({ tournament }: { tournament: TournamentDto }) {
  */
 export function TournamentCard({ tournament }: { tournament: TournamentDto }) {
   const live = isLive(tournament.registrationState);
-  const { taken, target, fraction, label } = rosterProgress(tournament);
-  const placesLeft = target === null ? null : Math.max(target - taken, 0);
+  const { taken, target, fraction, label, placesLeft } = rosterProgress(tournament);
   const when = whenLabel(tournament);
   const fee = tournament.entryFeeGrosz;
 
@@ -65,7 +64,7 @@ export function TournamentCard({ tournament }: { tournament: TournamentDto }) {
         <div className="mt-auto pt-5">
           <div className="flex justify-between gap-3 text-sm">
             <span className="font-semibold">{label}</span>
-            {live && placesLeft !== null && placesLeft > 0 ? (
+            {live && placesLeft !== null ? (
               <span className="font-bold text-golden-light">
                 {m.tournament_seats_left({ n: placesLeft })}
               </span>
