@@ -21,6 +21,7 @@
   "table_n": "Stół {n}",
   "dartboard_n": "Tarcza {n}",
   "no_slots_for_date": "Brak wolnych terminów na ten dzień",
+  "when_all_closed": "Klub jest zamknięty we wszystkie dni dostępne do rezerwacji. Zadzwoń do nas.",
   "no_tables_free": "Brak wolnych miejsc o tej godzinie. Wybierz inną.",
   "no_kind_free": "W tej kategorii nie ma teraz wolnych miejsc.",
   "min_booking_note": "Minimalna rezerwacja — 1 godzina",

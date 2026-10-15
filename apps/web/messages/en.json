@@ -21,6 +21,7 @@
   "table_n": "Table {n}",
   "dartboard_n": "Dartboard {n}",
   "no_slots_for_date": "No free slots on this date",
+  "when_all_closed": "The club is closed on every day open for booking. Please call us.",
   "no_tables_free": "Nothing free at this time. Try another slot.",
   "no_kind_free": "None free in this category right now.",
   "min_booking_note": "Minimum booking — 1 hour",

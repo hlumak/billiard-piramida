@@ -70,6 +70,9 @@ export function WhenStep() {
   const { hours } = useVenueConfig();
   const today = warsawToday();
   const dates = Array.from({ length: BOOKING_DAYS_AHEAD }, (_, i) => addDays(today, i));
+  // No day to open on (a closure longer than the window): say so, rather than
+  // leave the hours placeholder waiting for a pick that cannot come
+  const allClosed = dates.every(day => isClosedAllDay(hoursForDate(day, hours)));
 
   return (
     <div>
@@ -126,7 +129,13 @@ export function WhenStep() {
         })}
       </div>
 
-      {date === null ? <TimeSkeleton /> : <TimePicker date={date} />}
+      {date !== null ? (
+        <TimePicker date={date} />
+      ) : allClosed ? (
+        <p className="py-8 text-center text-grey-cool">{m.when_all_closed()}</p>
+      ) : (
+        <TimeSkeleton />
+      )}
     </div>
   );
 }
