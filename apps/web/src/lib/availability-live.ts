@@ -12,19 +12,26 @@ function wsUrl(): string {
 
 const INITIAL_RETRY_MS = 1_000;
 const MAX_RETRY_MS = 30_000;
+/** Open this long before it drops, and a socket counts as having worked: the
+ *  next retry starts from the shortest delay again */
+const STABLE_MS = 10_000;
 
 type Listener = (date: IsoDate) => void;
 
 /**
  * One shared WebSocket for the whole app. Dates are refcounted: the socket
  * subscribes on first listener, unsubscribes on last, and closes when idle.
- * On (re)connect every watched date fires once — events may have been missed.
+ * On a reconnect every watched date fires once — events may have been missed
+ * while it was down. The first connect does not: the listeners' own queries
+ * have only just fetched.
  */
 class AvailabilityLive {
   private socket: WebSocket | null = null;
   private readonly listeners = new Map<IsoDate, Set<Listener>>();
   private retryMs = INITIAL_RETRY_MS;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Set while a dropped socket is being replaced */
+  private reconnecting = false;
 
   subscribe(date: IsoDate, listener: Listener): () => void {
     const set = this.listeners.get(date);
@@ -54,13 +61,16 @@ class AvailabilityLive {
 
     const socket = new WebSocket(wsUrl());
     this.socket = socket;
+    let openedAt: number | null = null;
 
     socket.addEventListener('open', () => {
-      this.retryMs = INITIAL_RETRY_MS;
+      openedAt = Date.now();
+      const missed = this.reconnecting;
+      this.reconnecting = false;
       for (const date of this.listeners.keys()) {
         socket.send(JSON.stringify({ type: 'subscribe', date }));
         // Refetch once per watched date — changes may have happened while offline
-        this.emit(date);
+        if (missed) this.emit(date);
       }
     });
 
@@ -83,6 +93,13 @@ class AvailabilityLive {
       if (this.socket !== socket) return;
       this.socket = null;
       if (this.listeners.size === 0) return;
+      // Only a socket that stayed up resets the delay: one the server refuses
+      // right after the handshake (too many from this address) opens too, and
+      // resetting on open would retry it, and refetch, every second
+      if (openedAt !== null && Date.now() - openedAt >= STABLE_MS) {
+        this.retryMs = INITIAL_RETRY_MS;
+      }
+      this.reconnecting = true;
       this.retryTimer = setTimeout(() => {
         this.retryTimer = null;
         this.ensureConnected();
@@ -97,6 +114,8 @@ class AvailabilityLive {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
     }
+    this.reconnecting = false;
+    this.retryMs = INITIAL_RETRY_MS;
     this.socket?.close();
     this.socket = null;
   }
