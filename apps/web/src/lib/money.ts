@@ -16,3 +16,11 @@ export function parseZloty(input: string, maxGrosz: number = MAX_PRICE_GROSZ): n
   const grosz = Math.round(value * 100);
   return grosz <= maxGrosz ? grosz : null;
 }
+
+/** The currency the way a price shows it in this locale: "zł" in Polish, "PLN" otherwise. */
+export function plnUnit(locale: string): string {
+  const parts = new Intl.NumberFormat(locale, { style: 'currency', currency: 'PLN' }).formatToParts(
+    0
+  );
+  return parts.find(part => part.type === 'currency')?.value ?? 'PLN';
+}
