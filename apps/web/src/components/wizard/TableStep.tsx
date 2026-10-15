@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -19,7 +19,7 @@ import { useLiveAvailability } from '../../lib/availability-live';
 import { ACTIVITY_KINDS, activityName, gameName, spotName } from '../../lib/spots';
 import { useVenueConfig } from '../../lib/venue-config';
 import { QueryError } from '../QueryError';
-import { goToStep, selectTable } from '../../store/booking-wizard';
+import { clearTable, goToStep, selectTable } from '../../store/booking-wizard';
 import { FloorPlan, PlanLegend } from './FloorPlan';
 import { freeSpotIds } from './free-spots';
 import { StepActions } from './WizardFrame';
@@ -95,6 +95,14 @@ export function TableStep({
   // The chips show one kind at a time; a spot already picked decides which
   const [kind, setKind] = useState<ActivityKind>(pickedKind ?? 'billiard');
 
+  // Someone else can take the picked spot meanwhile: then it is no longer
+  // picked anywhere — not here, and not in the summary or its price either
+  const free = freeSpotIds(availability?.tables ?? [], startHour, durationHours);
+  const lost = availability !== undefined && tableId !== null && !free.has(tableId);
+  useEffect(() => {
+    if (lost) clearTable();
+  }, [lost]);
+
   if (isError && !availability) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !availability) {
     return (
@@ -104,10 +112,8 @@ export function TableStep({
     );
   }
 
-  const free = freeSpotIds(availability.tables, startHour, durationHours);
   const roomIsBusy = free.size === 0;
-  // Someone else can take the picked spot meanwhile: then it is no longer picked
-  const picked = tableId !== null && free.has(tableId) ? tableId : null;
+  const picked = lost ? null : tableId;
   const offeredKinds = ACTIVITY_KINDS.filter(k => availability.tables.some(t => t.kind === k));
   const groups = spotGroups(availability.tables, kind, rates);
 
@@ -191,38 +197,39 @@ export function TableStep({
         </div>
 
         <div className="flex flex-col gap-5 md:gap-6">
-          {groups.length === 0 ? (
+          {/* Only this kind is out: the toggle above is the way on, so no step back */}
+          {!roomIsBusy &&
+          groups.every(group => group.spots.every(spot => !free.has(spot.tableId))) ? (
             <p className="text-grey-cool">{m.no_kind_free()}</p>
-          ) : (
-            groups.map(group => (
-              <section key={`${kind}-${group.key}`} aria-label={group.title}>
-                <h3 className="text-sm font-bold md:text-[15px]">
-                  {group.title}
-                  <span className="font-medium text-grey-cool md:hidden"> · {group.detail}</span>
-                </h3>
-                <p className="mt-1 hidden text-[13px] text-grey-cool md:block">{group.detail}</p>
-                <div className="mt-2.5 grid grid-cols-5 gap-2 md:mt-3">
-                  {group.spots.map(spot => {
-                    const isFree = free.has(spot.tableId);
-                    const name = spotName(spot.kind, spot.label);
-                    return (
-                      <button
-                        key={spot.tableId}
-                        type="button"
-                        aria-pressed={isFree ? picked === spot.tableId : undefined}
-                        aria-label={isFree ? name : `${name}, ${m.plan_taken_now()}`}
-                        disabled={!isFree}
-                        onClick={() => pick(spot.tableId)}
-                        className="chip anim-stagger-item h-12 text-base disabled:border-[1.5px] disabled:border-dashed disabled:border-creme/22 disabled:shadow-none md:h-12.5 md:text-[17px]"
-                      >
-                        {spot.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ))
-          )}
+          ) : null}
+          {groups.map(group => (
+            <section key={`${kind}-${group.key}`} aria-label={group.title}>
+              <h3 className="text-sm font-bold md:text-[15px]">
+                {group.title}
+                <span className="font-medium text-grey-cool md:hidden"> · {group.detail}</span>
+              </h3>
+              <p className="mt-1 hidden text-[13px] text-grey-cool md:block">{group.detail}</p>
+              <div className="mt-2.5 grid grid-cols-5 gap-2 md:mt-3">
+                {group.spots.map(spot => {
+                  const isFree = free.has(spot.tableId);
+                  const name = spotName(spot.kind, spot.label);
+                  return (
+                    <button
+                      key={spot.tableId}
+                      type="button"
+                      aria-pressed={isFree ? picked === spot.tableId : undefined}
+                      aria-label={isFree ? name : `${name}, ${m.plan_taken_now()}`}
+                      disabled={!isFree}
+                      onClick={() => pick(spot.tableId)}
+                      className="chip anim-stagger-item h-12 text-base disabled:border-[1.5px] disabled:border-dashed disabled:border-creme/22 disabled:shadow-none md:h-12.5 md:text-[17px]"
+                    >
+                      {spot.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
           <PlanLegend className="hidden flex-col gap-2.5 border-t border-creme/12 pt-4.5 text-sm md:flex" />
         </div>
       </div>

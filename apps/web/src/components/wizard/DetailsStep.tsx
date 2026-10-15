@@ -1,5 +1,6 @@
 import { Description, FieldError, Input, Label, TextField } from '@heroui/react';
 import { useForm } from '@tanstack/react-form';
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -59,10 +60,15 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
       });
       resetWizard();
     },
-    onError: error => {
+    onError: (error, input) => {
       // The menu moved on under the guest: refresh it so the order shows the truth
       if (error instanceof ApiError && error.code === 'unknown_food_item') {
         void queryClient.invalidateQueries({ queryKey: menuQuery(getLocale()).queryKey });
+      }
+      // Someone else got there first: the grid is stale, and the table step
+      // should show the spot taken when the guest goes back to it
+      if (error instanceof ApiError && error.code === 'slot_taken') {
+        void queryClient.invalidateQueries({ queryKey: availabilityQuery(input.date).queryKey });
       }
     }
   });
@@ -83,7 +89,15 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
 
   const err = createBooking.error;
   const isTimeError = needsNewTime(err);
+  const slotTaken = err instanceof ApiError && err.code === 'slot_taken';
   const errorMessage = err ? mutationErrorText(err) : null;
+
+  // The confirm button sits in the phone's bottom bar, often far below the
+  // error: bring the error into view rather than leave it off screen
+  const alertRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (err) alertRef.current?.scrollIntoView({ block: 'center' });
+  }, [err]);
   // With food in the order the menu must be known, or the lines can't be priced
   const menuPending = Object.keys(items).length > 0 && menu === undefined;
 
@@ -177,8 +191,22 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
       />
 
       {errorMessage ? (
-        <div role="alert" className="mt-5 rounded-2xl bg-danger-soft p-4 text-sm text-creme">
+        <div
+          ref={alertRef}
+          role="alert"
+          className="mt-5 scroll-mt-24 rounded-2xl bg-danger-soft p-4 text-sm text-creme"
+        >
           {errorMessage}
+          {/* Taken spot: another one at the same time may still be free */}
+          {slotTaken ? (
+            <button
+              type="button"
+              onClick={() => goToStep('table')}
+              className="btn-outline mt-3 h-10 w-full text-sm"
+            >
+              ← {m.change_spot()}
+            </button>
+          ) : null}
           {isTimeError ? (
             <button
               type="button"

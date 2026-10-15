@@ -122,6 +122,11 @@ export function selectTable(tableId: number, kind: ActivityKind, tableLabel: str
   }));
 }
 
+/** The picked spot went to someone else: nothing is picked any more. */
+export function clearTable(): void {
+  wizardStore.setState(state => (state.tableId === null ? state : { ...state, ...noSpot }));
+}
+
 export function selectGame(game: BilliardGame): void {
   wizardStore.setState(state => ({ ...state, game }));
 }
