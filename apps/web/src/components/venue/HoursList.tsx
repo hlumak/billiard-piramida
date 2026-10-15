@@ -31,12 +31,16 @@ export function HoursList({ className }: { className?: string }) {
               isToday ? 'bg-golden/14' : ''
             }`}
           >
+            {/* Flex centres the smaller tag on the day's line; on the baseline
+                it sat low. ::first-letter needs a block, hence inline-block. */}
             <dt
-              className={`first-letter:uppercase ${isToday ? 'font-semibold' : 'text-cream-soft'}`}
+              className={`flex items-center gap-2 ${isToday ? 'font-semibold' : 'text-cream-soft'}`}
             >
-              {dayRangeLabel(group.weekdays)}
+              <span className="inline-block first-letter:uppercase">
+                {dayRangeLabel(group.weekdays)}
+              </span>
               {isToday ? (
-                <span className="ml-2 text-xs font-bold uppercase tracking-wide text-golden-light">
+                <span className="text-xs leading-none font-bold tracking-wide text-golden-light uppercase">
                   {m.hours_today()}
                 </span>
               ) : null}
