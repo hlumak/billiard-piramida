@@ -67,7 +67,11 @@ export function RateTiles({ withBooking = false }: { withBooking?: boolean }) {
           </div>
           <p className="flex shrink-0 flex-col items-end md:mt-7 md:flex-row md:items-baseline md:gap-2">
             <span className="text-[28px] leading-none font-bold text-golden tabular-nums md:text-[46px]">
-              {formatNumber(rates[tier] / 100, { maximumFractionDigits: 2 })}
+              {/* Whole złoty bare, otherwise both decimals, as formatPln prices it: "27,50" */}
+              {formatNumber(rates[tier] / 100, {
+                minimumFractionDigits: rates[tier] % 100 === 0 ? 0 : 2,
+                maximumFractionDigits: 2
+              })}
             </span>
             <span className="mt-0.5 text-xs text-grey-cool md:mt-0 md:text-[15px]">
               {m.rate_unit()}
