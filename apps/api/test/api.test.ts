@@ -3368,7 +3368,7 @@ test('closures: refused over bookings, close slots, block every way of booking i
       url: `/api/admin/closures/${id}`,
       headers
     });
-    assert.equal(removed.statusCode, 204);
+    assert.equal(removed.statusCode, 200);
   }
   const gone = await app.inject({
     method: 'DELETE',
@@ -3420,7 +3420,7 @@ test('closures: whole days close every slot; nonsense is refused', async () => {
     url: `/api/admin/closures/${created.json().id}`,
     headers
   });
-  assert.equal(removed.statusCode, 204);
+  assert.equal(removed.statusCode, 200);
 
   const post = (payload: Record<string, unknown>) =>
     app.inject({

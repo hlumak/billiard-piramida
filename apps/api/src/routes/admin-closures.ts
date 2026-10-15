@@ -202,7 +202,7 @@ export const adminClosureRoutes: FastifyPluginAsyncTypebox = async admin => {
     {
       schema: {
         params: Type.Object({ id: UUID }),
-        response: { 204: Type.Null(), '4xx': ERROR_RESPONSE }
+        response: { 200: Type.Object({ deleted: Type.Boolean() }), '4xx': ERROR_RESPONSE }
       }
     },
     async (request, reply) => {
@@ -212,7 +212,7 @@ export const adminClosureRoutes: FastifyPluginAsyncTypebox = async admin => {
         .returning();
       if (!removed) return reply.code(404).send({ error: 'not_found' });
       announce(removed);
-      return reply.code(204).send(null);
+      return { deleted: true };
     }
   );
 };
