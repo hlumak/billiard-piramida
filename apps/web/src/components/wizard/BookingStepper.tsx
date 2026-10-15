@@ -43,7 +43,8 @@ export function BookingStepper({ step }: { step: WizardStep }) {
                 key={entry}
                 type="button"
                 onClick={() => goToStep(entry)}
-                className="py-1 text-left text-cream-soft underline decoration-creme/40 underline-offset-2"
+                // 44px to tap, laid out as the 24px row the other names take
+                className="-my-2.5 py-3.5 text-left text-cream-soft underline decoration-creme/40 underline-offset-2"
               >
                 {LABELS[entry]()}
               </button>
