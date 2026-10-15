@@ -79,6 +79,8 @@
   "opening_hours": "Opening hours",
   "map_label": "Find us on the map",
   "map_directions": "Get directions",
+  "map_show": "Show map",
+  "map_show_note": "Loads the map from Google Maps.",
   "no_bookings": "No bookings yet",
   "find_booking_title": "Find a booking",
   "find_booking_hint": "Booked on another device or browser? Enter the phone number you used to see your upcoming bookings.",

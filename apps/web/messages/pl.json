@@ -79,6 +79,8 @@
   "opening_hours": "Godziny otwarcia",
   "map_label": "Znajdź nas na mapie",
   "map_directions": "Wyznacz trasę",
+  "map_show": "Pokaż mapę",
+  "map_show_note": "Mapa wczyta się z Map Google.",
   "no_bookings": "Nie masz jeszcze rezerwacji",
   "find_booking_title": "Znajdź rezerwację",
   "find_booking_hint": "Rezerwowałeś na innym urządzeniu lub w innej przeglądarce? Wpisz numer telefonu użyty przy rezerwacji, aby zobaczyć nadchodzące rezerwacje.",

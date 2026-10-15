@@ -23,8 +23,8 @@ export const VENUE_ADDRESS = `${VENUE.street}, ${VENUE.postalCode} ${VENUE.city}
  * language/region fields, which follow the site locale — every locale was
  * checked to return a shell carrying this same place id.
  *
- * Unlike the OSM embed this replaced, Google's does set third-party cookies
- * once it loads. That is the club's call, taken knowingly.
+ * Unlike the OSM embed this replaced, Google's talks to Google once it loads,
+ * so VenueMap loads it only when the visitor asks for it.
  */
 const MAP_EMBED_PB =
   '!1m18!1m12!1m3!1d4940.42048659591!2d19.491529976840894!3d51.74747897186878' +
