@@ -98,6 +98,11 @@ function SessionControls({
   );
 }
 
+/**
+ * The header's search: a number in, that client's bookings out, from any
+ * section. Named for what it finds, since the bookings and customers sections
+ * have their own phone filters right below it.
+ */
 function PhoneSearch({ onSearch }: { onSearch: (phone: string) => void }) {
   const [value, setValue] = useState('');
   const id = useId();
@@ -112,7 +117,7 @@ function PhoneSearch({ onSearch }: { onSearch: (phone: string) => void }) {
     >
       <Search aria-hidden className="size-4.5 flex-none text-grey-cool" />
       <label htmlFor={id} className="sr-only">
-        {m.admin_search_phone()}
+        {m.admin_find_bookings()}
       </label>
       <input
         id={id}
@@ -120,7 +125,7 @@ function PhoneSearch({ onSearch }: { onSearch: (phone: string) => void }) {
         inputMode="tel"
         value={value}
         onChange={event => setValue(event.target.value)}
-        placeholder={m.admin_search_phone()}
+        placeholder={m.admin_find_bookings()}
         className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-grey-cool/80"
       />
     </form>

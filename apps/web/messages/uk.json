@@ -152,6 +152,7 @@
   "admin_new_booking": "Нове бронювання",
   "admin_create_btn": "Створити",
   "admin_search_phone": "Пошук за телефоном",
+  "admin_find_bookings": "Знайти бронювання за телефоном",
   "admin_extend_1h": "+1 год",
   "admin_customer_bookings": "Бронювання клієнта",
   "admin_in_menu": "У меню",
