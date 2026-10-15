@@ -47,7 +47,7 @@ const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[
 const small =
   'h-9 rounded-[10px] px-3 text-[13px] font-semibold transition-colors disabled:opacity-50';
 const quiet = `${small} border border-creme/25 text-creme hover:bg-creme/6`;
-const danger = `${small} border border-[#ff9b8a]/60 text-[#ffb3a6] hover:bg-[rgb(255_120_100/0.12)]`;
+const danger = `${small} border border-[#ff9b8a]/60 text-danger-soft-foreground hover:bg-[rgb(255_120_100/0.12)]`;
 
 function RowActions({ booking }: { booking: BookingDto }) {
   const queryClient = useQueryClient();
@@ -311,7 +311,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
                         </span>
                         <a
                           href={`tel:${booking.customerPhone}`}
-                          className="text-golden-light hover:underline"
+                          className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
                         >
                           {formatPhone(booking.customerPhone)}
                         </a>

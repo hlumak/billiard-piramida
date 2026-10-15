@@ -90,7 +90,7 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
                 <span className="flex items-center gap-2">
                   <a
                     href={`tel:${customer.phone.replaceAll(' ', '')}`}
-                    className="text-sm text-golden-light hover:underline"
+                    className="text-sm text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
                   >
                     {formatPhone(customer.phone)}
                   </a>

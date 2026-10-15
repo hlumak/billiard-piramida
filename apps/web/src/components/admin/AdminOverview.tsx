@@ -139,7 +139,7 @@ function TodayRow({ booking, now }: { booking: BookingDto; now: number }) {
           <span className="lg:hidden"> · </span>
           <a
             href={`tel:${booking.customerPhone}`}
-            className="text-golden-light hover:underline lg:text-[13px]"
+            className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light lg:text-[13px]"
           >
             {formatPhone(booking.customerPhone)}
           </a>

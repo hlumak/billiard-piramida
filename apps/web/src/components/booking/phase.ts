@@ -14,8 +14,8 @@ export const PHASE_STYLES: Record<BookingPhase, string> = {
   upcoming: 'border border-golden/60 text-golden-light',
   active: 'bg-golden text-btn-text',
   finished: 'bg-creme/10 text-cream-soft',
-  cancelled: 'bg-[rgb(255_120_100/0.16)] text-[#ffb3a6]',
-  no_show: 'border border-[#ff9b8a] text-[#ffb3a6]'
+  cancelled: 'bg-[rgb(255_120_100/0.16)] text-danger-soft-foreground',
+  no_show: 'border border-[#ff9b8a] text-danger-soft-foreground'
 };
 
 /** Booking API error codes → localized copy; anything unknown is generic. */

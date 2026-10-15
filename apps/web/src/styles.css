@@ -229,7 +229,8 @@
      every field, not just the phone one, so forms stay of a piece. */
   --field-background: #176b47;
   --field-foreground: #f6f1dc;
-  --field-placeholder: #b4bda6;
+  /* 4.6:1 on the field: a placeholder is read too (it was #b4bda6, 3.3:1) */
+  --field-placeholder: #d6dbcb;
   --field-border-width: 0px;
   --field-border: transparent;
   --field-shadow:
@@ -237,6 +238,11 @@
 
   --segment: #176b47;
   --segment-foreground: #f6f1dc;
+
+  /* HeroUI mixes its danger red with the foreground for soft buttons and
+     error text, which comes out #ff8978: 3.7–3.8:1 on the green cards. A paler
+     red reads 5:1 there and stays clearly a warning. */
+  --danger-soft-foreground: #ffb8ab;
 
   --border: color-mix(in oklab, #dbdabc 40%, transparent);
   --separator: color-mix(in oklab, #dbdabc 30%, transparent);
@@ -360,6 +366,30 @@ body {
 
 /* The native option list is drawn by the OS, so it needs a SOLID ground of
    its own rather than inheriting whatever the platform paints behind it. */
+/* HeroUI paints a field's error, an invalid field's label and part, and the
+   required asterisk in the raw --danger (#ff383c): 2.4:1 on a card. They take
+   the readable red every other error on the site uses. */
+.field-error,
+.error-message,
+.label--invalid,
+[data-invalid='true'] .label,
+[aria-invalid='true'] .label,
+[data-slot='date-input-group-segment'][data-invalid='true'],
+.label--required::after,
+[data-required='true'] > .label::after {
+  color: var(--danger-soft-foreground);
+}
+
+/* A date field's day, month and year are separate targets: at least 24px
+   each (WCAG 2.2 target size), they were about 17×20 */
+[data-slot='date-input-group-segment'] {
+  display: inline-flex;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
 .PhoneInputCountrySelect option {
   background-color: var(--surface);
   color: var(--surface-foreground);

@@ -30,7 +30,7 @@ export function CancelModal({ booking }: { booking: BookingDto }) {
       <Button
         variant="danger-soft"
         aria-label={m.cancel_booking()}
-        className="h-12.5 w-full rounded-[14px] px-4 bg-[rgb(255_120_100/0.14)] text-[15px] font-semibold text-[#ffb3a6] hover:bg-[rgb(255_120_100/0.22)]"
+        className="h-12.5 w-full rounded-[14px] px-4 bg-[rgb(255_120_100/0.14)] text-[15px] font-semibold text-danger-soft-foreground hover:bg-[rgb(255_120_100/0.22)]"
         onPress={() => setOpen(true)}
       >
         {m.cancel_short()}

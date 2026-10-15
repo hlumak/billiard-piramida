@@ -40,7 +40,7 @@ function EntryRow({ entry }: { entry: AdminBlacklistEntryDto }) {
             {entry.name !== null ? (
               <a
                 href={`tel:${entry.phone}`}
-                className="ml-2 text-sm font-normal text-golden-light hover:underline"
+                className="ml-2 text-sm font-normal text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
               >
                 {formatPhone(entry.phone)}
               </a>
