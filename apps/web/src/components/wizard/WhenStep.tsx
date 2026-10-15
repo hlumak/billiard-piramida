@@ -224,10 +224,18 @@ function TimePicker({ date }: { date: IsoDate }) {
               </span>
             ) : null}
           </div>
+          {/* One row of up to four; more go in two even rows, so a Saturday's
+              eight still fit beside the summary */}
           <div
             role="group"
             aria-label={m.time_duration()}
-            className="mt-2.5 grid grid-cols-3 gap-1 rounded-[14px] bg-card p-1.25 sm:inline-grid sm:grid-flow-col sm:grid-cols-none md:mt-3"
+            className={`mt-2.5 grid grid-cols-3 gap-1 rounded-[14px] bg-card p-1.25 sm:inline-grid md:mt-3 ${
+              lengths.length > 6
+                ? 'sm:grid-cols-4'
+                : lengths.length > 4
+                  ? 'sm:grid-cols-3'
+                  : 'sm:grid-flow-col sm:grid-cols-none'
+            }`}
           >
             {lengths.map(n => (
               <button
@@ -236,7 +244,7 @@ function TimePicker({ date }: { date: IsoDate }) {
                 aria-pressed={duration === n}
                 disabled={n > longest}
                 onClick={() => selectDuration(n)}
-                className="segment h-11 px-5 text-[15px] sm:min-w-27.5"
+                className="segment h-11 px-5 text-[15px] sm:min-w-25"
               >
                 {m.hours_n({ n })}
               </button>
