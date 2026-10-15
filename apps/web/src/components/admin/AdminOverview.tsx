@@ -105,27 +105,34 @@ function spotLine(booking: BookingDto): string {
   return booking.game ? `${name} · ${gameName(booking.game).toLocaleLowerCase(getLocale())}` : name;
 }
 
+/**
+ * A finished booking is dimmed but keeps its actions: the tab is often
+ * settled at the bar after the game ends, and a dialog opened just before
+ * the end must not vanish with its row's buttons.
+ */
 function TodayRow({ booking, now }: { booking: BookingDto; now: number }) {
   const status = liveStatus(booking, now);
   const time = `${warsawTime(booking.startsAt)}–${warsawTime(booking.endsAt)}`;
+  // On each part rather than on the wrapper, which is display: contents on a wide screen
+  const dim = status.tone === 'done' ? 'opacity-55' : '';
   return (
-    <li
-      className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 border-t border-line px-4 py-3.5 md:px-5.5 lg:grid-cols-[118px_minmax(0,1fr)_132px_auto] lg:gap-x-4 ${
-        status.tone === 'done' ? 'opacity-55' : ''
-      }`}
-    >
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 border-t border-line px-4 py-3.5 md:px-5.5 lg:grid-cols-[118px_minmax(0,1fr)_132px_auto] lg:gap-x-4">
       <div className="min-w-0 lg:contents">
-        <p className="font-bold tabular-nums lg:col-start-1 lg:row-start-1">
+        <p className={`font-bold tabular-nums lg:col-start-1 lg:row-start-1 ${dim}`}>
           {time}
           <span className="font-semibold lg:hidden">
             {' '}
             · {spotName(booking.kind, booking.tableLabel)}
           </span>
         </p>
-        <p className="hidden text-[13px] text-grey-cool lg:col-start-1 lg:row-start-2 lg:block">
+        <p
+          className={`hidden text-[13px] text-grey-cool lg:col-start-1 lg:row-start-2 lg:block ${dim}`}
+        >
           {spotLine(booking)}
         </p>
-        <p className="mt-0.5 min-w-0 truncate text-[13px] text-grey-cool lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:text-base">
+        <p
+          className={`mt-0.5 min-w-0 truncate text-[13px] text-grey-cool lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:text-base ${dim}`}
+        >
           <span className="font-semibold lg:block lg:text-[15px] lg:text-creme">
             {booking.customerName}
           </span>
@@ -139,16 +146,14 @@ function TodayRow({ booking, now }: { booking: BookingDto; now: number }) {
         </p>
       </div>
       <span
-        className={`rounded-full px-2.5 py-1 text-center text-xs font-bold whitespace-nowrap lg:col-start-3 lg:row-span-2 lg:row-start-1 ${TONES[status.tone]}`}
+        className={`rounded-full px-2.5 py-1 text-center text-xs font-bold whitespace-nowrap lg:col-start-3 lg:row-span-2 lg:row-start-1 ${TONES[status.tone]} ${dim}`}
       >
         {status.label}
       </span>
-      {status.tone === 'done' ? null : (
-        <div className="col-span-2 flex gap-2 lg:col-span-1 lg:col-start-4 lg:row-span-2 lg:row-start-1 lg:justify-end">
-          <AdminBookingOrder booking={booking} />
-          <AdminEditBooking booking={booking} />
-        </div>
-      )}
+      <div className="col-span-2 flex gap-2 lg:col-span-1 lg:col-start-4 lg:row-span-2 lg:row-start-1 lg:justify-end">
+        <AdminBookingOrder booking={booking} />
+        <AdminEditBooking booking={booking} />
+      </div>
     </li>
   );
 }
@@ -251,7 +256,13 @@ export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void 
   const now = useNowMinute();
   const today = warsawToday(now);
   const { data: stats, isPending, isError, refetch } = useQuery(adminStatsQuery());
-  const { data: dayBookings } = useQuery(adminBookingsQuery({ date: today }));
+  // The same query the schedule makes, so the two share one cache entry
+  const {
+    data: dayBookings,
+    isError: dayFailed,
+    error: dayError,
+    refetch: refetchDay
+  } = useQuery(adminBookingsQuery({ date: today, status: 'confirmed' }));
   const { data: spots } = useQuery(tablesQuery());
   const { data: menu } = useQuery(menuQuery(getLocale()));
 
@@ -266,9 +277,7 @@ export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void 
 
   const money = (grosz: number) => formatPln(grosz, intlTag());
   const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
-  const confirmed = (dayBookings ?? [])
-    .filter(booking => booking.status === 'confirmed')
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const confirmed = [...(dayBookings ?? [])].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const playing = confirmed.filter(
     booking => Date.parse(booking.startsAt) <= now && now < Date.parse(booking.endsAt)
   );
@@ -319,7 +328,11 @@ export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void 
               {m.admin_schedule_link()} →
             </button>
           </div>
-          {!loaded ? (
+          {!loaded && dayFailed ? (
+            <div className="border-t border-line">
+              <QueryError error={dayError} onRetry={() => refetchDay()} />
+            </div>
+          ) : !loaded ? (
             <div className="flex justify-center border-t border-line py-10">
               <Spinner aria-label={m.loading()} />
             </div>
@@ -337,7 +350,8 @@ export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void 
         </section>
 
         <div className="flex flex-col gap-5">
-          {spots ? <TablesNow spots={spots} bookings={confirmed} now={now} /> : null}
+          {/* Only with today's bookings in: without them every table would read free */}
+          {spots && loaded ? <TablesNow spots={spots} bookings={confirmed} now={now} /> : null}
           <section className="card anim-stagger-item p-4.5 md:px-5.5 md:py-5">
             <h2 className="text-lg font-bold">{m.admin_top_bar()}</h2>
             <p className="mt-0.5 text-[13px] text-grey-cool">{m.admin_last_30()}</p>
