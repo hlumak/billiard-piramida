@@ -6,7 +6,7 @@ import { formatPln, hoursForDate, MAX_BOOKING_HOURS, sizeOf, type BookingDto } f
 import { useVenueConfig } from '../../lib/venue-config';
 import { bookingHours, formatDayLong, intlTag, warsawDate, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
-import { gameName, spotName, spotRentalLabel } from '../../lib/spots';
+import { spotDescription, spotRentalLabel } from '../../lib/spots';
 import { VENUE, VENUE_DIRECTIONS_URL } from '../../lib/venue';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
@@ -45,16 +45,12 @@ export function BookingDetails({
 
   const canManage = booking.phase === 'upcoming' || booking.phase === 'active';
   const celebrate = justCreated && booking.phase !== 'cancelled';
-  const size = sizeOf(booking.tableId);
-  const spot = [
-    spotName(booking.kind, booking.tableLabel),
-    size,
+  const spot = spotDescription(booking.kind, booking.tableLabel, {
+    size: sizeOf(booking.tableId),
     // Absent on a dartboard, and on rentals taken before the club began
     // recording it — either way there is nothing truthful to show
-    booking.game ? gameName(booking.game) : null
-  ]
-    .filter(Boolean)
-    .join(' · ');
+    game: booking.game
+  });
   const money = (grosz: number) => formatPln(grosz, intlTag());
 
   return (

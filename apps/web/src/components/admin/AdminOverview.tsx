@@ -11,7 +11,7 @@ import { formatPhone } from '@repo/shared/phone';
 import { adminBookingsQuery, adminStatsQuery } from '../../lib/admin-api';
 import { intlTag, warsawTime, warsawToday } from '../../lib/format';
 import { menuQuery, tablesQuery } from '../../lib/queries';
-import { gameName, spotName } from '../../lib/spots';
+import { spotDescription, spotName } from '../../lib/spots';
 import { useNowMinute } from '../../lib/use-now';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
@@ -106,11 +106,6 @@ function Kpi({
   );
 }
 
-function spotLine(booking: BookingDto): string {
-  const name = spotName(booking.kind, booking.tableLabel);
-  return booking.game ? `${name} · ${gameName(booking.game).toLocaleLowerCase(getLocale())}` : name;
-}
-
 /**
  * A finished booking is dimmed but keeps its actions: the tab is often
  * settled at the bar after the game ends, and a dialog opened just before
@@ -134,7 +129,10 @@ function TodayRow({ booking, now }: { booking: BookingDto; now: number }) {
         <p
           className={`hidden text-[13px] text-grey-cool lg:col-start-1 lg:row-start-2 lg:block ${dim}`}
         >
-          {spotLine(booking)}
+          {spotDescription(booking.kind, booking.tableLabel, {
+            game: booking.game,
+            lowercaseGame: true
+          })}
         </p>
         <p
           className={`mt-0.5 min-w-0 truncate text-[13px] text-grey-cool lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:text-base ${dim}`}

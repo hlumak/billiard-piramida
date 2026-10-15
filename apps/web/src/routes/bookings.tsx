@@ -16,7 +16,7 @@ import { QueryError } from '../components/QueryError';
 import { forgetBooking, useRecentBookings } from '../lib/recent-bookings';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
-import { spotName } from '../lib/spots';
+import { spotDescription } from '../lib/spots';
 
 export const Route = createFileRoute('/bookings')({
   head: () => ({ meta: noindexMeta(m.seo_title_bookings()) }),
@@ -182,7 +182,6 @@ function BookingGroup({
 /** Day, time, phase and spot — shared by managed bookings and lookup summaries. */
 function BookingLine({ booking, muted }: { booking: BookingSummaryDto; muted: boolean }) {
   const date = warsawDate(booking.startsAt);
-  const size = sizeOf(booking.tableId);
   return (
     <>
       <DateBadge date={date} muted={muted} />
@@ -199,8 +198,7 @@ function BookingLine({ booking, muted }: { booking: BookingSummaryDto; muted: bo
           </span>
         </div>
         <p className="mt-1 truncate text-sm text-cream-soft">
-          {spotName(booking.kind, booking.tableLabel)}
-          {size ? ` · ${size}` : ''}
+          {spotDescription(booking.kind, booking.tableLabel, { size: sizeOf(booking.tableId) })}
         </p>
       </div>
     </>
