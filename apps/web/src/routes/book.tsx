@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Spinner } from '@heroui/react';
-import { isIsoDate, type IsoDate } from '@repo/shared';
+import { BOOKING_DAYS_AHEAD, addDays, isIsoDate, type IsoDate } from '@repo/shared';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
@@ -36,7 +36,13 @@ export const Route = createFileRoute('/book')({
   // ?date=…&start=… arrives from the home page's free-tables strip: the guest
   // picked an hour there, so the wizard opens on the table step with it set.
   validateSearch: (search: Record<string, unknown>): { date?: IsoDate; start?: number } => {
-    const start = Number(search.start);
+    // A number, or the digits of one: Number('') and Number(null) are 0 and
+    // Number(true) is 1, which would hand the wizard a start nobody picked
+    const raw = search.start;
+    const start =
+      typeof raw === 'number' || (typeof raw === 'string' && /^d{1,2}$/.test(raw))
+        ? Number(raw)
+        : Number.NaN;
     return {
       ...(typeof search.date === 'string' && isIsoDate(search.date) ? { date: search.date } : {}),
       ...(Number.isInteger(start) && start >= 0 && start <= 23 ? { start } : {})
@@ -107,9 +113,16 @@ function BookingWizard() {
   useEffect(() => {
     const today = warsawToday();
     resetIfDateStale(today);
-    if (prefill.date !== undefined && prefill.start !== undefined && prefill.date >= today) {
-      selectDate(prefill.date);
-      selectTime(prefill.start, 1);
+    const { date, start } = prefill;
+    // Only a day the wizard itself would offer: not past, not beyond the window
+    if (
+      date !== undefined &&
+      start !== undefined &&
+      date >= today &&
+      date < addDays(today, BOOKING_DAYS_AHEAD)
+    ) {
+      selectDate(date);
+      selectTime(start, 1);
       void navigate({ to: '/book', search: {}, replace: true });
     } else if (wizardStore.state.date === null) {
       const day = firstOpenDay(today, warsawHour(Date.now()), hours);
