@@ -1,5 +1,6 @@
 /** Single source for environment configuration. */
 import { join } from 'node:path';
+import { isTestingSecret } from './turnstile.ts';
 
 /** Dev-only fallback for tooling (seed, tests, drizzle-kit) — never used by the server. */
 export const LOCAL_DATABASE_URL = 'postgres://piramida:piramida@localhost:5432/piramida';
@@ -26,6 +27,11 @@ export interface ApiConfig {
   uploadsDir: string;
   /** Meta Graph app token for Instagram oEmbed lookups; unset = og:image scrape only. */
   metaOembedToken: string | undefined;
+  /** Cloudflare Turnstile secret; the public forms skip the bot check when unset. */
+  turnstileSecret: string | undefined;
+  /** Hostnames a Turnstile token may be solved on; undefined = any (dev only). */
+  turnstileHostnames: string[] | undefined;
+  production: boolean;
 }
 
 /** Loopback + RFC 1918: nginx next door, natively or in a container on the docker bridge. */
@@ -77,9 +83,22 @@ export function loadConfig(warn: (message: string) => void = console.warn): ApiC
     for (const problem of problems) warn(`${problem} — acceptable for local dev only`);
   }
 
-  const listed = process.env.ALLOWED_ORIGINS?.split(',')
-    .map(origin => origin.trim())
-    .filter(origin => origin !== '');
+  const turnstileSecret = process.env.TURNSTILE_SECRET_KEY || undefined;
+  const turnstileHostnames = splitList(process.env.TURNSTILE_HOSTNAMES);
+  if (production && turnstileSecret !== undefined) {
+    // A test secret passes every token (or none); without hostnames a token
+    // solved on any site that copied our public site key would count
+    if (isTestingSecret(turnstileSecret)) {
+      throw new Error('Refusing to start: TURNSTILE_SECRET_KEY is a Cloudflare test secret');
+    }
+    if (turnstileHostnames === undefined) {
+      throw new Error(
+        'Refusing to start: TURNSTILE_SECRET_KEY is set but TURNSTILE_HOSTNAMES is not'
+      );
+    }
+  }
+
+  const listed = splitList(process.env.ALLOWED_ORIGINS);
   return {
     databaseUrl,
     port: Number(process.env.API_PORT ?? 3001),
@@ -88,7 +107,7 @@ export function loadConfig(warn: (message: string) => void = console.warn): ApiC
     host: process.env.API_HOST ?? '127.0.0.1',
     logLevel: process.env.LOG_LEVEL ?? 'info',
     // Same-origin in production unless listed; never "reflect any origin"
-    allowedOrigins: listed && listed.length > 0 ? listed : production ? undefined : DEV_ORIGINS,
+    allowedOrigins: listed ?? (production ? undefined : DEV_ORIGINS),
     adminToken,
     jwtSecret,
     // Browsers accept Secure cookies on http://localhost, so dev needs no opt-out;
@@ -96,6 +115,18 @@ export function loadConfig(warn: (message: string) => void = console.warn): ApiC
     cookieSecure: process.env.COOKIE_SECURE !== 'false',
     trustedProxies: process.env.TRUSTED_PROXIES || DEFAULT_TRUSTED_PROXIES,
     uploadsDir: process.env.UPLOADS_DIR ?? DEFAULT_UPLOADS_DIR,
-    metaOembedToken: process.env.META_OEMBED_TOKEN || undefined
+    metaOembedToken: process.env.META_OEMBED_TOKEN || undefined,
+    turnstileSecret,
+    turnstileHostnames,
+    production
   };
+}
+
+/** A comma-separated setting as a list; undefined when unset or empty. */
+function splitList(value: string | undefined): string[] | undefined {
+  const items = value
+    ?.split(',')
+    .map(item => item.trim())
+    .filter(item => item !== '');
+  return items && items.length > 0 ? items : undefined;
 }

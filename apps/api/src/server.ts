@@ -12,7 +12,15 @@ const app = await buildApp({
   cookieSecure: config.cookieSecure,
   trustedProxies: config.trustedProxies,
   uploadsDir: config.uploadsDir,
-  oembedToken: config.metaOembedToken
+  oembedToken: config.metaOembedToken,
+  turnstile:
+    config.turnstileSecret === undefined
+      ? undefined
+      : {
+          secret: config.turnstileSecret,
+          hostnames: config.turnstileHostnames ?? null,
+          acceptTestingKeys: !config.production
+        }
 });
 
 // Graceful shutdown: drain in-flight requests and close the pg pool (onClose hook)

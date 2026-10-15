@@ -1872,6 +1872,82 @@ test('the global limit allows 100 requests a minute per visitor, staff exempt', 
   }
 });
 
+test('the public forms need a solved bot check once Turnstile is configured', async () => {
+  const solvedFor = new Map<string, string>([
+    ['good-booking', 'booking'],
+    ['good-register', 'register']
+  ]);
+  const siteverify = (async (_url: string | URL | Request, init: RequestInit = {}) => {
+    const action = solvedFor.get((init.body as URLSearchParams).get('response') ?? '');
+    return new Response(
+      JSON.stringify(
+        action ? { success: true, action, hostname: 'billiard-piramida.pl' } : { success: false }
+      )
+    );
+  }) as typeof fetch;
+  const guarded = await buildApp({
+    databaseUrl: TEST_URL,
+    logger: false,
+    uploadsDir,
+    jwtSecret: 'test-jwt-secret',
+    rateLimitMax: 1000,
+    bookingCreateLimit: 1000,
+    turnstile: {
+      secret: 'test',
+      hostnames: ['billiard-piramida.pl'],
+      acceptTestingKeys: false,
+      fetch: siteverify
+    }
+  });
+  try {
+    const forms = [
+      {
+        url: '/api/bookings',
+        payload: {
+          tableId: 1,
+          date: MONDAY,
+          startHour: 18,
+          durationHours: 1,
+          customerName: 'Bot Check',
+          customerPhone: '+48 602 111 336'
+        }
+      },
+      {
+        url: '/api/auth/register',
+        payload: { phone: '+48 602 111 337', name: 'Bot Check', password: 'secret-pass-1' }
+      },
+      {
+        url: '/api/tournaments/seat-counting-cup/register',
+        payload: { name: 'Bot Check', phone: '+48 602 111 338' }
+      }
+    ];
+    for (const form of forms) {
+      for (const headers of [{}, { 'x-turnstile-token': 'unsolved' }]) {
+        const res = await guarded.inject({ method: 'POST', ...form, headers });
+        assert.equal(res.statusCode, 403, `${form.url} without a solved token`);
+        assert.equal(res.json().error, 'bot_check_failed');
+      }
+    }
+    // A token solved for another form does not open this one…
+    const register = forms[1]!;
+    const wrongAction = await guarded.inject({
+      method: 'POST',
+      ...register,
+      headers: { 'x-turnstile-token': 'good-booking' }
+    });
+    assert.equal(wrongAction.statusCode, 403);
+    // …its own does
+    const passed = await guarded.inject({
+      method: 'POST',
+      ...register,
+      headers: { 'x-turnstile-token': 'good-register' }
+    });
+    assert.equal(passed.statusCode, 201);
+  } finally {
+    await guarded.close();
+  }
+});
+
 test('public booking creation is limited per IP', async () => {
   const limited = await buildApp({
     databaseUrl: TEST_URL,

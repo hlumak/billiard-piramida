@@ -123,6 +123,7 @@ export function tournamentRoutes(app: AppInstance) {
       // …and over an hour, not a minute: 20/min let one IP fill a 16-seat
       // roster in under a minute (lapsing pending seats are the other half)
       config: { rateLimit: { max: 10, timeWindow: '1 hour' } },
+      preHandler: app.requireHuman('tournament'),
       schema: {
         params: SLUG_PARAMS,
         querystring: LOCALE_QUERY,

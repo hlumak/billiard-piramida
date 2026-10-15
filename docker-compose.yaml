@@ -69,6 +69,8 @@ services:
       # Same-origin through nginx needs no CORS; list origins only for others
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       META_OEMBED_TOKEN: ${META_OEMBED_TOKEN:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      TURNSTILE_HOSTNAMES: ${TURNSTILE_HOSTNAMES:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     volumes:
       - uploads:/data/uploads
@@ -89,6 +91,7 @@ services:
       target: web
       args:
         VITE_SITE_URL: ${VITE_SITE_URL:-}
+        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
     image: piramida-web:local
     restart: unless-stopped
     environment:

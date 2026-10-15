@@ -58,3 +58,13 @@ test('auth cookies are Secure unless explicitly turned off', () => {
   env({ COOKIE_SECURE: 'false' });
   assert.equal(loadConfig().cookieSecure, false);
 });
+
+test('production refuses a Turnstile test secret, or a secret without hostnames', () => {
+  const base = { NODE_ENV: 'production', ADMIN_TOKEN: STRONG, JWT_SECRET: STRONG };
+  env({ ...base, TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA' });
+  assert.throws(() => loadConfig(), /test secret/);
+  env({ ...base, TURNSTILE_SECRET_KEY: 'real-secret' });
+  assert.throws(() => loadConfig(), /TURNSTILE_HOSTNAMES/);
+  env({ ...base, TURNSTILE_SECRET_KEY: 'real-secret', TURNSTILE_HOSTNAMES: 'a.pl, b.pl' });
+  assert.deepEqual(loadConfig().turnstileHostnames, ['a.pl', 'b.pl']);
+});

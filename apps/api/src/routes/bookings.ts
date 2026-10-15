@@ -88,6 +88,7 @@ export function bookingRoutes(
       // Anonymous and unverified, so the abuse limits live here: per IP (this),
       // per phone (in the transaction) and how far ahead (below)
       config: { rateLimit: { max: createLimitPerHour, timeWindow: '1 hour' } },
+      preHandler: app.requireHuman('booking'),
       schema: {
         body: CREATE_BOOKING_BODY,
         response: { 201: CREATED_BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }

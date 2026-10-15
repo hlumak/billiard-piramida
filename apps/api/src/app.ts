@@ -24,6 +24,12 @@ import { availabilityRoutes } from './routes/availability.ts';
 import { users } from './db/schema.ts';
 import { eq } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
+import {
+  TURNSTILE_HEADER,
+  verifyTurnstile,
+  type TurnstileAction,
+  type TurnstileOptions
+} from './lib/turnstile.ts';
 import { bookingRoutes } from './routes/bookings.ts';
 import { menuRoutes } from './routes/menu.ts';
 import { newsRoutes } from './routes/news.ts';
@@ -45,6 +51,10 @@ declare module 'fastify' {
     cookieSecure: boolean;
     /** Resolves the signed-in user from the JWT (Authorization header or cookie), or null. */
     authenticatedUser: (request: FastifyRequest) => Promise<typeof users.$inferSelect | null>;
+    /** preHandler for a public form: 403 unless the request carries a solved Turnstile token. */
+    requireHuman: (
+      action: TurnstileAction
+    ) => (request: FastifyRequest, reply: FastifyReply) => Promise<FastifyReply | undefined>;
   }
 }
 
@@ -98,6 +108,8 @@ export interface AppOptions {
   uploadsDir?: string | undefined;
   /** Meta Graph app token for Instagram oEmbed; the importer scrapes og:image without it. */
   oembedToken?: string | undefined;
+  /** Bot check on the public forms; off (every request passes) when unset. */
+  turnstile?: TurnstileOptions | undefined;
 }
 
 export async function buildApp({
@@ -111,7 +123,8 @@ export async function buildApp({
   bookingCreateLimit = 10,
   trustedProxies = DEFAULT_TRUSTED_PROXIES,
   uploadsDir = DEFAULT_UPLOADS_DIR,
-  oembedToken
+  oembedToken,
+  turnstile
 }: AppOptions) {
   const app = Fastify({
     logger:
@@ -199,6 +212,20 @@ export async function buildApp({
     setHeaders: reply => {
       reply.header('cross-origin-resource-policy', 'cross-origin');
     }
+  });
+
+  app.decorate('requireHuman', (action: TurnstileAction) => async (request, reply) => {
+    if (turnstile === undefined) return undefined;
+    const header = request.headers[TURNSTILE_HEADER];
+    const verdict = await verifyTurnstile(
+      turnstile,
+      typeof header === 'string' ? header : undefined,
+      action,
+      request.ip
+    );
+    if (verdict.ok) return undefined;
+    request.log.info({ action, reason: verdict.reason }, 'bot check failed');
+    return reply.code(403).send({ error: 'bot_check_failed' });
   });
 
   app.decorate('authenticatedUser', async (request: FastifyRequest) => {
