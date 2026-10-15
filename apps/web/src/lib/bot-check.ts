@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { getLocale } from '../paraglide/runtime.js';
 
 /**
@@ -159,14 +159,4 @@ export type BotCheck = Pick<BotCheckController, 'mount' | 'token' | 'reset'>;
 export function useBotCheck(action: BotCheckAction): BotCheck {
   const [check] = useState(() => new BotCheckController(action));
   return check;
-}
-
-/**
- * Where the widget appears when Cloudflare needs the guest to act. Empty
- * (and so taking no room) the rest of the time.
- */
-export function BotCheckWidget({ check, className }: { check: BotCheck; className?: string }) {
-  const element = useRef<HTMLDivElement>(null);
-  useEffect(() => (element.current ? check.mount(element.current) : undefined), [check]);
-  return <div ref={element} className={`empty:hidden ${className ?? ''}`} />;
 }

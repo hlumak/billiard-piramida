@@ -10,7 +10,8 @@ import { tabId, tabPanelId } from '../tab-ids';
 import { ApiError } from '../../lib/api';
 import { authApi, storeSession, type RegisterInput } from '../../lib/auth';
 import { useSubmitOnce } from '../../lib/use-submit-once';
-import { BotCheckWidget, useBotCheck } from '../../lib/bot-check';
+import { useBotCheck } from '../../lib/bot-check';
+import { BotCheckWidget } from '../BotCheckWidget';
 import { m } from '../../paraglide/messages.js';
 
 const EMPTY_CARDS: CardsState = { sportCardType: null, sportCardNumber: '' };
