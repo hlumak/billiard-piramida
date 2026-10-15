@@ -47,6 +47,20 @@ function useShownDay(): { date: IsoDate | null; today: IsoDate; hourNow: number 
   return { date, today, hourNow: date === today ? warsawHour(now) : null };
 }
 
+function ChipSkeletons() {
+  return (
+    <>
+      {[0, 1, 2, 3, 4].map(i => (
+        <span
+          key={i}
+          aria-hidden
+          className="skeleton h-15.5 w-21.5 shrink-0 rounded-[14px] lg:w-auto lg:flex-1"
+        />
+      ))}
+    </>
+  );
+}
+
 function Chips({ date, hourNow }: { date: IsoDate; hourNow: number | null }) {
   useLiveAvailability(date);
   const { data, isPending, isError, error, refetch } = useQuery(availabilityQuery(date));
@@ -66,19 +80,7 @@ function Chips({ date, hourNow }: { date: IsoDate; hourNow: number | null }) {
       </p>
     );
   }
-  if (isPending) {
-    return (
-      <>
-        {[0, 1, 2, 3, 4].map(i => (
-          <span
-            key={i}
-            aria-hidden
-            className="skeleton h-15.5 w-21.5 shrink-0 rounded-[14px] lg:w-auto lg:flex-1"
-          />
-        ))}
-      </>
-    );
-  }
+  if (isPending) return <ChipSkeletons />;
 
   const hours = freeByHour(data, hourNow);
   if (hours.length === 0 || hours.every(entry => entry.free === 0)) {
@@ -148,7 +150,11 @@ export function FreeTables({ className }: { className?: string }) {
       </div>
       <p className="mt-1 pr-5 text-[13px] text-grey-cool lg:hidden">{m.home_free_hint()}</p>
       <div className="mt-3.5 flex gap-2 overflow-x-auto pr-5 [scrollbar-width:none] lg:mt-0 lg:flex-1 lg:gap-2.5 lg:overflow-visible lg:pr-0">
-        {!hydrated ? null : date === null ? (
+        {/* Placeholders from the server render on, so the strip has its
+            height before the chips arrive and nothing below it jumps */}
+        {!hydrated ? (
+          <ChipSkeletons />
+        ) : date === null ? (
           <p className="py-4 text-sm text-cream-soft">{m.home_free_none()}</p>
         ) : (
           <Chips date={date} hourNow={hourNow} />
