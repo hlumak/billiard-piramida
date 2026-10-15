@@ -1,19 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import {
-  addDays,
-  hoursForDate,
-  isClosedAllDay,
-  type AvailabilityDto,
-  type IsoDate
-} from '@repo/shared';
+import { addDays, type AvailabilityDto, type IsoDate } from '@repo/shared';
 import { isRateLimited } from '../../lib/api';
 import { useLiveAvailability } from '../../lib/availability-live';
-import { formatHour, warsawHour, warsawToday } from '../../lib/format';
+import { formatDay, formatHour, warsawHour, warsawToday } from '../../lib/format';
 import { useIsHydrated } from '../../lib/hydration';
 import { availabilityQuery } from '../../lib/queries';
 import { useNowMinute } from '../../lib/use-now';
-import { useVenueConfig } from '../../lib/venue-config';
+import { firstOpenDay, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 
 interface HourFree {
@@ -22,33 +16,38 @@ interface HourFree {
 }
 
 /**
- * Billiard tables free at each start hour still ahead. An hour where no table
- * is either free or booked is in the past (the API marks those unavailable),
- * and drops out; darts are not tables, so they do not count.
+ * Billiard tables free at each start hour still ahead; darts are not tables,
+ * so they do not count. On today's strip the hours before `hourNow` are over
+ * (the API still marks the booked ones `booked`), and the hour under way
+ * stays only while a table can still start in it.
  */
-function freeByHour(availability: AvailabilityDto): HourFree[] {
+function freeByHour(availability: AvailabilityDto, hourNow: number | null): HourFree[] {
   const tables = availability.tables.filter(table => table.kind === 'billiard');
   const result: HourFree[] = [];
   for (let hour = availability.open; hour < availability.close; hour++) {
+    if (hourNow !== null && hour < hourNow) continue;
     const slots = tables.flatMap(table => table.slots.filter(slot => slot.hour === hour));
-    if (slots.every(slot => !slot.available && !slot.booked)) continue;
-    result.push({ hour, free: slots.filter(slot => slot.available).length });
+    const free = slots.filter(slot => slot.available).length;
+    if (hour === hourNow && free === 0) continue;
+    result.push({ hour, free });
   }
   return result;
 }
 
-/** Today, unless the club is shut today or past its last start hour: then tomorrow. */
-function useShownDate(): { date: IsoDate; tomorrow: boolean } {
+/**
+ * The first day with an hour still to start — today, or the next day the
+ * club opens — and the hour it is now, while that day is today. Ticks every
+ * minute, so a page left open moves on by itself.
+ */
+function useShownDay(): { date: IsoDate | null; today: IsoDate; hourNow: number | null } {
   const { hours } = useVenueConfig();
-  // Ticks every minute, so a page left open rolls over to tomorrow on its own
   const now = useNowMinute();
   const today = warsawToday(now);
-  const todays = hoursForDate(today, hours);
-  const over = isClosedAllDay(todays) || warsawHour(now) >= todays.close - 1;
-  return over ? { date: addDays(today, 1), tomorrow: true } : { date: today, tomorrow: false };
+  const date = firstOpenDay(today, warsawHour(now), hours);
+  return { date, today, hourNow: date === today ? warsawHour(now) : null };
 }
 
-function Chips({ date }: { date: IsoDate }) {
+function Chips({ date, hourNow }: { date: IsoDate; hourNow: number | null }) {
   useLiveAvailability(date);
   const { data, isPending, isError, error, refetch } = useQuery(availabilityQuery(date));
 
@@ -81,7 +80,7 @@ function Chips({ date }: { date: IsoDate }) {
     );
   }
 
-  const hours = freeByHour(data);
+  const hours = freeByHour(data, hourNow);
   if (hours.length === 0 || hours.every(entry => entry.free === 0)) {
     return <p className="py-4 text-sm text-cream-soft">{m.home_free_none()}</p>;
   }
@@ -117,16 +116,19 @@ function Chips({ date }: { date: IsoDate }) {
 }
 
 /**
- * "Free tables today": every start hour left today with how many tables are
- * still free, live (the same WebSocket the booking wizard listens to). An hour
+ * "Free tables today": every start hour left today (once today is over, on
+ * the next day the club opens) with how many tables are still free, live (the same WebSocket the booking wizard listens to). An hour
  * goes straight to the table step with the date and time already picked.
  * Client-only: what "today" and "now" are is the visitor's moment, not the
  * server render's.
  */
 export function FreeTables({ className }: { className?: string }) {
   const hydrated = useIsHydrated();
-  const { date, tomorrow } = useShownDate();
+  const { date, today, hourNow } = useShownDay();
   const titleId = 'free-tables-title';
+  let title = m.home_free_today();
+  if (date === addDays(today, 1)) title = m.home_free_tomorrow();
+  else if (date !== null && date !== today) title = m.home_free_on({ day: formatDay(date) });
 
   return (
     <section
@@ -135,7 +137,7 @@ export function FreeTables({ className }: { className?: string }) {
     >
       <div className="flex items-baseline justify-between gap-3 pr-5 lg:block lg:w-55 lg:shrink-0 lg:pr-0">
         <h2 id={titleId} className="text-[17px] font-bold">
-          {tomorrow ? m.home_free_tomorrow() : m.home_free_today()}
+          {title}
         </h2>
         <Link to="/book" className="text-[13px] font-bold text-golden-light lg:hidden">
           {m.home_free_more()} →
@@ -146,7 +148,11 @@ export function FreeTables({ className }: { className?: string }) {
       </div>
       <p className="mt-1 pr-5 text-[13px] text-grey-cool lg:hidden">{m.home_free_hint()}</p>
       <div className="mt-3.5 flex gap-2 overflow-x-auto pr-5 [scrollbar-width:none] lg:mt-0 lg:flex-1 lg:gap-2.5 lg:overflow-visible lg:pr-0">
-        {hydrated ? <Chips date={date} /> : null}
+        {!hydrated ? null : date === null ? (
+          <p className="py-4 text-sm text-cream-soft">{m.home_free_none()}</p>
+        ) : (
+          <Chips date={date} hourNow={hourNow} />
+        )}
       </div>
       <Link
         to="/book"

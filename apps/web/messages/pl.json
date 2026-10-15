@@ -442,6 +442,7 @@
   ],
   "home_free_today": "Wolne stoły dziś",
   "home_free_tomorrow": "Wolne stoły jutro",
+  "home_free_on": "Wolne stoły: {day}",
   "home_free_hint": "Wybierz godzinę, potem stół na planie",
   "home_free_none": "Wszystko zajęte — sprawdź inne dni",
   "home_free_more": "Inne dni",

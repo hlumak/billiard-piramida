@@ -441,6 +441,7 @@
   ],
   "home_free_today": "Free tables today",
   "home_free_tomorrow": "Free tables tomorrow",
+  "home_free_on": "Free tables on {day}",
   "home_free_hint": "Pick an hour, then your table",
   "home_free_none": "Fully booked — check the other days",
   "home_free_more": "Other days",

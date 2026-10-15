@@ -1,20 +1,12 @@
 import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Spinner } from '@heroui/react';
-import {
-  BOOKING_DAYS_AHEAD,
-  hoursForDate,
-  isClosedAllDay,
-  isIsoDate,
-  MIN_BOOKING_HOURS,
-  type IsoDate,
-  type WeeklyHours
-} from '@repo/shared';
+import { isIsoDate, type IsoDate } from '@repo/shared';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
-import { addDays, warsawHour, warsawToday } from '../lib/format';
-import { useVenueConfig } from '../lib/venue-config';
+import { warsawHour, warsawToday } from '../lib/format';
+import { firstOpenDay, useVenueConfig } from '../lib/venue-config';
 import { PageLayout } from '../components/site/PageLayout';
 import { BookingStepper } from '../components/wizard/BookingStepper';
 import { WhenStep } from '../components/wizard/WhenStep';
@@ -53,20 +45,6 @@ export const Route = createFileRoute('/book')({
   head: () => ({ meta: noindexMeta(msg.seo_title_book()) }),
   component: BookingWizard
 });
-
-/**
- * The first day in the booking window with an hour still to start: today
- * only while its last start hour is ahead, then the next day the club opens.
- */
-function firstOpenDay(today: IsoDate, hourNow: number, hours: WeeklyHours): IsoDate | null {
-  for (let i = 0; i < BOOKING_DAYS_AHEAD; i++) {
-    const day = addDays(today, i);
-    const { close } = hoursForDate(day, hours);
-    const over = i === 0 && hourNow >= close - MIN_BOOKING_HOURS;
-    if (!isClosedAllDay(hoursForDate(day, hours)) && !over) return day;
-  }
-  return null;
-}
 
 /**
  * Clamp forward jumps to the first step whose prerequisites are missing.
