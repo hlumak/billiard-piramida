@@ -12,9 +12,9 @@ import { UtilizationBars } from './charts/UtilizationBars';
 const DAYS = 30;
 
 export function AdminStats() {
-  const { data, isPending, isError, refetch } = useQuery(adminAnalyticsQuery(DAYS));
+  const { data, isPending, isError, error, refetch } = useQuery(adminAnalyticsQuery(DAYS));
 
-  if (isError && !data) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !data) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !data) {
     return (
       <div className="flex justify-center py-16">

@@ -65,17 +65,19 @@ function useMyBookings() {
     stored == null ||
     (bookings.length === 0 &&
       (results.some(result => result.isPending) || (signedIn && mine.isPending)));
-  // A network/5xx failure with nothing to show must not masquerade as "no bookings"
-  const hardFailure =
-    results.some(
+  // A network/5xx failure with nothing to show must not masquerade as "no bookings";
+  // the error itself goes along, so a rate limit is said as one
+  const failure =
+    results.find(
       result => result.error && !(result.error instanceof ApiError && result.error.status === 404)
-    ) || mine.isError;
+    )?.error ?? (mine.isError ? mine.error : null);
+  const hardFailure = failure !== null;
   const retry = () => {
     results.forEach(result => void result.refetch());
     if (signedIn) void mine.refetch();
   };
 
-  return { bookings, isLoading, hardFailure, retry, signedIn };
+  return { bookings, isLoading, hardFailure, failure, retry, signedIn };
 }
 
 /**
@@ -97,6 +99,7 @@ function MyBookingsList({
   bookings,
   isLoading,
   hardFailure,
+  failure,
   retry
 }: Omit<ReturnType<typeof useMyBookings>, 'signedIn'>) {
   if (isLoading) {
@@ -108,7 +111,7 @@ function MyBookingsList({
   }
   if (bookings.length === 0) {
     // A network/5xx failure with nothing to show must not masquerade as "no bookings"
-    if (hardFailure) return <QueryError onRetry={retry} />;
+    if (hardFailure) return <QueryError error={failure} onRetry={retry} />;
     return (
       <div className="card anim-reveal flex flex-col items-center gap-5 px-6 py-12 text-center">
         <p className="text-lg text-cream-soft">{m.no_bookings()}</p>

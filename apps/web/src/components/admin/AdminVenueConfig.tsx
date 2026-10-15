@@ -83,7 +83,7 @@ function HourSelect({
  */
 export function AdminVenueConfig() {
   const queryClient = useQueryClient();
-  const { data: config, isPending, isError, refetch } = useQuery(adminVenueConfigQuery());
+  const { data: config, isPending, isError, error, refetch } = useQuery(adminVenueConfigQuery());
   const [draft, setDraft] = useState<{ rates: RateDraft; hours: WeeklyHours } | null>(null);
 
   // Seeded from the server copy on first load, then owned by the form
@@ -114,7 +114,7 @@ export function AdminVenueConfig() {
     }
   });
 
-  if (isError && !config) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !config) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !current) {
     return (
       <div className="flex justify-center py-16">

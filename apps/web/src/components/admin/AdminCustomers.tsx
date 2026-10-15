@@ -19,8 +19,16 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
     return () => clearTimeout(timer);
   }, [phoneInput]);
 
-  const { data, isPending, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
-    useInfiniteQuery(adminCustomersQuery(phone));
+  const {
+    data,
+    isPending,
+    isError,
+    error,
+    refetch,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage
+  } = useInfiniteQuery(adminCustomersQuery(phone));
   const customers = data?.pages.flat();
 
   const search = (
@@ -39,7 +47,7 @@ export function AdminCustomers({ onShowBookings }: { onShowBookings: (phone: str
     return (
       <div>
         {search}
-        <QueryError onRetry={() => refetch()} />
+        <QueryError error={error} onRetry={() => refetch()} />
       </div>
     );
   }

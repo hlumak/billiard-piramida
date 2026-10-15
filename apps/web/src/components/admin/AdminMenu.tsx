@@ -103,9 +103,9 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
 }
 
 export function AdminMenu() {
-  const { data: items, isPending, isError, refetch } = useQuery(adminMenuQuery());
+  const { data: items, isPending, isError, error, refetch } = useQuery(adminMenuQuery());
 
-  if (isError && !items) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !items) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !items) {
     return (
       <div className="flex justify-center py-16">

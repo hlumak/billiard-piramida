@@ -23,6 +23,7 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
   const {
     data: menu,
     isError,
+    error,
     refetch
   } = useQuery({
     ...menuQuery(getLocale()),
@@ -151,7 +152,7 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
 
                 <p className="text-sm font-semibold text-golden-light">{m.admin_order_add()}</p>
                 {isError && !menu ? (
-                  <QueryError onRetry={() => refetch()} />
+                  <QueryError error={error} onRetry={() => refetch()} />
                 ) : !menu ? (
                   <div className="flex justify-center py-6">
                     <Spinner aria-label={m.loading()} />

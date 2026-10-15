@@ -114,6 +114,7 @@ export function AdminTournamentRoster({ tournamentId }: { tournamentId: number }
     data: roster,
     isPending,
     isError,
+    error,
     refetch
   } = useQuery(adminRegistrationsQuery(tournamentId));
 
@@ -159,7 +160,7 @@ export function AdminTournamentRoster({ tournamentId }: { tournamentId: number }
         ? m.err_generic()
         : null;
 
-  if (isError && !roster) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !roster) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !roster) {
     return (
       <div className="flex justify-center py-6">

@@ -223,6 +223,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
     data: bookings,
     isPending,
     isError,
+    error,
     refetch
   } = useQuery(adminBookingsQuery({ date, status: 'confirmed' }));
   // Rows come from the venue's real spots, so seeding a new dartboard shows up
@@ -312,7 +313,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
       </div>
 
       {isError && !bookings ? (
-        <QueryError onRetry={() => refetch()} />
+        <QueryError error={error} onRetry={() => refetch()} />
       ) : isPending || !bookings ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

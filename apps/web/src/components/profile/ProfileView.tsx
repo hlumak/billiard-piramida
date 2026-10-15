@@ -55,7 +55,7 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
   }, [isAuthError]);
 
   // Non-auth failure: keep the session, offer a retry instead of signing out
-  if (error && !isAuthError) return <QueryError onRetry={() => refetch()} />;
+  if (error && !isAuthError) return <QueryError error={error} onRetry={() => refetch()} />;
 
   if (isPending || !profile || cards === null) {
     return (

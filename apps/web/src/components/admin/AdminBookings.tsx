@@ -167,7 +167,13 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
     status,
     phone: phone !== '' ? phone : undefined
   };
-  const { data: bookings, isPending, isError, refetch } = useQuery(adminBookingsQuery(filters));
+  const {
+    data: bookings,
+    isPending,
+    isError,
+    error,
+    refetch
+  } = useQuery(adminBookingsQuery(filters));
   // Localized dish names for the order summary (items carry only a slug)
   const { data: menu } = useQuery(menuQuery(getLocale()));
   const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
@@ -212,7 +218,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
       </div>
 
       {isError && !bookings ? (
-        <QueryError onRetry={() => refetch()} />
+        <QueryError error={error} onRetry={() => refetch()} />
       ) : isPending || !bookings ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

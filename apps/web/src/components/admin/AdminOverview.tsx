@@ -255,7 +255,7 @@ function TablesNow({
 export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void }) {
   const now = useNowMinute();
   const today = warsawToday(now);
-  const { data: stats, isPending, isError, refetch } = useQuery(adminStatsQuery());
+  const { data: stats, isPending, isError, error, refetch } = useQuery(adminStatsQuery());
   // The same query the schedule makes, so the two share one cache entry
   const {
     data: dayBookings,
@@ -266,7 +266,7 @@ export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void 
   const { data: spots } = useQuery(tablesQuery());
   const { data: menu } = useQuery(menuQuery(getLocale()));
 
-  if (isError && !stats) return <QueryError onRetry={() => refetch()} />;
+  if (isError && !stats) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !stats) {
     return (
       <div className="flex justify-center py-16">

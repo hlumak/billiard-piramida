@@ -146,14 +146,14 @@ function AddForm() {
  * book by phone; removing a number forgives it.
  */
 export function AdminBlacklist() {
-  const { data: entries, isPending, isError, refetch } = useQuery(adminBlacklistQuery());
+  const { data: entries, isPending, isError, error, refetch } = useQuery(adminBlacklistQuery());
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-grey-cool">{m.admin_blacklist_hint()}</p>
       <AddForm />
       {isError && !entries ? (
-        <QueryError onRetry={() => refetch()} />
+        <QueryError error={error} onRetry={() => refetch()} />
       ) : isPending || !entries ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />
