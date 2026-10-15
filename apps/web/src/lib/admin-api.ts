@@ -4,6 +4,7 @@ import type {
   AdminCustomerDto,
   AdminMenuItemDto,
   AdminNewsItemDto,
+  AdminOnlineBookingDto,
   MenuTranslationDto,
   NewsTranslationDto,
   AdminStatsDto,
@@ -115,6 +116,9 @@ export const adminApi = {
     request<{ ok: boolean }>('/api/admin/session', { method: 'POST', body: { token } }),
   logout: () => request<{ ok: boolean }>('/api/admin/logout', { method: 'POST' }),
   stats: (signal?: AbortSignal) => request<AdminStatsDto>('/api/admin/stats', { signal }),
+  /** Bookings guests made on the site in the last day, newest first. */
+  onlineBookings: (signal?: AbortSignal) =>
+    request<AdminOnlineBookingDto[]>('/api/admin/bookings/online', { signal }),
   bookings: (filters: AdminBookingFilters, signal?: AbortSignal) => {
     const params = new URLSearchParams();
     if (filters.date) params.set('date', filters.date);
@@ -327,6 +331,19 @@ export const adminStatsQuery = () =>
     queryKey: ['admin', 'stats'],
     queryFn: ({ signal }) => adminApi.stats(signal),
     refetchInterval: 60_000
+  });
+
+/**
+ * The staff bell. Polled every half minute even from a background tab:
+ * that is exactly when a desk that left the panel open needs to hear of a
+ * new booking.
+ */
+export const adminOnlineBookingsQuery = () =>
+  queryOptions({
+    queryKey: ['admin', 'online-bookings'],
+    queryFn: ({ signal }) => adminApi.onlineBookings(signal),
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: true
   });
 
 export const adminBookingsQuery = (filters: AdminBookingFilters) =>
