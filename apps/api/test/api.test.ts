@@ -17,6 +17,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 import { buildApp } from '../src/app.ts';
 import { LOCAL_DATABASE_URL } from '../src/lib/config.ts';
+import { issueAdminSession } from '../src/lib/admin-session.ts';
 import { createDb } from '../src/db/client.ts';
 import { bookings, tournamentRegistrations, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
@@ -1830,24 +1831,39 @@ test('guests book at most 14 days ahead and hold at most 3 upcoming bookings per
   assert.equal((await book(thursday, 4, '+48 602 111 334')).statusCode, 201);
 });
 
-test('the global limit leaves room for quick browsing, but still applies', async () => {
-  // Production defaults: a burst like thirty fast page loads (about five
-  // requests each) from one visitor must not be refused — the old ceiling of
-  // 100 a minute refused the 101st
-  const defaults = await buildApp({ databaseUrl: TEST_URL, logger: false, uploadsDir });
+test('the global limit allows 100 requests a minute per visitor, staff exempt', async () => {
+  // Production defaults: twenty quick page loads (about five requests each)
+  // from one visitor pass, the next request is refused
+  const defaults = await buildApp({
+    databaseUrl: TEST_URL,
+    logger: false,
+    uploadsDir,
+    adminToken: 'test-admin-token'
+  });
   try {
     const headers = { 'x-forwarded-for': '198.51.100.77' };
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 100; i++) {
       const res = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers });
       assert.notEqual(res.statusCode, 429, `request ${i + 1} of a page-load burst was refused`);
     }
-    // …while a flood is still cut off
-    let limited = false;
-    for (let i = 0; i < 600 && !limited; i++) {
-      const res = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers });
-      if (res.statusCode === 429) limited = true;
+    const flood = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers });
+    assert.equal(flood.statusCode, 429);
+
+    // Staff at the desk share the club's address with guests: a valid
+    // session is not counted, so the panel keeps working…
+    const staff = { ...headers, cookie: `admin_token=${issueAdminSession('test-admin-token')}` };
+    for (let i = 0; i < 5; i++) {
+      const res = await defaults.inject({
+        method: 'GET',
+        url: '/api/venue-config',
+        headers: staff
+      });
+      assert.equal(res.statusCode, 200);
     }
-    assert.ok(limited, 'expected a 429 once one address floods the API');
+    // …while a forged or expired one is
+    const forged = { ...headers, cookie: 'admin_token=9999999999999.forged' };
+    const res = await defaults.inject({ method: 'GET', url: '/api/venue-config', headers: forged });
+    assert.equal(res.statusCode, 429);
   } finally {
     await defaults.close();
   }

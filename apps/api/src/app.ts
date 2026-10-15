@@ -15,6 +15,8 @@ import { VenueConfigStore } from './services/venue-config.ts';
 import { ImageStore, UPLOADS_URL_PREFIX } from './services/images.ts';
 import { DEFAULT_TRUSTED_PROXIES, DEFAULT_UPLOADS_DIR, type AllowedOrigin } from './lib/config.ts';
 import { ERROR_RESPONSE } from './lib/schemas.ts';
+import { verifyAdminSession } from './lib/admin-session.ts';
+import { ADMIN_TOKEN_COOKIE } from './lib/cookies.ts';
 import { adminRoutes } from './routes/admin.ts';
 import { authRoutes } from './routes/auth.ts';
 import { liveRoutes } from './routes/live.ts';
@@ -73,10 +75,10 @@ export interface AppOptions {
    * Global per-IP request ceiling per minute. Routes that set their own
    * `config.rateLimit` are unaffected. One page load costs about five
    * requests (three from the server render, counted against the visitor,
-   * plus the browser's own), and switching the site's language is a full page
-   * load: at 100, a visitor clicking through languages, or a few people
-   * behind one address (club Wi-Fi, a mobile carrier's NAT), was locked out
-   * for the rest of the minute with every list on the page empty. Tests raise it because Fastify's
+   * plus the browser's own), so 100 leaves room for twenty quick page loads.
+   * It was 600 while every visitor arrived from a Cloudflare address and
+   * shared one bucket; nginx now restores the visitor's own address, so each
+   * one counts alone. Tests raise it because Fastify's
    * `inject` gives every request the same source address, so the whole suite
    * shares one bucket that a real client never would.
    */
@@ -105,7 +107,7 @@ export async function buildApp({
   adminToken,
   jwtSecret,
   cookieSecure = false,
-  rateLimitMax = 600,
+  rateLimitMax = 100,
   bookingCreateLimit = 10,
   trustedProxies = DEFAULT_TRUSTED_PROXIES,
   uploadsDir = DEFAULT_UPLOADS_DIR,
@@ -155,7 +157,16 @@ export async function buildApp({
   });
   await app.register(rateLimit, {
     max: rateLimitMax,
-    timeWindow: '1 minute'
+    timeWindow: '1 minute',
+    // Staff with a valid session are not counted: the desk shares the club
+    // Wi-Fi, so one address with guests, and a panel locked out mid-shift
+    // costs more than anything a signed-in member of staff could flood.
+    // The limiter runs before the cookie plugin's hook, hence parsing here.
+    allowList: request => {
+      if (!adminToken || request.headers.cookie === undefined) return false;
+      const session = app.parseCookie(request.headers.cookie)[ADMIN_TOKEN_COOKIE];
+      return session !== undefined && verifyAdminSession(adminToken, session);
+    }
   });
   await app.register(websocket, {
     options: { maxPayload: 1024 }
