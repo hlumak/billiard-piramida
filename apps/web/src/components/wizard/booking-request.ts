@@ -60,7 +60,12 @@ export function bookingRequestFrom(
 }
 
 /** Refusals the guest can only fix by going back to the time step and re-picking. */
-const NEEDS_NEW_TIME = new Set(['slot_taken', 'start_in_past', 'outside_operating_hours']);
+const NEEDS_NEW_TIME = new Set([
+  'slot_taken',
+  'slot_closed',
+  'start_in_past',
+  'outside_operating_hours'
+]);
 
 export function needsNewTime(error: unknown): boolean {
   return error instanceof ApiError && NEEDS_NEW_TIME.has(error.code);

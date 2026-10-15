@@ -101,7 +101,7 @@ function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) 
 function BookingWizard() {
   const navigate = useNavigate();
   const state = useStore(wizardStore);
-  const { hours } = useVenueConfig();
+  const { hours, closures } = useVenueConfig();
 
   const prefill = Route.useSearch();
 
@@ -125,7 +125,7 @@ function BookingWizard() {
       selectTime(start, 1);
       void navigate({ to: '/book', search: {}, replace: true });
     } else if (wizardStore.state.date === null) {
-      const day = firstOpenDay(today, warsawHour(Date.now()), hours);
+      const day = firstOpenDay(today, warsawHour(Date.now()), hours, closures);
       if (day !== null) selectDate(day);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
