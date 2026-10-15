@@ -196,7 +196,8 @@ export const adminApi = {
     request<UploadedImageDto>('/api/admin/images/from-post', { method: 'POST', body: { url } }),
   venueConfig: (signal?: AbortSignal) =>
     request<VenueConfigDto>('/api/admin/venue-config', { signal }),
-  saveVenueConfig: (config: VenueConfigDto) =>
+  /** Closures are their own resource; the settings form saves rates and hours */
+  saveVenueConfig: (config: Omit<VenueConfigDto, 'closures'>) =>
     request<VenueConfigDto>('/api/admin/venue-config', { method: 'PUT', body: config }),
   tournaments: (signal?: AbortSignal) =>
     request<AdminTournamentDto[]>('/api/admin/tournaments', { signal }),

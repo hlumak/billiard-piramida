@@ -26,7 +26,8 @@ import { venueConfigQuery } from './queries';
  */
 export const FALLBACK_VENUE_CONFIG: VenueConfigDto = {
   rates: DEFAULT_HOURLY_RATE_GROSZ,
-  hours: DEFAULT_WEEKLY_HOURS
+  hours: DEFAULT_WEEKLY_HOURS,
+  closures: []
 };
 
 export function useVenueConfig(): VenueConfigDto {

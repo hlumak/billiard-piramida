@@ -7,11 +7,13 @@ import {
 } from '@repo/shared';
 import { venueHours, venueRates } from '../db/schema.ts';
 import type { Db } from '../db/client.ts';
+import { loadUpcomingClosures, toClosureDto, type ClosureRow } from './closures.ts';
 
 const TIERS: RateTier[] = ['9ft', '12ft', 'darts'];
 
 /**
- * Rates and opening hours, read from the database and held in memory.
+ * Rates, opening hours and the whole club's upcoming closures, read from the
+ * database and held in memory.
  *
  * Every availability request and every booking write needs this, so it is
  * cached rather than re-queried per request, and the admin writes drop the
@@ -21,35 +23,50 @@ const TIERS: RateTier[] = ['9ft', '12ft', 'darts'];
  */
 const TTL_MS = 60_000;
 
+/** Closures stay rows (with their instants) so expired ones drop out per read */
+interface Loaded {
+  config: Omit<VenueConfigDto, 'closures'>;
+  closures: ClosureRow[];
+}
+
 export class VenueConfigStore {
   readonly #db: Db;
-  #cached: VenueConfigDto | null = null;
+  #cached: Loaded | null = null;
   #loadedAt = 0;
   /** In-flight load, shared so a cold burst issues one query, not twenty */
-  #pending: Promise<VenueConfigDto> | null = null;
+  #pending: Promise<Loaded> | null = null;
 
   constructor(db: Db) {
     this.#db = db;
   }
 
   async get(): Promise<VenueConfigDto> {
-    if (this.#cached !== null && Date.now() - this.#loadedAt < TTL_MS) return this.#cached;
-    this.#pending ??= this.#load().finally(() => {
-      this.#pending = null;
-    });
-    return this.#pending;
+    let cached = this.#cached;
+    if (cached === null || Date.now() - this.#loadedAt >= TTL_MS) {
+      this.#pending ??= this.#load().finally(() => {
+        this.#pending = null;
+      });
+      cached = await this.#pending;
+    }
+    // A closure that ended since the load drops out now, not at the next one
+    const now = Date.now();
+    return {
+      ...cached.config,
+      closures: cached.closures.filter(row => row.endsAt.getTime() > now).map(toClosureDto)
+    };
   }
 
-  /** Call after any write to venue_rates or venue_hours. */
+  /** Call after any write to venue_rates, venue_hours or closures. */
   invalidate(): void {
     this.#cached = null;
     this.#loadedAt = 0;
   }
 
-  async #load(): Promise<VenueConfigDto> {
-    const [rateRows, hourRows] = await Promise.all([
+  async #load(): Promise<Loaded> {
+    const [rateRows, hourRows, closureRows] = await Promise.all([
       this.#db.select().from(venueRates),
-      this.#db.select().from(venueHours)
+      this.#db.select().from(venueHours),
+      loadUpcomingClosures(this.#db, { clubOnly: true })
     ]);
 
     // Missing rows fall back to the values the club opened with rather than
@@ -67,9 +84,9 @@ export class VenueConfigStore {
       }
     }
 
-    const config: VenueConfigDto = { rates, hours };
-    this.#cached = config;
+    const loaded = { config: { rates, hours }, closures: closureRows };
+    this.#cached = loaded;
     this.#loadedAt = Date.now();
-    return config;
+    return loaded;
   }
 }

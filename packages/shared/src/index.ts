@@ -1,5 +1,6 @@
 export * from './locales.ts';
 export * from './schedule.ts';
+export * from './closures.ts';
 export * from './pricing.ts';
 export * from './venue.ts';
 export * from './urls.ts';

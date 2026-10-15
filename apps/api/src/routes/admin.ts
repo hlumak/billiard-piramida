@@ -6,6 +6,7 @@ import { FailureLimiter } from '../lib/failure-limiter.ts';
 import { adminImageRoutes } from './admin-images.ts';
 import { adminBlacklistRoutes } from './admin-blacklist.ts';
 import { adminBookingRoutes } from './admin-bookings.ts';
+import { adminClosureRoutes } from './admin-closures.ts';
 import { adminCustomerRoutes } from './admin-customers.ts';
 import { adminMenuRoutes } from './admin-menu.ts';
 import { adminNewsRoutes } from './admin-news.ts';
@@ -96,6 +97,7 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
     await admin.register(adminNewsRoutes);
     await admin.register(adminTournamentRoutes);
     await admin.register(adminVenueConfigRoutes);
+    await admin.register(adminClosureRoutes);
     await admin.register(adminImageRoutes);
   });
 }

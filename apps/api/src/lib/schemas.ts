@@ -22,7 +22,9 @@ import type {
   TournamentRegistrationResultDto,
   UploadedImageDto,
   UserProfileDto,
-  VenueConfigDto
+  VenueConfigDto,
+  ClosureDto,
+  ClosureConflictDto
 } from '@repo/shared';
 
 /**
@@ -72,7 +74,8 @@ export const AVAILABILITY_RESPONSE = Type.Object({
         Type.Object({
           hour: Type.Integer(),
           available: Type.Boolean(),
-          booked: Type.Boolean()
+          booked: Type.Boolean(),
+          closed: Type.Boolean()
         })
       )
     })
@@ -101,9 +104,29 @@ export const RATE_TABLE = Type.Object({
   darts: Type.Integer({ minimum: 0, maximum: MAX_HOURLY_RATE_GROSZ })
 });
 
+export const CLOSURE_RESPONSE = Type.Object({
+  id: Type.String(),
+  startDate: ISO_DATE,
+  startHour: Type.Integer(),
+  endDate: ISO_DATE,
+  endHour: Type.Integer(),
+  tableIds: Type.Union([Type.Array(Type.Integer()), Type.Null()]),
+  reason: Type.Union([Type.String(), Type.Null()])
+});
+
+export const CLOSURE_CONFLICT_RESPONSE = Type.Object({
+  bookingId: Type.String(),
+  tableId: Type.Integer(),
+  customerName: Type.String(),
+  customerPhone: Type.String(),
+  startsAt: Type.String(),
+  endsAt: Type.String()
+});
+
 export const VENUE_CONFIG_RESPONSE = Type.Object({
   rates: RATE_TABLE,
-  hours: WEEKLY_HOURS
+  hours: WEEKLY_HOURS,
+  closures: Type.Array(CLOSURE_RESPONSE)
 });
 
 export const MENU_ITEM_RESPONSE = Type.Object({
@@ -403,6 +426,8 @@ export type SchemaDriftChecks = [
   Expect<Equals<Static<typeof ADMIN_NEWS_ITEM_RESPONSE>, AdminNewsItemDto>>,
   Expect<Equals<Static<typeof UPLOADED_IMAGE_RESPONSE>, UploadedImageDto>>,
   Expect<Equals<Static<typeof VENUE_CONFIG_RESPONSE>, VenueConfigDto>>,
+  Expect<Equals<Static<typeof CLOSURE_RESPONSE>, ClosureDto>>,
+  Expect<Equals<Static<typeof CLOSURE_CONFLICT_RESPONSE>, ClosureConflictDto>>,
   Expect<Equals<Static<typeof TOURNAMENT_RESPONSE>, TournamentDto>>,
   Expect<Equals<Static<typeof TOURNAMENT_REGISTRATION_RESULT>, TournamentRegistrationResultDto>>,
   Expect<Equals<Static<typeof ADMIN_TOURNAMENT_RESPONSE>, AdminTournamentDto>>,

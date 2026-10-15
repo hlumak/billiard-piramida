@@ -1,5 +1,6 @@
 import type { Locale } from './locales.ts';
 import type { RateTable } from './pricing.ts';
+import type { ClosureDto } from './closures.ts';
 import type { IsoDate, WeeklyHours } from './schedule.ts';
 import type {
   TournamentRegistrationState,
@@ -45,6 +46,8 @@ export interface SlotDto {
   /** Occupied by a confirmed booking, regardless of pastness. Lets staff log
    *  walk-in games that already started today (which `available` hides). */
   booked: boolean;
+  /** Inside a closure staff set for this spot or the whole club: nobody books it. */
+  closed: boolean;
 }
 
 export interface TableAvailabilityDto {
@@ -71,6 +74,9 @@ export interface VenueConfigDto {
   rates: RateTable;
   /** Seven days, index = JS weekday (0 = Sunday … 6 = Saturday) */
   hours: WeeklyHours;
+  /** The whole club's closures that have not ended yet, soonest first. Ones
+   *  for single spots stay staff-side: they show as taken spots instead. */
+  closures: ClosureDto[];
 }
 
 export interface MenuItemDto {

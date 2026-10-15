@@ -23,6 +23,7 @@ import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BILLIARD_GAME } from '../lib/schemas.ts';
 import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
 import { createManageToken, insertOrderItems, mustLoadBookingDto } from './bookings.ts';
+import { isClosedFor } from './closures.ts';
 import type { FastifyInstance } from 'fastify';
 
 /** Body fields the guest form and the reception desk have in common. */
@@ -164,6 +165,9 @@ export async function createBooking(
           throw new BookingRefused('too_many_bookings');
         }
       }
+
+      // Staff close a time for the desk as much as for the website
+      if (await isClosedFor(tx, tableId, startsAt, endsAt)) throw new BookingRefused('slot_closed');
 
       const [created] = await tx
         .insert(bookings)

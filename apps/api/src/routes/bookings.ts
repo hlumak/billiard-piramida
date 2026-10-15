@@ -29,6 +29,7 @@ import {
   phaseOf,
   toBookingDtos
 } from '../services/bookings.ts';
+import { isClosedFor } from '../services/closures.ts';
 import type { FastifyRequest } from 'fastify';
 import type { AppInstance } from '../app.ts';
 
@@ -245,10 +246,16 @@ export function bookingRoutes(
       );
 
       try {
-        await app.db
-          .update(bookings)
-          .set({ endsAt: newEndsAt, discountGrosz })
-          .where(eq(bookings.id, booking.id));
+        const closed = await app.db.transaction(async tx => {
+          // The added hours may run into time staff have closed
+          if (await isClosedFor(tx, booking.tableId, booking.endsAt, newEndsAt)) return true;
+          await tx
+            .update(bookings)
+            .set({ endsAt: newEndsAt, discountGrosz })
+            .where(eq(bookings.id, booking.id));
+          return false;
+        });
+        if (closed) return reply.code(409).send({ error: 'slot_closed' });
       } catch (err) {
         if (pgErrorCode(err) === EXCLUSION_VIOLATION) {
           return reply.code(409).send({ error: 'slot_taken' });
