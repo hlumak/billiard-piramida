@@ -194,7 +194,9 @@ export function AdminNewBooking() {
         <span className="sm:hidden">{m.admin_book_short()}</span>
         <span className="hidden sm:inline">{m.admin_new_booking()}</span>
       </button>
-      <AdminBookingModal isOpen={isOpen} onOpenChange={setOpen} />
+      {/* Mounted only while open: the button lives in the panel's header for
+          the whole shift, and each booking starts from today with an empty form */}
+      {isOpen ? <AdminBookingModal isOpen={isOpen} onOpenChange={setOpen} /> : null}
     </>
   );
 }
