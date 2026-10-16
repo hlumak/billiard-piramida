@@ -9,11 +9,11 @@ import {
 } from '@repo/shared';
 import { isRateLimited } from '../../lib/api';
 import { useLiveAvailability } from '../../lib/availability-live';
-import { formatDay, formatHour, warsawHour, warsawMinute, warsawToday } from '../../lib/format';
+import { formatClock, formatDay } from '../../lib/format';
 import { useIsHydrated } from '../../lib/hydration';
 import { availabilityQuery } from '../../lib/queries';
 import { useNowMinute } from '../../lib/use-now';
-import { firstOpenDay, useVenueConfig } from '../../lib/venue-config';
+import { clubMoment, firstOpenDay, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 
 interface HourFree {
@@ -57,9 +57,11 @@ function freeByHour(availability: AvailabilityDto, hourNow: number | null): Hour
 function useShownDay(): { date: IsoDate | null; today: IsoDate; hourNow: number | null } {
   const { hours, closures } = useVenueConfig();
   const now = useNowMinute();
-  const today = warsawToday(now);
-  const date = firstOpenDay(today, warsawMinute(now), hours, closures);
-  return { date, today, hourNow: date === today ? warsawHour(now) : null };
+  // The club's day: on a late night its small hours are still the evening's
+  const moment = clubMoment(hours, now);
+  const today = moment.date;
+  const date = firstOpenDay(today, moment.minute, hours, closures);
+  return { date, today, hourNow: date === today ? Math.floor(moment.minute / 60) : null };
 }
 
 function ChipSkeletons() {
@@ -110,7 +112,7 @@ function Chips({ date, hourNow }: { date: IsoDate; hourNow: number | null }) {
             key={hour}
             className="flex h-15.5 w-21.5 shrink-0 flex-col items-center justify-center rounded-[14px] text-creme/70 shadow-[inset_0_0_0_1.5px_rgb(246_241_220/0.22)] lg:w-auto lg:flex-1"
           >
-            <span className="text-[17px] font-bold lg:text-lg">{formatHour(hour)}</span>
+            <span className="text-[17px] font-bold lg:text-lg">{formatClock(hour * 60)}</span>
             <span className="text-[11px] font-semibold lg:text-xs">{m.hours_busy()}</span>
           </span>
         ) : (
@@ -122,7 +124,7 @@ function Chips({ date, hourNow }: { date: IsoDate; hourNow: number | null }) {
             className="chip anim-stagger-item relative h-15.5 w-21.5 shrink-0 flex-col rounded-[14px] hover:-translate-y-0.5 lg:w-auto lg:flex-1"
           >
             {/* Named by what it shows ("16:00 8 free"), then what it does */}
-            <span className="text-[17px] lg:text-lg">{formatHour(hour)}</span>{' '}
+            <span className="text-[17px] lg:text-lg">{formatClock(hour * 60)}</span>{' '}
             <span className="text-[11px] font-semibold text-golden-light lg:text-xs">
               {m.free_n({ n: free })}
             </span>

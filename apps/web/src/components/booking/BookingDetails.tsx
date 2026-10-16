@@ -10,8 +10,8 @@ import {
   sizeOf,
   type BookingDto
 } from '@repo/shared';
-import { useVenueConfig } from '../../lib/venue-config';
-import { bookingMinutes, formatDayLong, intlTag, warsawDate, warsawTime } from '../../lib/format';
+import { bookingClubDate, useVenueConfig } from '../../lib/venue-config';
+import { bookingMinutes, formatDayLong, intlTag, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { spotDescription, spotRentalLabel } from '../../lib/spots';
 import { VENUE } from '../../lib/venue';
@@ -42,9 +42,11 @@ export function BookingDetails({
   const { data: menu } = useQuery(menuQuery(getLocale()));
   const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
 
-  const date = warsawDate(booking.startsAt);
-  const closeMinute = hoursForDate(date, useVenueConfig().hours).close * 60;
-  const { start, end } = bookingMinutes(booking);
+  const { hours } = useVenueConfig();
+  // The club day: a 00:30 on a late night is the evening's
+  const date = bookingClubDate(booking, hours);
+  const closeMinute = hoursForDate(date, hours).close * 60;
+  const { start, end } = bookingMinutes(booking, hours);
   // Half an hour more must still end by closing time and stay within the
   // longest booking the API accepts; whether the table is free then, the API says
   const canExtend =

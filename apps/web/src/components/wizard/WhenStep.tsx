@@ -25,12 +25,11 @@ import {
   formatDayLong,
   formatDuration,
   formatHour,
-  formatMonthYear,
-  warsawToday
+  formatMonthYear
 } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { useLiveAvailability } from '../../lib/availability-live';
-import { useVenueConfig } from '../../lib/venue-config';
+import { clubMoment, useVenueConfig } from '../../lib/venue-config';
 import { closedSpanLine, closedSpanText, partlyClosedTag } from '../../lib/closures';
 import { QueryError } from '../QueryError';
 import {
@@ -146,7 +145,8 @@ const sectionTitle = 'text-sm font-bold md:text-[15px]';
 export function WhenStep() {
   const date = useStore(wizardStore, state => state.date);
   const { hours, closures } = useVenueConfig();
-  const today = warsawToday();
+  // The club's today: past midnight on a late night, still the evening's
+  const today = clubMoment(hours).date;
   const dates = Array.from({ length: BOOKING_DAYS_AHEAD }, (_, i) => addDays(today, i));
   // Shut by the weekly hours, or for the whole day by staff
   const isShut = (day: IsoDate) =>

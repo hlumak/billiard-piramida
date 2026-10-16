@@ -1,7 +1,7 @@
 import { BOOKING_DAYS_AHEAD, clubClosureOn, hoursForDate, weekdayOf } from '@repo/shared';
-import { addDays, formatDay, formatHour, warsawToday, weekdayName } from '../../lib/format';
+import { addDays, formatDay, formatHour, weekdayName } from '../../lib/format';
 import { closedSpanLine, closedSpanText, hoursLeft } from '../../lib/closures';
-import { groupWeeklyHours, useVenueConfig } from '../../lib/venue-config';
+import { clubMoment, groupWeeklyHours, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 
 /** "понеділок" for one day, "понеділок – четвер" for a run. */
@@ -22,7 +22,7 @@ function dayRangeLabel(weekdays: number[]): string {
  */
 export function HoursList({ className }: { className?: string }) {
   const { hours, closures } = useVenueConfig();
-  const todayDate = warsawToday();
+  const todayDate = clubMoment(hours).date;
   const today = weekdayOf(todayDate);
   const todayHours = hoursForDate(todayDate, hours);
   const todayClosure = clubClosureOn(todayDate, hours, closures);

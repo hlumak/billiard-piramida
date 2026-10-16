@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { BrandLogo } from '../BrandLogo';
 import { LocaleSwitcher } from '../LocaleSwitcher';
-import { weekdayName, warsawToday } from '../../lib/format';
+import { wallHour, weekdayName, warsawToday } from '../../lib/format';
 import { VENUE, VENUE_ADDRESS, VENUE_PHONE_HREF } from '../../lib/venue';
 import { groupWeeklyHours, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
@@ -20,7 +20,7 @@ function useHoursLine(): string {
           : `${weekdayName(first, 'short')}–${weekdayName(last, 'short')}`;
       return group.closed
         ? `${days} ${m.hours_closed()}`
-        : `${days} ${group.hours.open}–${group.hours.close}`;
+        : `${days} ${group.hours.open}–${wallHour(group.hours.close)}`;
     })
     .join(' · ');
 }

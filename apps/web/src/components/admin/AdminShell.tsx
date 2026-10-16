@@ -2,9 +2,9 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Ellipsis, ExternalLink, LogOut, Search, X } from 'lucide-react';
 import { hoursForDate, isClosedAllDay } from '@repo/shared';
-import { formatDayLong, formatHour, warsawToday } from '../../lib/format';
+import { formatDayLong, formatHour } from '../../lib/format';
 import { useNowMinute } from '../../lib/use-now';
-import { useVenueConfig } from '../../lib/venue-config';
+import { clubMoment, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { BrandLogo } from '../BrandLogo';
 import { ClearButton } from '../ClearButton';
@@ -154,7 +154,7 @@ export function AdminShell({
 }: ShellProps) {
   const current = ADMIN_PANES.find(entry => entry.id === pane) ?? ADMIN_PANES[0];
   const { hours } = useVenueConfig();
-  const today = warsawToday(useNowMinute());
+  const today = clubMoment(hours, useNowMinute()).date;
   const day = hoursForDate(today, hours);
   const hoursText = isClosedAllDay(day)
     ? m.admin_closed_today()
