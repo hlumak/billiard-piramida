@@ -52,8 +52,16 @@ export function hourlyRateGrosz(spot: SpotRef, rates: RateTable): number {
   return rates[rateTierOf(spot)];
 }
 
-export function spotPriceGrosz(spot: SpotRef, durationHours: number, rates: RateTable): number {
-  return durationHours * hourlyRateGrosz(spot, rates);
+/**
+ * Rental for a stretch of time at an hourly rate: a half hour bills half the
+ * hour. Rounded to the grosz, so an odd rate cannot produce half a grosz.
+ */
+export function rentalGrosz(hourlyRateGrosz: number, durationMinutes: number): number {
+  return Math.round((hourlyRateGrosz * durationMinutes) / 60);
+}
+
+export function spotPriceGrosz(spot: SpotRef, durationMinutes: number, rates: RateTable): number {
+  return rentalGrosz(hourlyRateGrosz(spot, rates), durationMinutes);
 }
 
 /**

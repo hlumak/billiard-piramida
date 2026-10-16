@@ -38,9 +38,10 @@ export interface TableDto {
   kind: ActivityKind;
 }
 
+/** One half-hour slot of a spot's day. */
 export interface SlotDto {
-  /** Local Warsaw hour, e.g. 16 for 16:00 */
-  hour: number;
+  /** Minutes after local Warsaw midnight, e.g. 990 for 16:30 */
+  startMinute: number;
   /** Bookable by the public: not taken AND not in the past. */
   available: boolean;
   /** Occupied by a confirmed booking, regardless of pastness. Lets staff log
@@ -395,8 +396,10 @@ export interface AdminStatsDto {
 export interface CreateBookingInput {
   tableId: TableDto['id'];
   date: IsoDate;
-  startHour: number;
-  durationHours: number;
+  /** Minutes after local midnight, on the half-hour grid (18:30 = 1110) */
+  startMinute: number;
+  /** At least an hour, in half-hour steps (90 = 1:30) */
+  durationMinutes: number;
   customerName: BookingDto['customerName'];
   customerPhone: BookingDto['customerPhone'];
   /** Self-declared, guests included — staff verify the physical cards on site */
