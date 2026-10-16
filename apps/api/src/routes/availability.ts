@@ -1,11 +1,11 @@
 import { Type } from 'typebox';
 import type { AvailabilityDto, TableAvailabilityDto } from '@repo/shared';
-import { hoursForDate, isIsoDate, MIN_BOOKING_HOURS } from '@repo/shared';
+import { hoursForDate, isIsoDate, SLOT_MINUTES } from '@repo/shared';
 import { and, eq, gt, gte, lt } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { AVAILABILITY_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
 import { loadClosuresBetween } from '../services/closures.ts';
-import { HOUR_MS, warsawInstant } from '../lib/time.ts';
+import { MINUTE_MS, warsawInstant, warsawInstantAt } from '../lib/time.ts';
 import type { AppInstance } from '../app.ts';
 
 export function availabilityRoutes(app: AppInstance) {
@@ -57,16 +57,19 @@ export function availabilityRoutes(app: AppInstance) {
         const busy = dayBookings.filter(b => b.tableId === table.id);
         const shut = dayClosures.filter(c => c.tableIds === null || c.tableIds.includes(table.id));
         const slots = [];
-        for (let hour = open; hour <= close - MIN_BOOKING_HOURS; hour++) {
-          const slotStart = warsawInstant(date, hour);
-          const slotEnd = new Date(slotStart.getTime() + HOUR_MS);
+        // Every half hour the club is open, the last one included: a
+        // booking cannot start there (under the 1-hour minimum), but whether
+        // it is free decides if a 1:30 fits before closing
+        for (let startMinute = open * 60; startMinute < close * 60; startMinute += SLOT_MINUTES) {
+          const slotStart = warsawInstantAt(date, startMinute);
+          const slotEnd = new Date(slotStart.getTime() + SLOT_MINUTES * MINUTE_MS);
           const overlaps = busy.some(b => b.startsAt < slotEnd && b.endsAt > slotStart);
           const closed = shut.some(c => c.startsAt < slotEnd && c.endsAt > slotStart);
           const inPast = slotStart.getTime() < now.getTime() - 5 * 60_000;
-          // `booked` = taken (staff can still log past-but-free hours today);
-          // `available` also excludes past hours for the public wizard.
+          // `booked` = taken (staff can still log past-but-free slots today);
+          // `available` also excludes past slots for the public wizard.
           slots.push({
-            hour,
+            startMinute,
             available: !overlaps && !inPast && !closed,
             booked: overlaps,
             closed

@@ -35,7 +35,15 @@ test('operating hours per weekday', () => {
 test('slot starts are half-hourly and leave room for the 1-hour minimum', () => {
   // Mon 16-21: 16:00, 16:30 … 20:00
   assert.deepEqual(slotStartsForDate('2026-07-13', HOURS), [
-    at(16), at(16, 30), at(17), at(17, 30), at(18), at(18, 30), at(19), at(19, 30), at(20)
+    at(16),
+    at(16, 30),
+    at(17),
+    at(17, 30),
+    at(18),
+    at(18, 30),
+    at(19),
+    at(19, 30),
+    at(20)
   ]);
   const saturday = slotStartsForDate('2026-07-18', HOURS); // Sat 15-23
   assert.equal(saturday[0], at(15));

@@ -7,12 +7,14 @@ import {
   hourlyRateGrosz,
   isIsoDate,
   isValidBookingWindow,
-  MAX_BOOKING_HOURS,
+  MAX_BOOKING_MINUTES,
   MAX_SPORT_CARDS_PER_BOOKING,
   MAX_SPOT_ID,
   MAX_UPCOMING_BOOKINGS_PER_PHONE,
-  MIN_BOOKING_HOURS,
+  MIN_BOOKING_MINUTES,
+  rentalGrosz,
   resolveBookingGame,
+  SLOT_MINUTES,
   type BilliardGame,
   type BookingDto
 } from '@repo/shared';
@@ -21,7 +23,7 @@ import { and, count, eq, gt, sql } from 'drizzle-orm';
 import { blacklist, bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BILLIARD_GAME } from '../lib/schemas.ts';
-import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
+import { MINUTE_MS, warsawDateOf, warsawInstant, warsawInstantAt } from '../lib/time.ts';
 import { createManageToken, insertOrderItems, mustLoadBookingDto } from './bookings.ts';
 import { isClosedFor } from './closures.ts';
 import type { FastifyInstance } from 'fastify';
@@ -30,8 +32,18 @@ import type { FastifyInstance } from 'fastify';
 export const NEW_BOOKING_FIELDS = {
   tableId: Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }),
   date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
-  startHour: Type.Integer({ minimum: 0, maximum: 23 }),
-  durationHours: Type.Integer({ minimum: MIN_BOOKING_HOURS, maximum: MAX_BOOKING_HOURS }),
+  /** Minutes after local midnight — 18:00 or 18:30, never 18:15 */
+  startMinute: Type.Integer({
+    minimum: 0,
+    maximum: 24 * 60 - SLOT_MINUTES,
+    multipleOf: SLOT_MINUTES
+  }),
+  /** 60, 90, 120 … — an hour at least, in half-hour steps */
+  durationMinutes: Type.Integer({
+    minimum: MIN_BOOKING_MINUTES,
+    maximum: MAX_BOOKING_MINUTES,
+    multipleOf: SLOT_MINUTES
+  }),
   customerName: Type.String({ minLength: 1, maxLength: 120 }),
   customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
   /** Self-declared and open to guests — staff check the cards at reception */
@@ -43,8 +55,8 @@ export const NEW_BOOKING_FIELDS = {
 export interface NewBooking {
   tableId: number;
   date: string;
-  startHour: number;
-  durationHours: number;
+  startMinute: number;
+  durationMinutes: number;
   customerName: string;
   customerPhone: string;
   sportCardCount?: number | undefined;
@@ -95,7 +107,7 @@ export async function createBooking(
   input: NewBooking,
   policy: BookingPolicy
 ): Promise<CreateBookingResult> {
-  const { tableId, date, startHour, durationHours } = input;
+  const { tableId, date, startMinute, durationMinutes } = input;
   const customerName = input.customerName.trim();
   if (customerName === '') return refuse(422, 'invalid_name');
   if (!isIsoDate(date)) return refuse(400, 'invalid_date');
@@ -118,12 +130,14 @@ export async function createBooking(
     return refuse(422, 'booking_too_far');
   }
   const { rates, hours } = await app.venueConfig.get();
-  if (!isValidBookingWindow(date, startHour, durationHours, hours)) {
+  // Also refuses a start off the half-hour grid or a length under an hour,
+  // should a caller get past the schema
+  if (!isValidBookingWindow(date, startMinute, durationMinutes, hours)) {
     return refuse(422, 'outside_operating_hours');
   }
 
-  const startsAt = warsawInstant(date, startHour);
-  const endsAt = new Date(startsAt.getTime() + durationHours * HOUR_MS);
+  const startsAt = warsawInstantAt(date, startMinute);
+  const endsAt = new Date(startsAt.getTime() + durationMinutes * MINUTE_MS);
   const earliestStart =
     policy.kind === 'guest' ? Date.now() - START_GRACE_MS : warsawInstant(today, 0).getTime();
   if (startsAt.getTime() < earliestStart) return refuse(422, 'start_in_past');
@@ -142,7 +156,10 @@ export async function createBooking(
   // a later reprice must not rewrite this receipt.
   const sportCardCount = input.sportCardCount ?? 0;
   const lockedRateGrosz = hourlyRateGrosz(spot, rates);
-  const discountGrosz = discountGroszFor(sportCardCount, lockedRateGrosz * durationHours);
+  const discountGrosz = discountGroszFor(
+    sportCardCount,
+    rentalGrosz(lockedRateGrosz, durationMinutes)
+  );
   const manage = policy.kind === 'guest' ? createManageToken() : null;
 
   try {

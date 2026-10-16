@@ -72,7 +72,7 @@ export const AVAILABILITY_RESPONSE = Type.Object({
       label: Type.String(),
       slots: Type.Array(
         Type.Object({
-          hour: Type.Integer(),
+          startMinute: Type.Integer(),
           available: Type.Boolean(),
           booked: Type.Boolean(),
           closed: Type.Boolean()

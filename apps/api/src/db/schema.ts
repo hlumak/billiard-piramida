@@ -111,6 +111,13 @@ export const bookings = pgTable(
     // zero-length booking would slip past the overlap guard (an empty range
     // overlaps nothing), and negative money would corrupt every total
     check('bookings_ends_after_start', sql`${t.endsAt} > ${t.startsAt}`),
+    // The half-hour grid: starts on :00 or :30 and runs whole half hours,
+    // an hour at least. Epoch seconds work because Warsaw is a whole number
+    // of hours off UTC, so local :00/:30 is UTC :00/:30 too
+    check(
+      'bookings_on_half_hour_grid',
+      sql`extract(epoch from ${t.startsAt}) % 1800 = 0 and extract(epoch from ${t.endsAt}) % 1800 = 0 and ${t.endsAt} - ${t.startsAt} >= interval '1 hour'`
+    ),
     check('bookings_sport_card_count_non_negative', sql`${t.sportCardCount} >= 0`),
     check('bookings_hourly_rate_non_negative', sql`${t.hourlyRateGrosz} >= 0`),
     check('bookings_discount_non_negative', sql`${t.discountGrosz} >= 0`)
