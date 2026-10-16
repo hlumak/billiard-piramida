@@ -35,11 +35,12 @@ export function AdminStats() {
     tooltip: `${formatDay(d.date)} · ${formatPln(d.revenueGrosz, intlTag())} · ${d.bookings}×`
   }));
 
+  // Hours of the club's day: a late night's 00:xx comes as 24 and sorts last, but reads "0:00"
   const hourBars = data.startHours.map(h => ({
     key: String(h.hour),
-    label: `${h.hour}:00`,
+    label: `${h.hour % 24}:00`,
     value: h.bookings,
-    tooltip: `${h.hour}:00 · ${h.bookings}`
+    tooltip: `${h.hour % 24}:00 · ${h.bookings}`
   }));
 
   return (
