@@ -3,8 +3,10 @@ import { test } from 'node:test';
 import {
   DEFAULT_WEEKLY_HOURS,
   hoursForDate,
+  clubDateAt,
   isClosedAllDay,
   isOnSlotGrid,
+  isValidWeek,
   isValidBookingWindow,
   maxDurationAt,
   slotStartsForDate,
@@ -105,4 +107,64 @@ test('a day whose open is not before its close is shut', () => {
   assert.equal(maxDurationAt('2026-07-13', at(16), closedMondays), 0);
   assert.equal(isValidBookingWindow('2026-07-13', at(16), 60, closedMondays), false);
   assert.equal(isClosedAllDay(hoursForDate('2026-07-17', closedMondays)), false);
+});
+
+test('a night may run past midnight, up to 02:00', () => {
+  const late: WeeklyHours = [...DEFAULT_WEEKLY_HOURS] as WeeklyHours;
+  late[1] = { open: 16, close: 25 }; // Monday 16:00–01:00
+  assert.equal(isValidWeek(late), true);
+  assert.equal(isClosedAllDay(hoursForDate('2026-07-13', late)), false);
+  // Starts run on past midnight, the last one an hour before closing
+  const starts = slotStartsForDate('2026-07-13', late);
+  assert.equal(starts.at(-1), at(24)); // 00:00 on the night
+  assert.equal(isValidBookingWindow('2026-07-13', at(23, 30), 90, late), true); // 23:30–01:00
+  assert.equal(isValidBookingWindow('2026-07-13', at(24, 30), 60, late), false); // ends 01:30
+  assert.equal(maxDurationAt('2026-07-13', at(23), late), 120);
+
+  late[1] = { open: 16, close: 26 };
+  assert.equal(isValidWeek(late), true);
+  late[1] = { open: 16, close: 27 }; // 03:00 is past the latest closing
+  assert.equal(isValidWeek(late), false);
+});
+
+test('a week is refused when hours make no sense or a night runs into the next day', () => {
+  const week = (monday: { open: number; close: number }, tuesday = DEFAULT_WEEKLY_HOURS[2]) => {
+    const hours: WeeklyHours = [...DEFAULT_WEEKLY_HOURS] as WeeklyHours;
+    hours[1] = monday;
+    hours[2] = tuesday;
+    return hours;
+  };
+  assert.equal(isValidWeek(DEFAULT_WEEKLY_HOURS), true);
+  assert.equal(isValidWeek(week({ open: 0, close: 0 })), true); // shut
+  assert.equal(isValidWeek(week({ open: 20, close: 18 })), false); // backwards
+  assert.equal(isValidWeek(week({ open: 24, close: 26 })), false); // opens at the next midnight
+  assert.equal(isValidWeek(week({ open: 16.5, close: 21 })), false); // whole hours only
+  // Monday until 01:00 while Tuesday opens at midnight: 00:30 would be both
+  assert.equal(isValidWeek(week({ open: 16, close: 25 }, { open: 0, close: 6 })), false);
+  assert.equal(isValidWeek(week({ open: 16, close: 25 }, { open: 1, close: 6 })), true);
+  // …unless Tuesday is shut
+  assert.equal(isValidWeek(week({ open: 16, close: 25 }, { open: 0, close: 0 })), true);
+  // Saturday's night runs into Sunday, which wraps to the start of the week
+  const weekend: WeeklyHours = [...DEFAULT_WEEKLY_HOURS] as WeeklyHours;
+  weekend[6] = { open: 15, close: 26 };
+  weekend[0] = { open: 1, close: 23 };
+  assert.equal(isValidWeek(weekend), false);
+});
+
+test('the small hours of a late night belong to the evening before', () => {
+  const late: WeeklyHours = [...DEFAULT_WEEKLY_HOURS] as WeeklyHours;
+  late[1] = { open: 16, close: 25 }; // Monday 13 July until 01:00
+  // Tuesday 00:30 is still Monday night
+  assert.deepEqual(clubDateAt('2026-07-14', at(0, 30), late), {
+    date: '2026-07-13',
+    minute: at(24, 30)
+  });
+  // From 01:00 it is Tuesday's own
+  assert.deepEqual(clubDateAt('2026-07-14', at(1), late), { date: '2026-07-14', minute: at(1) });
+  assert.deepEqual(clubDateAt('2026-07-14', at(17), late), { date: '2026-07-14', minute: at(17) });
+  // With the published hours (no late nights) every moment is its own day
+  assert.deepEqual(clubDateAt('2026-07-14', at(0, 30), DEFAULT_WEEKLY_HOURS), {
+    date: '2026-07-14',
+    minute: at(0, 30)
+  });
 });

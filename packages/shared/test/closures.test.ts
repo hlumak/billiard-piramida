@@ -120,3 +120,27 @@ test('isWholeDays: midnight to midnight', () => {
   assert.equal(isWholeDays(closure({ startHour: 0, endDate: '2026-10-25', endHour: 0 })), true);
   assert.equal(isWholeDays(closure({})), false);
 });
+
+test('closedSpansOn: a closure through midnight reaches the late night as hours past 24', () => {
+  // Saturday 22:00 to Sunday 01:00
+  const lateParty = closure({ startHour: 22, endDate: '2026-10-25', endHour: 1 });
+  assert.deepEqual(
+    closedSpansOn('2026-10-24', [lateParty]).map(s => [s.from, s.to]),
+    [
+      [22, 24],
+      [24, 25]
+    ]
+  );
+  assert.equal(isHourClosed('2026-10-24', 24, [lateParty]), true); // 00:00–01:00 that night
+  assert.equal(isHourClosed('2026-10-24', 25, [lateParty]), false);
+  // Clipped to a day open until 01:00, the whole night from 22:00 is gone
+  const late = [...DEFAULT_WEEKLY_HOURS] as typeof DEFAULT_WEEKLY_HOURS;
+  late[6] = { open: 15, close: 25 };
+  assert.deepEqual(
+    clubClosureOn('2026-10-24', late, [lateParty])?.spans.map(s => [s.from, s.to]),
+    [
+      [22, 24],
+      [24, 25]
+    ]
+  );
+});
