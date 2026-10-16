@@ -3,10 +3,10 @@ import {
   BOOKING_DAYS_AHEAD,
   DEFAULT_HOURLY_RATE_GROSZ,
   DEFAULT_WEEKLY_HOURS,
-  MIN_BOOKING_HOURS,
+  MIN_BOOKING_MINUTES,
   addDays,
-  hoursForDate,
   isHourClosed,
+  slotStartsForDate,
   isClosedAllDay,
   type ClosureDto,
   type DayHours,
@@ -38,23 +38,29 @@ export function useVenueConfig(): VenueConfigDto {
 }
 
 /**
- * The first day in the booking window with an hour still to start: today
- * only while it has a start hour ahead, then the next day the club opens —
- * skipping hours (and days) staff have closed.
+ * The first day in the booking window with a start still to come: today
+ * only while it has a half-hour start ahead, then the next day the club
+ * opens — skipping times (and days) staff have closed.
  */
 export function firstOpenDay(
   today: IsoDate,
-  hourNow: number,
+  minuteNow: number,
   hours: WeeklyHours,
   closures: readonly ClosureDto[]
 ): IsoDate | null {
   for (let i = 0; i < BOOKING_DAYS_AHEAD; i++) {
     const day = addDays(today, i);
-    const { open, close } = hoursForDate(day, hours);
-    for (let hour = open; hour <= close - MIN_BOOKING_HOURS; hour++) {
-      // Today keeps only the hours still ahead, as it always did
-      if (i === 0 && hour <= hourNow) continue;
-      if (!isHourClosed(day, hour, closures)) return day;
+    for (const start of slotStartsForDate(day, hours)) {
+      // Today keeps only the starts still ahead
+      if (i === 0 && start <= minuteNow) continue;
+      // Closures are whole hours: the shortest stay from here must miss them all
+      const firstHour = Math.floor(start / 60);
+      const lastHour = Math.floor((start + MIN_BOOKING_MINUTES - 1) / 60);
+      let closed = false;
+      for (let hour = firstHour; hour <= lastHour; hour++) {
+        if (isHourClosed(day, hour, closures)) closed = true;
+      }
+      if (!closed) return day;
     }
   }
   return null;

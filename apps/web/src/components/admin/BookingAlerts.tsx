@@ -5,9 +5,9 @@ import { Bell } from 'lucide-react';
 import type { AdminOnlineBookingDto } from '@repo/shared';
 import { adminOnlineBookingsQuery } from '../../lib/admin-api';
 import {
-  bookingHours,
+  bookingMinutes,
+  formatClockRange,
   formatDay,
-  formatHour,
   warsawDate,
   warsawTime,
   warsawToday
@@ -104,10 +104,10 @@ function chime(): void {
 }
 
 function bookingLine(booking: AdminOnlineBookingDto): string {
-  const { start, end } = bookingHours(booking);
+  const { start, end } = bookingMinutes(booking);
   return [
     formatDay(warsawDate(booking.startsAt)),
-    `${formatHour(start)}–${formatHour(end)}`,
+    formatClockRange(start, end - start),
     spotDescription(booking.kind, booking.tableLabel, {
       game: booking.game,
       lowercaseGame: true

@@ -1,21 +1,24 @@
-import type { AvailabilityDto } from '@repo/shared';
+import { SLOT_MINUTES, type AvailabilityDto } from '@repo/shared';
 
 /**
- * Spots free for the whole chosen window: every hour from `startHour` for
- * `durationHours` hours must be available on the spot, not just the first.
+ * Spots free for the whole chosen window: every half hour from `startMinute`
+ * for `durationMinutes` must be available on the spot, not just the first.
  */
 export function freeSpotIds(
   tables: AvailabilityDto['tables'],
-  startHour: number,
-  durationHours: number
+  startMinute: number,
+  durationMinutes: number
 ): Set<number> {
   const free = new Set<number>();
+  const window = Array.from(
+    { length: Math.ceil(durationMinutes / SLOT_MINUTES) },
+    (_, i) => startMinute + i * SLOT_MINUTES
+  );
   for (const table of tables) {
-    const availableHours = new Set(
-      table.slots.filter(slot => slot.available).map(slot => slot.hour)
+    const availableSlots = new Set(
+      table.slots.filter(slot => slot.available).map(slot => slot.startMinute)
     );
-    const window = Array.from({ length: durationHours }, (_, i) => startHour + i);
-    if (window.every(hour => availableHours.has(hour))) free.add(table.tableId);
+    if (window.every(slot => availableSlots.has(slot))) free.add(table.tableId);
   }
   return free;
 }

@@ -14,6 +14,7 @@ import type {
   TournamentRegistrationResultDto,
   VenueConfigDto
 } from '@repo/shared';
+import { EXTEND_STEP_MINUTES } from '@repo/shared';
 import { notFound } from '@tanstack/react-router';
 import { manageTokenFor } from './recent-bookings';
 import { currentRequestContext } from './request-context';
@@ -223,9 +224,14 @@ export const api = {
       body: input,
       headers: botCheckHeaders(botToken)
     }),
-  extendBooking: (id: string, additionalHours: number) => {
+  /** Half an hour more — the only step the API takes; press again for more. */
+  extendBooking: (id: string) => {
     const [path, headers] = bookingPath(id, '/extend');
-    return request<BookingDto>(path, { method: 'POST', headers, body: { additionalHours } });
+    return request<BookingDto>(path, {
+      method: 'POST',
+      headers,
+      body: { additionalMinutes: EXTEND_STEP_MINUTES }
+    });
   },
   addItems: (id: string, items: NewOrderItem[]) => {
     const [path, headers] = bookingPath(id, '/items');

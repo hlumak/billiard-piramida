@@ -3,9 +3,10 @@ import { Pencil, Plus } from 'lucide-react';
 import { Button, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  MAX_BOOKING_HOURS,
+  MAX_BOOKING_MINUTES,
   MAX_SPORT_CARDS_PER_BOOKING,
-  MIN_BOOKING_HOURS,
+  MIN_BOOKING_MINUTES,
+  SLOT_MINUTES,
   defaultGameFor,
   gamesFor,
   maxDurationAt,
@@ -18,7 +19,14 @@ import {
 import { isValidPhone } from '@repo/shared/phone';
 import { adminApi, adminBlacklistQuery } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
-import { bookingHours, formatHour, warsawDate, warsawHour, warsawToday } from '../../lib/format';
+import {
+  bookingMinutes,
+  formatClock,
+  formatDuration,
+  warsawDate,
+  warsawMinute,
+  warsawToday
+} from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { gameName, spotName } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
@@ -38,13 +46,16 @@ const chip = (selected: boolean, disabled = false) =>
 /** A slot picked elsewhere (e.g. the schedule grid) that seeds the form. */
 export interface NewBookingPrefill {
   date: IsoDate;
-  startHour: number;
+  /** Minutes after local midnight */
+  startMinute: number;
   tableId: number;
 }
 
 interface FormState {
   date: IsoDate;
-  startHour: number | null;
+  /** Minutes after local midnight, on the half-hour grid */
+  startMinute: number | null;
+  /** In minutes: an hour at least, in half-hour steps */
   duration: number;
   tableId: number | null;
   name: string;
@@ -56,7 +67,7 @@ interface FormState {
 
 type FormAction =
   | { type: 'date'; date: IsoDate }
-  | { type: 'startHour'; startHour: number }
+  | { type: 'startMinute'; startMinute: number }
   | { type: 'duration'; duration: number }
   | { type: 'tableId'; tableId: number }
   | { type: 'game'; game: BilliardGame }
@@ -75,8 +86,8 @@ function initialForm({ prefill, booking }: FormSeed): FormState {
   if (booking) {
     return {
       date: warsawDate(booking.startsAt),
-      startHour: warsawHour(booking.startsAt),
-      duration: Math.round((Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 3_600_000),
+      startMinute: warsawMinute(booking.startsAt),
+      duration: Math.round((Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 60_000),
       tableId: booking.tableId,
       name: booking.customerName,
       phone: booking.customerPhone,
@@ -86,8 +97,8 @@ function initialForm({ prefill, booking }: FormSeed): FormState {
   }
   return {
     date: prefill?.date ?? warsawToday(),
-    startHour: prefill?.startHour ?? null,
-    duration: 1,
+    startMinute: prefill?.startMinute ?? null,
+    duration: MIN_BOOKING_MINUTES,
     tableId: prefill?.tableId ?? null,
     name: '',
     phone: '',
@@ -97,16 +108,16 @@ function initialForm({ prefill, booking }: FormSeed): FormState {
 }
 
 /**
- * Changing the date, hour or duration invalidates the spot picked under the old
+ * Changing the date, start or duration invalidates the spot picked under the old
  * window — that rule lives here once instead of being re-spelled in three
  * onClick handlers, and clearing up after a create is a single transition.
  */
 function formReducer(state: FormState, action: FormAction): FormState {
   switch (action.type) {
     case 'date':
-      return { ...state, date: action.date, startHour: null, tableId: null, game: null };
-    case 'startHour':
-      return { ...state, startHour: action.startHour, tableId: null, game: null };
+      return { ...state, date: action.date, startMinute: null, tableId: null, game: null };
+    case 'startMinute':
+      return { ...state, startMinute: action.startMinute, tableId: null, game: null };
     case 'duration':
       return { ...state, duration: action.duration, tableId: null, game: null };
     // The spot decides what can be racked on it, so the game follows it here
@@ -125,7 +136,7 @@ function formReducer(state: FormState, action: FormAction): FormState {
     case 'created':
       return {
         ...state,
-        startHour: null,
+        startMinute: null,
         tableId: null,
         game: null,
         name: '',
@@ -147,38 +158,38 @@ function submitErrorMessage(err: unknown): string {
 
 interface SlotWindow {
   date: IsoDate;
-  startHour: number;
+  startMinute: number;
   duration: number;
 }
 
 /**
  * Staff may log games from earlier today, so a table is free for the window
- * when every hour is a valid slot that isn't already booked — using `booked`
- * (not `available`, which also hides past hours) is what makes past-today
- * walk-ins selectable.
+ * when every half hour is a valid slot that isn't already booked — using
+ * `booked` (not `available`, which also hides past slots) is what makes
+ * past-today walk-ins selectable.
  *
- * In edit mode the booking's own hours read as `booked` — by itself. Holding
- * its current slot must not make its own table look unavailable, so those
- * hours count as free for the form editing it.
+ * In edit mode the booking's own slots read as `booked` — by itself. Holding
+ * its current window must not make its own table look unavailable, so those
+ * slots count as free for the form editing it.
  */
 function isFreeForWindow(
   table: TableAvailabilityDto,
-  { date, startHour, duration }: SlotWindow,
+  { date, startMinute, duration }: SlotWindow,
   booking: BookingDto | undefined
 ): boolean {
   const held =
     booking !== undefined &&
     booking.tableId === table.tableId &&
     warsawDate(booking.startsAt) === date
-      ? bookingHours(booking)
+      ? bookingMinutes(booking)
       : null;
-  const slotByHour = new Map(table.slots.map(s => [s.hour, s]));
-  for (let h = startHour; h < startHour + duration; h++) {
-    const slot = slotByHour.get(h);
+  const slotByStart = new Map(table.slots.map(s => [s.startMinute, s]));
+  for (let t = startMinute; t < startMinute + duration; t += SLOT_MINUTES) {
+    const slot = slotByStart.get(t);
     if (!slot) return false;
     // A closure binds the desk too: the API refuses it as well
     if (slot.closed) return false;
-    if (slot.booked && !(held !== null && h >= held.start && h < held.end)) return false;
+    if (slot.booked && !(held !== null && t >= held.start && t < held.end)) return false;
   }
   return true;
 }
@@ -251,7 +262,7 @@ export function AdminBookingModal({
   // Remounted by the caller on a prefill/booking change (keyed), so the initial
   // state never needs syncing back from props.
   const [form, dispatch] = useReducer(formReducer, { prefill, booking }, initialForm);
-  const { date, startHour, duration, tableId, name, phone, sportCards, game } = form;
+  const { date, startMinute, duration, tableId, name, phone, sportCards, game } = form;
 
   const { data: availability } = useQuery({ ...availabilityQuery(date), enabled: isOpen });
   // The desk may book a black-listed number; it should know it is doing so
@@ -264,18 +275,20 @@ export function AdminBookingModal({
   // accepts exactly that. Picking a new start can leave the stored duration
   // over the limit, so the clamped value — not `duration` — drives the form.
   const maxDuration =
-    startHour === null
-      ? MAX_BOOKING_HOURS
-      : Math.min(maxDurationAt(date, startHour, venueHours), MAX_BOOKING_HOURS);
-  const effectiveDuration = Math.min(duration, Math.max(maxDuration, MIN_BOOKING_HOURS));
+    startMinute === null
+      ? MAX_BOOKING_MINUTES
+      : Math.min(maxDurationAt(date, startMinute, venueHours), MAX_BOOKING_MINUTES);
+  const effectiveDuration = Math.min(duration, Math.max(maxDuration, MIN_BOOKING_MINUTES));
+  const lengths: number[] = [];
+  for (let n = MIN_BOOKING_MINUTES; n <= maxDuration; n += SLOT_MINUTES) lengths.push(n);
 
   const create = useMutation({
     mutationFn: () => {
       const values = {
         tableId: tableId!,
         date,
-        startHour: startHour!,
-        durationHours: effectiveDuration,
+        startMinute: startMinute!,
+        durationMinutes: effectiveDuration,
         customerName: name.trim(),
         customerPhone: phone.trim(),
         sportCardCount: sportCards,
@@ -298,13 +311,13 @@ export function AdminBookingModal({
     }
   });
 
-  const hours = slotStartsForDate(date, venueHours);
-  // No spot can be judged free until a start hour is picked
+  const starts = slotStartsForDate(date, venueHours);
+  // No spot can be judged free until a start is picked
   const slotWindow: SlotWindow | null =
-    startHour === null ? null : { date, startHour, duration: effectiveDuration };
+    startMinute === null ? null : { date, startMinute, duration: effectiveDuration };
 
   const canSubmit =
-    startHour !== null && tableId !== null && name.trim().length > 0 && isValidPhone(phone);
+    startMinute !== null && tableId !== null && name.trim().length > 0 && isValidPhone(phone);
 
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
@@ -327,15 +340,15 @@ export function AdminBookingModal({
                 <div>
                   <p className="mb-2 text-sm text-grey-cool">{m.admin_start_time()}</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {hours.map(hour => (
+                    {starts.map(start => (
                       <button
-                        key={hour}
+                        key={start}
                         type="button"
-                        aria-pressed={startHour === hour}
-                        onClick={() => dispatch({ type: 'startHour', startHour: hour })}
-                        className={chip(startHour === hour)}
+                        aria-pressed={startMinute === start}
+                        onClick={() => dispatch({ type: 'startMinute', startMinute: start })}
+                        className={chip(startMinute === start)}
                       >
-                        {formatHour(hour)}
+                        {formatClock(start)}
                       </button>
                     ))}
                   </div>
@@ -344,15 +357,15 @@ export function AdminBookingModal({
                 <div>
                   <p className="mb-2 text-sm text-grey-cool">{m.time_duration()}</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {Array.from({ length: maxDuration }, (_, i) => i + 1).map(h => (
+                    {lengths.map(n => (
                       <button
-                        key={h}
+                        key={n}
                         type="button"
-                        aria-pressed={effectiveDuration === h}
-                        onClick={() => dispatch({ type: 'duration', duration: h })}
-                        className={chip(effectiveDuration === h)}
+                        aria-pressed={effectiveDuration === n}
+                        onClick={() => dispatch({ type: 'duration', duration: n })}
+                        className={chip(effectiveDuration === n)}
                       >
-                        {m.hours_n({ n: h })}
+                        {formatDuration(n)}
                       </button>
                     ))}
                   </div>

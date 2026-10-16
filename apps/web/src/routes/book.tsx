@@ -1,11 +1,17 @@
 import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Spinner } from '@heroui/react';
-import { BOOKING_DAYS_AHEAD, addDays, isIsoDate, type IsoDate } from '@repo/shared';
+import {
+  BOOKING_DAYS_AHEAD,
+  MIN_BOOKING_MINUTES,
+  addDays,
+  isIsoDate,
+  type IsoDate
+} from '@repo/shared';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
-import { warsawHour, warsawToday } from '../lib/format';
+import { warsawMinute, warsawToday } from '../lib/format';
 import { firstOpenDay, useVenueConfig } from '../lib/venue-config';
 import { PageLayout } from '../components/site/PageLayout';
 import { BookingStepper } from '../components/wizard/BookingStepper';
@@ -34,7 +40,8 @@ const DetailsStep = lazy(() => loadDetailsStep().then(module => ({ default: modu
 
 export const Route = createFileRoute('/book')({
   // ?date=…&start=… arrives from the home page's free-tables strip: the guest
-  // picked an hour there, so the wizard opens on the table step with it set.
+  // picked an hour there (start is that hour, 18 = 18:00), so the wizard
+  // opens on the table step with it set.
   validateSearch: (search: Record<string, unknown>): { date?: IsoDate; start?: number } => {
     // A number, or the digits of one: Number('') and Number(null) are 0 and
     // Number(true) is 1, which would hand the wizard a start nobody picked
@@ -59,7 +66,7 @@ export const Route = createFileRoute('/book')({
  */
 function permittedStep(state: WizardState): WizardStep {
   const index = stepIndex(state.step);
-  if (index > stepIndex('when') && (state.date == null || state.startHour == null)) return 'when';
+  if (index > stepIndex('when') && (state.date == null || state.startMinute == null)) return 'when';
   if (index > stepIndex('table') && (state.tableId == null || state.kind == null)) return 'table';
   return state.step;
 }
@@ -69,16 +76,16 @@ function permittedStep(state: WizardState): WizardStep {
  * so the steps receive non-null props instead of asserting store fields.
  */
 function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) {
-  const { date, startHour, durationHours, tableId, kind, tableLabel, game } = state;
-  if (step === 'when' || date == null || startHour == null) return <WhenStep />;
+  const { date, startMinute, durationMinutes, tableId, kind, tableLabel, game } = state;
+  if (step === 'when' || date == null || startMinute == null) return <WhenStep />;
   // `kind` is written together with `tableId`, so a spot without one can only
   // be a stale store from before darts existed — send them back to re-pick.
   if (step === 'table' || tableId == null || kind == null || tableLabel == null) {
     return (
       <TableStep
         date={date}
-        startHour={startHour}
-        durationHours={durationHours}
+        startMinute={startMinute}
+        durationMinutes={durationMinutes}
         tableId={tableId}
         kind={kind}
       />
@@ -93,7 +100,9 @@ function CurrentStep({ state, step }: { state: WizardState; step: WizardStep }) 
         </div>
       }
     >
-      <DetailsStep draft={{ date, startHour, durationHours, tableId, kind, tableLabel, game }} />
+      <DetailsStep
+        draft={{ date, startMinute, durationMinutes, tableId, kind, tableLabel, game }}
+      />
     </Suspense>
   );
 }
@@ -122,10 +131,10 @@ function BookingWizard() {
       date < addDays(today, BOOKING_DAYS_AHEAD)
     ) {
       selectDate(date);
-      selectTime(start, 1);
+      selectTime(start * 60, MIN_BOOKING_MINUTES);
       void navigate({ to: '/book', search: {}, replace: true });
     } else if (wizardStore.state.date === null) {
-      const day = firstOpenDay(today, warsawHour(Date.now()), hours, closures);
+      const day = firstOpenDay(today, warsawMinute(Date.now()), hours, closures);
       if (day !== null) selectDate(day);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

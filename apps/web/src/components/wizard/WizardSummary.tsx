@@ -5,10 +5,11 @@ import {
   formatPln,
   gamesFor,
   sizeOf,
+  rentalGrosz,
   spotPriceGrosz,
   type RateTable
 } from '@repo/shared';
-import { formatDayLong, formatHour, intlTag } from '../../lib/format';
+import { formatClockRange, formatDayLong, formatDuration, intlTag } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { gameName, spotDescription, spotRentalLabel, spotSummaryLabel } from '../../lib/spots';
 import { useVenueConfig } from '../../lib/venue-config';
@@ -39,11 +40,15 @@ export function useWizardTotals(): WizardTotals {
     0
   );
   if (state.tableId === null || state.kind === null) {
-    return { rental: null, total: cheapest(rates) * state.durationHours + food, estimate: true };
+    return {
+      rental: null,
+      total: rentalGrosz(cheapest(rates), state.durationMinutes) + food,
+      estimate: true
+    };
   }
   const rental = spotPriceGrosz(
     { id: state.tableId, kind: state.kind },
-    state.durationHours,
+    state.durationMinutes,
     rates
   );
   const discount = discountGroszFor(state.sportCardCount, rental);
@@ -71,8 +76,8 @@ const caption = 'text-xs font-bold tracking-[0.12em] text-grey-cool uppercase';
 const money = (grosz: number) => formatPln(grosz, intlTag());
 
 function timeRange(state: WizardState): string {
-  if (state.startHour === null) return '—';
-  return `${formatHour(state.startHour)}–${formatHour(state.startHour + state.durationHours)}`;
+  if (state.startMinute === null) return '—';
+  return formatClockRange(state.startMinute, state.durationMinutes);
 }
 
 function spotText(state: WizardState): string | null {
@@ -151,7 +156,7 @@ function PriceLines({ state, rental }: { state: WizardState; rental: number }) {
   return (
     <ul className="mb-4.5 flex flex-col gap-2 text-[15px] text-cream-soft">
       <li>
-        {spotRentalLabel(state.kind)} · {m.hours_n({ n: state.durationHours })} —{' '}
+        {spotRentalLabel(state.kind)} · {formatDuration(state.durationMinutes)} —{' '}
         <strong className="text-creme">{money(rental)}</strong>
       </li>
       {lines.map(line => (

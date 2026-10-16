@@ -1,9 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { addDays, type AvailabilityDto, type IsoDate } from '@repo/shared';
+import {
+  addDays,
+  MIN_BOOKING_MINUTES,
+  SLOT_MINUTES,
+  type AvailabilityDto,
+  type IsoDate
+} from '@repo/shared';
 import { isRateLimited } from '../../lib/api';
 import { useLiveAvailability } from '../../lib/availability-live';
-import { formatDay, formatHour, warsawHour, warsawToday } from '../../lib/format';
+import { formatDay, formatHour, warsawHour, warsawMinute, warsawToday } from '../../lib/format';
 import { useIsHydrated } from '../../lib/hydration';
 import { availabilityQuery } from '../../lib/queries';
 import { useNowMinute } from '../../lib/use-now';
@@ -15,10 +21,20 @@ interface HourFree {
   free: number;
 }
 
+/** Free for the shortest stay from this start: each of its half hours available. */
+function freeFrom(slots: AvailabilityDto['tables'][number]['slots'], start: number): boolean {
+  const free = new Set(slots.filter(slot => slot.available).map(slot => slot.startMinute));
+  for (let slot = start; slot < start + MIN_BOOKING_MINUTES; slot += SLOT_MINUTES) {
+    if (!free.has(slot)) return false;
+  }
+  return true;
+}
+
 /**
  * Billiard tables free at each start hour still ahead; darts are not tables,
- * so they do not count. On today's strip the hours before `hourNow` are over
- * (the API still marks the booked ones `booked`), and the hour under way
+ * so they do not count. The strip keeps to whole hours — the wizard offers
+ * the half hours in between. On today's strip the hours before `hourNow` are
+ * over (the API still marks the booked ones `booked`), and the hour under way
  * stays only while a table can still start in it.
  */
 function freeByHour(availability: AvailabilityDto, hourNow: number | null): HourFree[] {
@@ -26,8 +42,7 @@ function freeByHour(availability: AvailabilityDto, hourNow: number | null): Hour
   const result: HourFree[] = [];
   for (let hour = availability.open; hour < availability.close; hour++) {
     if (hourNow !== null && hour < hourNow) continue;
-    const slots = tables.flatMap(table => table.slots.filter(slot => slot.hour === hour));
-    const free = slots.filter(slot => slot.available).length;
+    const free = tables.filter(table => freeFrom(table.slots, hour * 60)).length;
     if (hour === hourNow && free === 0) continue;
     result.push({ hour, free });
   }
@@ -43,7 +58,7 @@ function useShownDay(): { date: IsoDate | null; today: IsoDate; hourNow: number 
   const { hours, closures } = useVenueConfig();
   const now = useNowMinute();
   const today = warsawToday(now);
-  const date = firstOpenDay(today, warsawHour(now), hours, closures);
+  const date = firstOpenDay(today, warsawMinute(now), hours, closures);
   return { date, today, hourNow: date === today ? warsawHour(now) : null };
 }
 

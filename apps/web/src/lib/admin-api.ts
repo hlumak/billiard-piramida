@@ -30,8 +30,10 @@ import { createFlagCookieStore } from './hydration';
 export interface AdminCreateBookingInput {
   tableId: number;
   date: IsoDate;
-  startHour: number;
-  durationHours: number;
+  /** Minutes after local midnight, on the half-hour grid */
+  startMinute: number;
+  /** An hour at least, in half-hour steps */
+  durationMinutes: number;
   customerName: string;
   customerPhone: string;
   sportCardCount?: number;
@@ -46,8 +48,8 @@ export interface AdminCreateBookingInput {
 export interface AdminBookingPatch {
   tableId?: number;
   date?: IsoDate;
-  startHour?: number;
-  durationHours?: number;
+  startMinute?: number;
+  durationMinutes?: number;
   customerName?: string;
   customerPhone?: string;
   sportCardCount?: number;

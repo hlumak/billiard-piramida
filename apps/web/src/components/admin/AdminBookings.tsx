@@ -3,8 +3,10 @@ import { Spinner } from '@heroui/react';
 import { Search } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  EXTEND_STEP_MINUTES,
   formatPln,
   hoursForDate,
+  MAX_BOOKING_MINUTES,
   type BookingDto,
   type BookingStatus,
   type IsoDate
@@ -19,7 +21,7 @@ import {
 } from '../../lib/admin-api';
 import { formatPhone } from '@repo/shared/phone';
 import {
-  bookingHours,
+  bookingMinutes,
   formatDay,
   intlTag,
   warsawDate,
@@ -94,8 +96,10 @@ function RowActions({ booking }: { booking: BookingDto }) {
   const extend = useMutation({
     // Through the staff edit, not the guest endpoint (that needs the guest's secret)
     mutationFn: () => {
-      const { start, end } = bookingHours(booking);
-      return adminApi.updateBooking(booking.id, { durationHours: end - start + 1 });
+      const { start, end } = bookingMinutes(booking);
+      return adminApi.updateBooking(booking.id, {
+        durationMinutes: end - start + EXTEND_STEP_MINUTES
+      });
     },
     onSuccess: invalidate
   });
@@ -113,9 +117,14 @@ function RowActions({ booking }: { booking: BookingDto }) {
   });
 
   const live = booking.phase === 'upcoming' || booking.phase === 'active';
-  // Hide +1h when it would run past closing time (the API would reject it)
-  const closeHour = hoursForDate(warsawDate(booking.startsAt), venueHours).close;
-  const canExtend = live && bookingHours(booking).end < closeHour;
+  // Hide +30 min when it would run past closing time or the longest booking
+  // (the API would reject it)
+  const closeMinute = hoursForDate(warsawDate(booking.startsAt), venueHours).close * 60;
+  const { start, end } = bookingMinutes(booking);
+  const canExtend =
+    live &&
+    end + EXTEND_STEP_MINUTES <= closeMinute &&
+    end - start + EXTEND_STEP_MINUTES <= MAX_BOOKING_MINUTES;
   // Once the start has passed a confirmed booking can turn out a no-show
   const started = booking.phase === 'active' || booking.phase === 'finished';
   const actionError = extend.error ?? cancel.error ?? restore.error ?? noShow.error;
@@ -128,7 +137,7 @@ function RowActions({ booking }: { booking: BookingDto }) {
         <AdminEditBooking booking={booking} />
         {canExtend ? (
           <RowButton pending={extend.isPending} onPress={() => extend.mutate()} className={quiet}>
-            {m.admin_extend_1h()}
+            {m.extend_30m()}
           </RowButton>
         ) : null}
         {live ? (

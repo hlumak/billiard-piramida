@@ -4,7 +4,9 @@ import { useStore } from '@tanstack/react-store';
 import { Clock, Lock } from 'lucide-react';
 import {
   BOOKING_DAYS_AHEAD,
-  MAX_BOOKING_HOURS,
+  MAX_BOOKING_MINUTES,
+  MIN_BOOKING_MINUTES,
+  SLOT_MINUTES,
   closedSpansOn,
   clubClosureOn,
   hoursForDate,
@@ -12,13 +14,16 @@ import {
   type AvailabilityDto,
   type ClosedSpan,
   type DayHours,
-  type IsoDate
+  type IsoDate,
+  type TableAvailabilityDto
 } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
 import {
   addDays,
   dateTileParts,
+  formatClock,
   formatDayLong,
+  formatDuration,
   formatHour,
   formatMonthYear,
   warsawToday
@@ -37,42 +42,68 @@ import {
 } from '../../store/booking-wizard';
 import { StepActions } from './WizardFrame';
 
-/** Hours at which at least one spot is free to start a booking. */
-function freeHours(availability: AvailabilityDto): number[] {
-  const hours: number[] = [];
-  for (let hour = availability.open; hour <= availability.close - 1; hour++) {
-    const anyFree = availability.tables.some(table =>
-      table.slots.some(slot => slot.hour === hour && slot.available)
-    );
-    if (anyFree) hours.push(hour);
+/** Every half hour a booking may start at: up to the last one an hour before closing. */
+function slotStarts(availability: AvailabilityDto): number[] {
+  const starts: number[] = [];
+  const last = availability.close * 60 - MIN_BOOKING_MINUTES;
+  for (let start = availability.open * 60; start <= last; start += SLOT_MINUTES) {
+    starts.push(start);
   }
-  return hours;
+  return starts;
+}
+
+/** Minutes free on one spot from `start`, counted in whole half hours. */
+function roomFrom(table: TableAvailabilityDto, start: number): number {
+  const free = new Set(table.slots.filter(slot => slot.available).map(slot => slot.startMinute));
+  let room = 0;
+  while (free.has(start + room)) room += SLOT_MINUTES;
+  return room;
+}
+
+/** Starts from which at least one spot is free for the shortest stay (an hour). */
+function freeStarts(availability: AvailabilityDto): number[] {
+  return slotStarts(availability).filter(start =>
+    availability.tables.some(table => roomFrom(table, start) >= MIN_BOOKING_MINUTES)
+  );
 }
 
 /**
- * Hours staff have closed for the whole club: every spot's slot is closed.
- * Read off the live grid rather than the venue config, which a guest's tab
- * may hold for a while — the grid is refreshed the moment a closure is set.
+ * Half hours staff have closed for the whole club: every spot's slot is
+ * closed. Read off the live grid rather than the venue config, which a
+ * guest's tab may hold for a while — the grid is refreshed the moment a
+ * closure is set.
  */
-function clubClosedHours(availability: AvailabilityDto): number[] {
-  const hours: number[] = [];
-  if (availability.tables.length === 0) return hours;
-  for (let hour = availability.open; hour <= availability.close - 1; hour++) {
+function clubClosedSlots(availability: AvailabilityDto): number[] {
+  const slots: number[] = [];
+  if (availability.tables.length === 0) return slots;
+  for (let slot = availability.open * 60; slot < availability.close * 60; slot += SLOT_MINUTES) {
     const closed = availability.tables.every(table =>
-      table.slots.some(slot => slot.hour === hour && slot.closed)
+      table.slots.some(entry => entry.startMinute === slot && entry.closed)
     );
-    if (closed) hours.push(hour);
+    if (closed) slots.push(slot);
   }
-  return hours;
+  return slots;
 }
 
-/** Runs of consecutive hours as spans, each with the reason staff gave for it. */
-function closedRuns(hours: number[], reasons: readonly ClosedSpan[]): ClosedSpan[] {
+/** Starts whose shortest stay runs into a club closure: shown struck through, not dropped. */
+function clubClosedStarts(availability: AvailabilityDto, closedSlots: number[]): number[] {
+  return slotStarts(availability).filter(start =>
+    closedSlots.some(slot => slot >= start && slot < start + MIN_BOOKING_MINUTES)
+  );
+}
+
+/**
+ * Runs of consecutive closed half hours as spans of hours (closures are
+ * whole hours), each with the reason staff gave for it.
+ */
+function closedRuns(slots: number[], reasons: readonly ClosedSpan[]): ClosedSpan[] {
   const runs: ClosedSpan[] = [];
-  for (const hour of hours) {
+  for (const slot of slots) {
     const last = runs.at(-1);
-    if (last && last.to === hour) last.to = hour + 1;
-    else runs.push({ from: hour, to: hour + 1, reason: null });
+    const from = slot / 60;
+    const to = (slot + SLOT_MINUTES) / 60;
+    if (last && last.to === from) last.to = to;
+    else runs.push({ from, to, reason: null });
   }
   for (const run of runs) {
     run.reason = reasons.find(span => span.from < run.to && span.to > run.from)?.reason ?? null;
@@ -80,17 +111,11 @@ function closedRuns(hours: number[], reasons: readonly ClosedSpan[]): ClosedSpan
   return runs;
 }
 
-/** Longest booking starting at `start` that at least one spot can host. */
+/** Longest booking (in minutes) starting at `start` that at least one spot can host. */
 function longestFrom(availability: AvailabilityDto, start: number): number {
   let best = 0;
-  for (const table of availability.tables) {
-    const free = new Set<number>();
-    for (const slot of table.slots) if (slot.available) free.add(slot.hour);
-    let run = 0;
-    while (free.has(start + run)) run++;
-    best = Math.max(best, run);
-  }
-  return Math.min(best, MAX_BOOKING_HOURS);
+  for (const table of availability.tables) best = Math.max(best, roomFrom(table, start));
+  return Math.min(best, MAX_BOOKING_MINUTES);
 }
 
 /**
@@ -104,7 +129,7 @@ function durationHint(
   day: DayHours
 ): string | null {
   if (stopRun) return closedSpanText(stopRun, day);
-  if (start !== null && span < MAX_BOOKING_HOURS) {
+  if (start !== null && span < MAX_BOOKING_MINUTES) {
     return m.when_until_close({ time: formatHour(day.close) });
   }
   return null;
@@ -236,19 +261,19 @@ function TimePicker({ date }: { date: IsoDate }) {
   return <TimeOptions availability={availability} loading={isPlaceholderData} />;
 }
 
-/** The hours a stay can start at; closed ones struck through, their reasons below. */
-function StartHours({
-  hours,
-  closedHours,
+/** The half hours a stay can start at; closed ones struck through, their reasons below. */
+function StartTimes({
+  starts,
+  closedStarts,
   closedLines,
   picked,
   onPick
 }: {
-  hours: number[];
-  closedHours: number[];
+  starts: number[];
+  closedStarts: number[];
   closedLines: string[];
   picked: number | null;
-  onPick: (hour: number) => void;
+  onPick: (start: number) => void;
 }) {
   return (
     <>
@@ -257,19 +282,19 @@ function StartHours({
         aria-label={m.time_start()}
         className="mt-2.5 grid grid-cols-3 gap-2 md:mt-3 md:flex md:flex-wrap md:gap-2.5"
       >
-        {hours.map(hour => {
-          const closed = closedHours.includes(hour);
+        {starts.map(start => {
+          const closed = closedStarts.includes(start);
           return (
             <button
-              key={hour}
+              key={start}
               type="button"
-              aria-pressed={picked === hour}
+              aria-pressed={picked === start}
               disabled={closed}
-              aria-label={closed ? `${formatHour(hour)}, ${m.hours_closed()}` : undefined}
-              onClick={() => onPick(hour)}
+              aria-label={closed ? `${formatClock(start)}, ${m.hours_closed()}` : undefined}
+              onClick={() => onPick(start)}
               className="chip h-12.5 text-base tabular-nums disabled:line-through md:w-24"
             >
-              {formatHour(hour)}
+              {formatClock(start)}
             </button>
           );
         })}
@@ -302,10 +327,12 @@ function DurationOptions({
   longest: number;
   hint: string | null;
 }) {
-  // Across the full width: one row of up to four; more go in two even rows,
-  // so a Saturday's eight still fit beside the summary
+  // Across the full width: one row of up to four; more go in even rows, so
+  // a Saturday's fifteen (1:00 to 8:00 by half hours) still fit beside the
+  // summary
   let columns = 'sm:auto-cols-fr sm:grid-flow-col sm:grid-cols-none';
-  if (lengths.length > 6) columns = 'sm:grid-cols-4';
+  if (lengths.length > 9) columns = 'sm:grid-cols-5';
+  else if (lengths.length > 6) columns = 'sm:grid-cols-4';
   else if (lengths.length > 4) columns = 'sm:grid-cols-3';
   return (
     <>
@@ -327,7 +354,7 @@ function DurationOptions({
             onClick={() => selectDuration(n)}
             className="segment h-11 px-5 text-[15px]"
           >
-            {m.hours_n({ n })}
+            {formatDuration(n)}
           </button>
         ))}
       </div>
@@ -344,40 +371,49 @@ function TimeOptions({
   /** The hours are still the previous day's */
   loading: boolean;
 }) {
-  const startHour = useStore(wizardStore, state => state.startHour);
-  const durationHours = useStore(wizardStore, state => state.durationHours);
+  const startMinute = useStore(wizardStore, state => state.startMinute);
+  const durationMinutes = useStore(wizardStore, state => state.durationMinutes);
 
   const { closures } = useVenueConfig();
-  const starts = freeHours(availability);
-  // Closed hours stay in the list, struck through, with the reason under it:
-  // hours that vanish read as "all booked", not "closed for an event"
-  const closedHours = clubClosedHours(availability);
-  const shownHours = [...new Set([...starts, ...closedHours])].sort((a, b) => a - b);
+  const starts = freeStarts(availability);
+  // Closed starts stay in the list, struck through, with the reason under it:
+  // starts that vanish read as "all booked", not "closed for an event"
+  const closedSlots = clubClosedSlots(availability);
+  const closedStarts = clubClosedStarts(availability, closedSlots).filter(
+    start => !starts.includes(start)
+  );
+  const shownStarts = [...new Set([...starts, ...closedStarts])].sort((a, b) => a - b);
   const day = { open: availability.open, close: availability.close };
-  const runs = closedRuns(closedHours, closedSpansOn(availability.date, closures));
+  const runs = closedRuns(closedSlots, closedSpansOn(availability.date, closures));
   const closedLines = runs.map(run => closedSpanLine(run, day));
-  // Live updates can take the picked hour away (someone else books it):
-  // trust the fresh list, so the hour un-highlights and Next waits
-  const start = startHour !== null && starts.includes(startHour) ? startHour : null;
-  const longest = start === null ? MAX_BOOKING_HOURS : longestFrom(availability, start);
-  const duration = Math.min(durationHours, Math.max(longest, 1));
+  // Live updates can take the picked start away (someone else books it):
+  // trust the fresh list, so the start un-highlights and Next waits
+  const start = startMinute !== null && starts.includes(startMinute) ? startMinute : null;
+  const longest = start === null ? MAX_BOOKING_MINUTES : longestFrom(availability, start);
+  const duration = Math.min(durationMinutes, Math.max(longest, MIN_BOOKING_MINUTES));
   // The closure that cuts the stay short, if one does
-  const stopRun = start === null ? undefined : runs.find(run => run.from === start + longest);
-  // Every length up to closing (or the cap) is listed; the ones no spot can
-  // host from this start are shown but cannot be picked
-  const span = Math.min(MAX_BOOKING_HOURS, availability.close - (start ?? availability.open));
-  const lengths = Array.from({ length: Math.max(span, 1) }, (_, i) => i + 1);
+  const stopRun = start === null ? undefined : runs.find(run => run.from * 60 === start + longest);
+  // Every length up to closing (or the cap), by half hours, is listed; the
+  // ones no spot can host from this start are shown but cannot be picked
+  const span = Math.min(
+    MAX_BOOKING_MINUTES,
+    availability.close * 60 - (start ?? availability.open * 60)
+  );
+  const lengths: number[] = [];
+  for (let n = MIN_BOOKING_MINUTES; n <= Math.max(span, MIN_BOOKING_MINUTES); n += SLOT_MINUTES) {
+    lengths.push(n);
+  }
 
   // …and when it shortens the longest stay from the picked start, the summary
   // beside the step must shrink with the highlighted length
   useEffect(() => {
-    if (start !== null && duration !== durationHours) selectDuration(duration);
-  }, [start, duration, durationHours]);
+    if (start !== null && duration !== durationMinutes) selectDuration(duration);
+  }, [start, duration, durationMinutes]);
 
-  const pickStart = (hour: number) => {
-    selectStart(hour);
-    const room = longestFrom(availability, hour);
-    if (durationHours > room) selectDuration(Math.max(room, 1));
+  const pickStart = (minute: number) => {
+    selectStart(minute);
+    const room = longestFrom(availability, minute);
+    if (durationMinutes > room) selectDuration(Math.max(room, MIN_BOOKING_MINUTES));
   };
 
   const next = () => {
@@ -405,19 +441,19 @@ function TimeOptions({
           </span>
         </div>
 
-        {shownHours.length === 0 ? (
+        {shownStarts.length === 0 ? (
           <p className="py-8 text-center text-grey-cool">{m.no_slots_for_date()}</p>
         ) : (
           <>
-            <StartHours
-              hours={shownHours}
-              closedHours={closedHours}
+            <StartTimes
+              starts={shownStarts}
+              closedStarts={closedStarts}
               closedLines={closedLines}
               picked={start}
               onPick={pickStart}
             />
 
-            {/* Only closed hours left: nothing to measure a stay from */}
+            {/* Only closed starts left: nothing to measure a stay from */}
             {starts.length > 0 ? (
               <DurationOptions
                 lengths={lengths}

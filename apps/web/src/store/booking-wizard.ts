@@ -1,5 +1,11 @@
 import { createStore } from '@tanstack/react-store';
-import { defaultGameFor, type ActivityKind, type BilliardGame, type IsoDate } from '@repo/shared';
+import {
+  defaultGameFor,
+  MIN_BOOKING_MINUTES,
+  type ActivityKind,
+  type BilliardGame,
+  type IsoDate
+} from '@repo/shared';
 
 /**
  * Four steps: when (date, start and length on one screen), the spot, the
@@ -18,8 +24,10 @@ export interface WizardState {
    *  something leaves the later steps open to jump to again from the stepper */
   reached: number;
   date: IsoDate | null;
-  startHour: number | null;
-  durationHours: number;
+  /** Minutes after local midnight, on the half-hour grid */
+  startMinute: number | null;
+  /** An hour at least, in half-hour steps */
+  durationMinutes: number;
   tableId: number | null;
   /** Kind + label of the picked spot — carried so later steps render and price
    *  it without refetching availability */
@@ -39,8 +47,8 @@ const initialState: WizardState = {
   direction: 1,
   reached: 0,
   date: null,
-  startHour: null,
-  durationHours: 1,
+  startMinute: null,
+  durationMinutes: MIN_BOOKING_MINUTES,
   tableId: null,
   kind: null,
   tableLabel: null,
@@ -88,7 +96,7 @@ export function goToStep(step: WizardStep): void {
  * start or length drops the spot, and the steps after them close again.
  */
 export function furthestStep(state: WizardState): number {
-  if (state.date === null || state.startHour === null) return stepIndex('when');
+  if (state.date === null || state.startMinute === null) return stepIndex('when');
   if (state.tableId === null || state.kind === null)
     return Math.min(state.reached, stepIndex('table'));
   return state.reached;
@@ -97,29 +105,31 @@ export function furthestStep(state: WizardState): number {
 /** Picking the same date again keeps every later pick; a new one clears them. */
 export function selectDate(date: IsoDate): void {
   wizardStore.setState(state =>
-    state.date === date ? state : { ...state, date, startHour: null, durationHours: 1, ...noSpot }
+    state.date === date
+      ? state
+      : { ...state, date, startMinute: null, durationMinutes: MIN_BOOKING_MINUTES, ...noSpot }
   );
 }
 
 /** A new start or length may not be free on the spot picked for the old one. */
-export function selectStart(startHour: number): void {
+export function selectStart(startMinute: number): void {
   wizardStore.setState(state =>
-    state.startHour === startHour ? state : { ...state, startHour, ...noSpot }
+    state.startMinute === startMinute ? state : { ...state, startMinute, ...noSpot }
   );
 }
 
-export function selectDuration(durationHours: number): void {
+export function selectDuration(durationMinutes: number): void {
   wizardStore.setState(state =>
-    state.durationHours === durationHours ? state : { ...state, durationHours, ...noSpot }
+    state.durationMinutes === durationMinutes ? state : { ...state, durationMinutes, ...noSpot }
   );
 }
 
 /** Date-free shortcut for a known window (the home page's free-hours strip). */
-export function selectTime(startHour: number, durationHours: number): void {
+export function selectTime(startMinute: number, durationMinutes: number): void {
   wizardStore.setState(state => ({
     ...state,
-    startHour,
-    durationHours,
+    startMinute,
+    durationMinutes,
     ...noSpot,
     step: 'table',
     direction: 1,
