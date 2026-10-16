@@ -1,4 +1,10 @@
-import { dateParts, VENUE_TIMEZONE, type IsoDate } from '@repo/shared';
+import {
+  clubDateAt,
+  dateParts,
+  VENUE_TIMEZONE,
+  type IsoDate,
+  type WeeklyHours
+} from '@repo/shared';
 import { m as msg } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
@@ -114,20 +120,31 @@ export function weekdayName(weekday: number, style: 'long' | 'short' = 'long'): 
   return formatter(intlTag(), { weekday: style, timeZone: 'UTC' }).format(date);
 }
 
-export function formatHour(hour: number): string {
-  return `${String(hour).padStart(2, '0')}:00`;
+/** An hour of the club's day as the wall clock shows it: past 24 is the next morning (25 → 1). */
+export function wallHour(hour: number): number {
+  return hour > 24 ? hour - 24 : hour;
 }
 
-/** "18:30" for a time of day given as minutes after midnight; 1440 is "24:00". */
+/** "16:00" for an opening hour; a closing 24 stays "24:00", 25 is "01:00". */
+export function formatHour(hour: number): string {
+  return `${String(wallHour(hour)).padStart(2, '0')}:00`;
+}
+
+/**
+ * "18:30" for a time of the club's day given as minutes after midnight; from
+ * 1440 it is the next morning, so a late night's 1470 reads "00:30".
+ */
 export function formatClock(minuteOfDay: number): string {
-  const hours = Math.floor(minuteOfDay / 60);
-  const minutes = minuteOfDay % 60;
+  const wall = minuteOfDay >= 24 * 60 ? minuteOfDay - 24 * 60 : minuteOfDay;
+  const hours = Math.floor(wall / 60);
+  const minutes = wall % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-/** "18:30–20:00": a stay from a start, both as minutes after midnight. */
+/** "18:30–20:00": a stay from a start, both as minutes after midnight; one ending at midnight ends "24:00". */
 export function formatClockRange(startMinute: number, durationMinutes: number): string {
-  return `${formatClock(startMinute)}–${formatClock(startMinute + durationMinutes)}`;
+  const end = startMinute + durationMinutes;
+  return `${formatClock(startMinute)}–${end === 24 * 60 ? '24:00' : formatClock(end)}`;
 }
 
 /** A booking's length in hours, in the visitor's locale: "1 год", "1,5 год", "2 h". */
@@ -156,13 +173,19 @@ export function warsawDate(instant: string | Date): IsoDate {
  * Venue-local start and end of a booking as minutes after midnight, on one
  * scale: a booking ending at midnight ends at 1440. `warsawMinute(endsAt)`
  * reads that as 0, which made a 22–24 booking look like it ended before it
- * began. Bookings never cross midnight, so start + length is exact.
+ * began, so the end is start + length. With the week's `hours` the start is
+ * on the booking's club day: 00:30 on a late night is 1470 of the evening.
  */
-export function bookingMinutes(booking: { startsAt: string; endsAt: string }): {
+export function bookingMinutes(
+  booking: { startsAt: string; endsAt: string },
+  hours?: WeeklyHours
+): {
   start: number;
   end: number;
 } {
-  const start = warsawMinute(booking.startsAt);
+  const start = hours
+    ? clubDateAt(warsawDate(booking.startsAt), warsawMinute(booking.startsAt), hours).minute
+    : warsawMinute(booking.startsAt);
   const duration = Math.round((Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 60_000);
   return { start, end: start + duration };
 }

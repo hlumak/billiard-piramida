@@ -108,7 +108,8 @@ const SCHEMA_DAYS = [
 export function venueJsonLd(config: VenueConfigDto | null | undefined): string {
   const { rates: rateTable, hours } = config ?? FALLBACK_VENUE_CONFIG;
   const rates = Object.values(rateTable);
-  const pad = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
+  // A late night's closing reads as the morning clock: 25 is "01:00"
+  const pad = (hour: number) => `${String(hour > 24 ? hour - 24 : hour).padStart(2, '0')}:00`;
 
   return JSON.stringify({
     '@context': 'https://schema.org',

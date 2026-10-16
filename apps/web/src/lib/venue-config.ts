@@ -5,6 +5,7 @@ import {
   DEFAULT_WEEKLY_HOURS,
   MIN_BOOKING_MINUTES,
   addDays,
+  clubDateAt,
   isHourClosed,
   slotStartsForDate,
   isClosedAllDay,
@@ -14,6 +15,7 @@ import {
   type VenueConfigDto,
   type WeeklyHours
 } from '@repo/shared';
+import { warsawDate, warsawMinute, warsawToday } from './format';
 import { venueConfigQuery } from './queries';
 
 /**
@@ -38,12 +40,29 @@ export function useVenueConfig(): VenueConfigDto {
 }
 
 /**
+ * The club's day and its time at `at`: past midnight on a late night it is
+ * still the evening before (00:30 → 1470), until the club closes.
+ */
+export function clubMoment(
+  hours: WeeklyHours,
+  at: number = Date.now()
+): { date: IsoDate; minute: number } {
+  return clubDateAt(warsawToday(at), warsawMinute(at), hours);
+}
+
+/** The club day a booking was made on — the evening, for one in a late night's small hours. */
+export function bookingClubDate(booking: { startsAt: string }, hours: WeeklyHours): IsoDate {
+  return clubDateAt(warsawDate(booking.startsAt), warsawMinute(booking.startsAt), hours).date;
+}
+
+/**
  * The first day in the booking window with a start still to come: today
  * only while it has a half-hour start ahead, then the next day the club
  * opens — skipping times (and days) staff have closed.
  */
 export function firstOpenDay(
   today: IsoDate,
+  /** Minutes into `today` as a club day (past 1440 on a late night) */
   minuteNow: number,
   hours: WeeklyHours,
   closures: readonly ClosureDto[]

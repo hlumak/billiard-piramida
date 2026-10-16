@@ -167,7 +167,8 @@ export const venueHours = pgTable(
   t => [
     check('venue_hours_weekday_range', sql`${t.weekday} between 0 and 6`),
     check('venue_hours_opens_range', sql`${t.opens} between 0 and 24`),
-    check('venue_hours_closes_range', sql`${t.closes} between 0 and 24`)
+    // Past 24 is the next morning, to 02:00 at the latest (MAX_CLOSE_HOUR)
+    check('venue_hours_closes_range', sql`${t.closes} between 0 and 26`)
   ]
 );
 

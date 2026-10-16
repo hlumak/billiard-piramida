@@ -12,24 +12,17 @@ import {
   type BookingDto,
   type ClosedSpan,
   type IsoDate,
-  type TableDto
+  type TableDto,
+  type WeeklyHours
 } from '@repo/shared';
-import { useVenueConfig } from '../../lib/venue-config';
+import { clubMoment, useVenueConfig } from '../../lib/venue-config';
 import { formatPhone } from '@repo/shared/phone';
 import { adminBookingsQuery, adminClosuresQuery } from '../../lib/admin-api';
 import { closedSpanText } from '../../lib/closures';
 import { tablesQuery } from '../../lib/queries';
 import { activityName, gameName, spotName } from '../../lib/spots';
 import { availabilityLive } from '../../lib/availability-live';
-import {
-  addDays,
-  bookingMinutes,
-  formatClock,
-  formatClockRange,
-  formatHour,
-  warsawMinute,
-  warsawToday
-} from '../../lib/format';
+import { addDays, bookingMinutes, formatClock, formatClockRange } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { QueryError } from '../QueryError';
@@ -40,12 +33,12 @@ import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
 import { AdminClosureModal } from './AdminClosures';
 
 /** (tableId, slot start) → the confirmed booking covering that half hour.
- *  Bookings sit on the half-hour grid and never cross midnight; one may end
- *  at 24:00 (see bookingMinutes). */
-function occupancyOf(bookings: BookingDto[]): Map<string, BookingDto> {
+ *  Bookings sit on the half-hour grid, on their club day: a late night's
+ *  run past midnight as 1440 and up (see bookingMinutes). */
+function occupancyOf(bookings: BookingDto[], hours: WeeklyHours): Map<string, BookingDto> {
   const map = new Map<string, BookingDto>();
   for (const booking of bookings) {
-    const { start, end } = bookingMinutes(booking);
+    const { start, end } = bookingMinutes(booking, hours);
     for (let t = start; t < end; t += SLOT_MINUTES) {
       map.set(`${booking.tableId}:${t}`, booking);
     }
@@ -163,7 +156,8 @@ function rowCells(
   open: number,
   close: number,
   occupancy: Map<string, BookingDto>,
-  closed: ClosedSpan[]
+  closed: ClosedSpan[],
+  hours: WeeklyHours
 ): RowCell[] {
   const gridEnd = close * 60;
   // Closures are whole hours
@@ -174,7 +168,7 @@ function rowCells(
     const booking = occupancy.get(`${spotId}:${minute}`);
     const run = booking ? undefined : closureAt(minute);
     if (booking) {
-      const end = bookingMinutes(booking).end;
+      const end = bookingMinutes(booking, hours).end;
       // A booking can outlast the grid when staff have since moved closing
       // time earlier: clamp, or it would push every following row out of place
       const span = (Math.min(end, gridEnd) - minute) / SLOT_MINUTES;
@@ -215,6 +209,8 @@ function SpotRow({
   occupancy,
   closed,
   now,
+  nowMinute: clubNowMinute,
+  weekHours,
   isPastDate,
   isToday,
   onPickSlot,
@@ -227,18 +223,21 @@ function SpotRow({
   /** This spot's closed hours on the day: its own closures and the club's */
   closed: ClosedSpan[];
   now: number;
+  /** Minutes into today as a club day (past 1440 on a late night) */
+  nowMinute: number;
+  weekHours: WeeklyHours;
   isPastDate: boolean;
   isToday: boolean;
   onPickSlot: (startMinute: number) => void;
   onShowBooking: (phone: string) => void;
 }) {
-  const nowMinute = isToday ? warsawMinute(now) : null;
+  const nowMinute = isToday ? clubNowMinute : null;
   // Over: the whole half hour lies before now
   const isPastSlot = (minute: number) =>
     isPastDate || (nowMinute !== null && minute + SLOT_MINUTES <= nowMinute);
   const name = spotName(spot.kind, spot.label);
 
-  const cells = rowCells(spot.id, open, close, occupancy, closed).map(cell => {
+  const cells = rowCells(spot.id, open, close, occupancy, closed, weekHours).map(cell => {
     if (cell.kind === 'booking') {
       return (
         <BookingCell
@@ -307,7 +306,8 @@ const legendSwatch = 'h-2.5 w-4 rounded-[3px]';
  *  slot at a glance, click it to book, click a booking to pull it up. */
 export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string) => void }) {
   const queryClient = useQueryClient();
-  const [date, setDate] = useState<IsoDate>(() => warsawToday());
+  const { hours: weekHours } = useVenueConfig();
+  const [date, setDate] = useState<IsoDate>(() => clubMoment(weekHours).date);
   const [prefill, setPrefill] = useState<NewBookingPrefill | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -339,9 +339,11 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
   );
 
   const now = useNowMinute();
-  const today = warsawToday(now);
+  // The club's today: past midnight on a late night, still the evening's grid
+  const moment = clubMoment(weekHours, now);
+  const today = moment.date;
   const isToday = date === today;
-  const { open, close } = hoursForDate(date, useVenueConfig().hours);
+  const { open, close } = hoursForDate(date, weekHours);
   // What is closed today, said once above the grid: the hatching shows where
   const dayClosures = closures.flatMap(closure => {
     const span = closureSpanOn(closure, date);
@@ -370,8 +372,8 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
   const hours = Array.from({ length: Math.max(close - open, 0) }, (_, i) => open + i);
   // Two columns an hour: a booking may start and end on the half hour
   const slotsPerHour = 60 / SLOT_MINUTES;
-  const occupancy = occupancyOf(bookings ?? []);
-  const nowMinute = warsawMinute(now);
+  const occupancy = occupancyOf(bookings ?? [], weekHours);
+  const nowMinute = moment.minute;
 
   // Where "now" falls across the opening hours, 0–1; only drawn on today's grid
   const nowFraction = (() => {
@@ -415,7 +417,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
         >
           <ChevronRight aria-hidden className="size-5" />
         </button>
-        <AdminDatePicker value={date} onChange={next => setDate(next ?? warsawToday())} />
+        <AdminDatePicker value={date} onChange={next => setDate(next ?? today)} />
         <button
           type="button"
           onClick={() => setClosing(Date.now())}
@@ -493,7 +495,8 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
                     : 'text-grey-cool'
                 }`}
               >
-                {formatHour(hour)}
+                {/* 24 is the hour after midnight on a late night: "00:00" */}
+                {formatClock(hour * 60)}
               </div>
             ))}
             {spotGroups(spots).map(group => (
@@ -510,6 +513,8 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
                     occupancy={occupancy}
                     closed={closedSpansOn(date, closures, spot.id)}
                     now={now}
+                    nowMinute={nowMinute}
+                    weekHours={weekHours}
                     isPastDate={date < today}
                     isToday={isToday}
                     onPickSlot={minute => pickSlot(spot.id, minute)}

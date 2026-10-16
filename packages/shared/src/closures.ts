@@ -1,4 +1,10 @@
-import { hoursForDate, isClosedAllDay, type IsoDate, type WeeklyHours } from './schedule.ts';
+import {
+  addDays,
+  hoursForDate,
+  isClosedAllDay,
+  type IsoDate,
+  type WeeklyHours
+} from './schedule.ts';
 
 /** What staff may tell guests about a closure ("Приватний захід"), in characters. */
 export const MAX_CLOSURE_REASON_LENGTH = 80;
@@ -40,7 +46,10 @@ export interface ClosureConflictDto {
   endsAt: string;
 }
 
-/** Closed hours on one date, `to` exclusive (24 is midnight). */
+/**
+ * Closed hours of one club day, `to` exclusive: 24 is midnight, and past it
+ * is the morning after (25 = 01:00), where a night that runs late reaches.
+ */
 export interface ClosedSpan {
   from: number;
   to: number;
@@ -62,8 +71,10 @@ function covers(closure: ClosureDto, tableId: number | undefined): boolean {
 }
 
 /**
- * The closed hours on `date`, earliest first: for one spot (its own closures
- * and the club's), or, without one, the club's alone.
+ * The closed hours on `date` and the morning after it (as 24 and up, where a
+ * late night reaches), earliest first: for one spot (its own closures and
+ * the club's), or, without one, the club's alone. A closure running through
+ * midnight comes back as two spans that meet at 24.
  */
 export function closedSpansOn(
   date: IsoDate,
@@ -71,10 +82,13 @@ export function closedSpansOn(
   tableId?: number
 ): ClosedSpan[] {
   const spans: ClosedSpan[] = [];
+  const morningAfter = addDays(date, 1);
   for (const closure of closures) {
     if (!covers(closure, tableId)) continue;
     const span = closureSpanOn(closure, date);
     if (span) spans.push(span);
+    const after = closureSpanOn(closure, morningAfter);
+    if (after) spans.push({ from: after.from + 24, to: after.to + 24, reason: after.reason });
   }
   return spans.sort((a, b) => a.from - b.from);
 }

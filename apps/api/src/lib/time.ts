@@ -1,5 +1,14 @@
 import { TZDate } from '@date-fns/tz';
-import { addDays, dateParts, VENUE_TIMEZONE, type IsoDate } from '@repo/shared';
+import {
+  addDays,
+  clubDateAt,
+  dateParts,
+  hoursForDate,
+  nightTailMinutes,
+  VENUE_TIMEZONE,
+  type IsoDate,
+  type WeeklyHours
+} from '@repo/shared';
 
 /** UTC instant of `hour:minute` local Warsaw time on `isoDate`. */
 export function warsawInstant(isoDate: IsoDate, hour: number, minute = 0): Date {
@@ -7,9 +16,34 @@ export function warsawInstant(isoDate: IsoDate, hour: number, minute = 0): Date 
   return new Date(new TZDate(y, m - 1, d, hour, minute, 0, VENUE_TIMEZONE).getTime());
 }
 
-/** UTC instant of a time of day given as minutes after local midnight (18:30 = 1110). */
+/**
+ * UTC instant of a time of day given as minutes after local midnight
+ * (18:30 = 1110). Past 24:00 is the next morning: a club day that runs to
+ * 01:00 puts 00:30 at 1470.
+ */
 export function warsawInstantAt(isoDate: IsoDate, minuteOfDay: number): Date {
-  return warsawInstant(isoDate, Math.floor(minuteOfDay / 60), minuteOfDay % 60);
+  const days = Math.floor(minuteOfDay / (24 * 60));
+  const rest = minuteOfDay - days * 24 * 60;
+  return warsawInstant(addDays(isoDate, days), Math.floor(rest / 60), rest % 60);
+}
+
+/**
+ * The club day an instant belongs to and its time on that day: Tuesday 00:30
+ * is Monday at 1470 while Monday's night runs past it, else its own date.
+ */
+export function clubDayOf(instant: Date, hours: WeeklyHours): { date: IsoDate; minute: number } {
+  return clubDateAt(warsawDateOf(instant), warsawMinuteOf(instant), hours);
+}
+
+/**
+ * [start, end) of one club day: from where the previous night ended (local
+ * midnight, unless it ran late) to midnight or the end of this day's own
+ * late night. Consecutive days tile the calendar without a gap or overlap.
+ */
+export function clubDayRange(isoDate: IsoDate, hours: WeeklyHours): [start: Date, end: Date] {
+  const previousTail = nightTailMinutes(hoursForDate(addDays(isoDate, -1), hours));
+  const ownTail = nightTailMinutes(hoursForDate(isoDate, hours));
+  return [warsawInstantAt(isoDate, previousTail), warsawInstantAt(addDays(isoDate, 1), ownTail)];
 }
 
 /** Warsaw-local calendar date (YYYY-MM-DD) of a UTC instant. */

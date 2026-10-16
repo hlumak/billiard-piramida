@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Button, Input, Label, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  MAX_CLOSE_HOUR,
   MAX_HOURLY_RATE_GROSZ,
   isClosedAllDay,
+  isValidWeek,
   type DayHours,
   type RateTier,
   type VenueConfigDto,
@@ -23,8 +25,13 @@ const RATE_ROWS: { tier: RateTier; label: () => string }[] = [
   { tier: 'darts', label: m.admin_rate_darts }
 ];
 
-/** 0–24: a booking must end by closing time, so 24 is a legal closing hour. */
-const HOUR_OPTIONS = Array.from({ length: 25 }, (_, hour) => hour);
+/** 0–23: the club's day starts on the day it opens. */
+const OPEN_OPTIONS = Array.from({ length: 24 }, (_, hour) => hour);
+/**
+ * 0–24, then into the next morning up to MAX_CLOSE_HOUR (25 = 01:00): a
+ * booking must end by closing time, so 24 is a legal closing hour too.
+ */
+const CLOSE_OPTIONS = Array.from({ length: MAX_CLOSE_HOUR + 1 }, (_, hour) => hour);
 
 /** Rates are typed in złoty; the wire format is grosze. */
 type RateDraft = Record<RateTier, string>;
@@ -45,28 +52,30 @@ function parseRate(value: string): number | null {
 function HourSelect({
   value,
   label,
+  options,
   isDisabled,
   onChange
 }: {
   value: number;
   label: string;
+  options: readonly number[];
   isDisabled: boolean;
   onChange: (hour: number) => void;
 }) {
   return (
     <label className="flex flex-col gap-1 text-xs text-grey-cool">
       {label}
-      {/* A native select: 25 fixed options need no combobox, and it is the one
-          control a phone renders as a proper wheel. */}
+      {/* A native select: a couple of dozen fixed options need no combobox,
+          and it is the one control a phone renders as a proper wheel. */}
       <select
         value={value}
         disabled={isDisabled}
         onChange={event => onChange(Number(event.target.value))}
         className="h-10 rounded-[10px] bg-club-green px-2 text-sm text-creme outline-none ring-1 ring-transparent focus:ring-golden disabled:opacity-40"
       >
-        {HOUR_OPTIONS.map(hour => (
+        {options.map(hour => (
           <option key={hour} value={hour}>
-            {formatHour(hour)}
+            {hour > 24 ? m.hours_next_day({ time: formatHour(hour) }) : formatHour(hour)}
           </option>
         ))}
       </select>
@@ -131,8 +140,10 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
   };
 
   const ratesValid = RATE_ROWS.every(row => parseRate(current.rates[row.tier]) !== null);
-  // A closed day is `open === close`; only a backwards pair is a mistake
-  const hoursValid = current.hours.every(day => day.open <= day.close);
+  // A closed day is `open === close`; a backwards pair is a mistake, and so
+  // is a night past midnight that runs into the next day's opening
+  const backwards = current.hours.some(day => day.open > day.close);
+  const hoursValid = !backwards && isValidWeek(current.hours);
 
   return (
     <div className="flex flex-col gap-6">
@@ -178,12 +189,14 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
                 </span>
                 <HourSelect
                   label={m.admin_hours_open()}
+                  options={OPEN_OPTIONS}
                   value={day.open}
                   isDisabled={closed}
                   onChange={open => setDay(weekday, { ...day, open })}
                 />
                 <HourSelect
                   label={m.admin_hours_close()}
+                  options={CLOSE_OPTIONS}
                   value={day.close}
                   isDisabled={closed}
                   onChange={close => setDay(weekday, { ...day, close })}
@@ -208,8 +221,11 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
             );
           })}
         </ul>
+        <p className="mt-3 text-xs text-grey-cool">{m.admin_hours_hint()}</p>
         {!hoursValid ? (
-          <p className="mt-3 text-sm text-danger-soft-foreground">{m.admin_hours_invalid()}</p>
+          <p className="mt-3 text-sm text-danger-soft-foreground">
+            {backwards ? m.admin_hours_invalid() : m.admin_hours_overlap()}
+          </p>
         ) : null}
       </section>
 

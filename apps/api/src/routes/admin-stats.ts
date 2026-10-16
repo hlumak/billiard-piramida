@@ -1,9 +1,16 @@
 import { Type } from 'typebox';
-import { addDays, hoursForDate, type AdminAnalyticsDto, type AdminStatsDto } from '@repo/shared';
+import {
+  addDays,
+  hoursForDate,
+  nightTailMinutes,
+  type AdminAnalyticsDto,
+  type AdminStatsDto,
+  type WeeklyHours
+} from '@repo/shared';
 import { and, count, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
 import { bookings, foodItems, orderItems, tables } from '../db/schema.ts';
 import { ADMIN_ANALYTICS_RESPONSE, ADMIN_STATS_RESPONSE } from '../lib/schemas.ts';
-import { warsawDateOf, warsawDayRange } from '../lib/time.ts';
+import { clubDayOf, clubDayRange } from '../lib/time.ts';
 import type { Db } from '../db/client.ts';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 
@@ -14,6 +21,18 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
  * price in, last month's takings stay last month's takings.
  */
 const RENTAL_GROSZ = sql<number>`coalesce(sum(extract(epoch from (${bookings.endsAt} - ${bookings.startsAt})) / 3600 * ${bookings.hourlyRateGrosz}), 0)::int`;
+
+/**
+ * Whether a booking's start falls in the small hours a late night still
+ * covers: then it counts on the evening before. Per weekday, from the hours
+ * in force — the tail of each day's night, indexed by the weekday after it.
+ */
+function inPreviousNight(hours: WeeklyHours) {
+  const local = sql`(${bookings.startsAt} at time zone 'Europe/Warsaw')`;
+  // Indexed by Postgres dow (0 = Sunday), each the minutes the evening before ran past midnight
+  const tails = [0, 1, 2, 3, 4, 5, 6].map(dow => nightTailMinutes(hours[(dow + 6) % 7]!));
+  return sql`(extract(hour from ${local}) * 60 + extract(minute from ${local})) < (array[${sql.raw(tails.join(','))}])[extract(dow from ${local})::int + 1]`;
+}
 
 /** Spot rental + food revenue of confirmed bookings starting in [from, to). */
 async function revenueBetween(db: Db, from: Date, to: Date): Promise<number> {
@@ -52,11 +71,13 @@ export const adminStatsRoutes: FastifyPluginAsyncTypebox = async admin => {
     async (): Promise<AdminStatsDto> => {
       const db = admin.db;
       const now = new Date();
-      const today = warsawDateOf(now);
-      const [dayStart, dayEnd] = warsawDayRange(today);
-      // Rolling windows that end with today, in whole local days
-      const weekStart = warsawDayRange(addDays(today, -6))[0];
-      const monthStart = warsawDayRange(addDays(today, -29))[0];
+      const { hours } = await admin.venueConfig.get();
+      // The club's today: a late night counts as the evening it began
+      const today = clubDayOf(now, hours).date;
+      const [dayStart, dayEnd] = clubDayRange(today, hours);
+      // Rolling windows that end with today, in whole club days
+      const weekStart = clubDayRange(addDays(today, -6), hours)[0];
+      const monthStart = clubDayRange(addDays(today, -29), hours)[0];
 
       const confirmedToday = and(
         eq(bookings.status, 'confirmed'),
@@ -135,15 +156,20 @@ export const adminStatsRoutes: FastifyPluginAsyncTypebox = async admin => {
     async (request): Promise<AdminAnalyticsDto> => {
       const db = admin.db;
       const days = request.query.days ?? 30;
-      const today = warsawDateOf(new Date());
-      const windowEnd = warsawDayRange(today)[1];
-      const windowStart = warsawDayRange(addDays(today, -(days - 1)))[0];
+      const { hours } = await admin.venueConfig.get();
+      const today = clubDayOf(new Date(), hours).date;
+      const windowEnd = clubDayRange(today, hours)[1];
+      const windowStart = clubDayRange(addDays(today, -(days - 1)), hours)[0];
       const confirmedInWindow = and(
         eq(bookings.status, 'confirmed'),
         gte(bookings.startsAt, windowStart),
         lt(bookings.startsAt, windowEnd)
       );
-      const warsawDay = sql<string>`to_char(${bookings.startsAt} at time zone 'Europe/Warsaw', 'YYYY-MM-DD')`;
+      // The club day of each start: the small hours of a late night go to its evening
+      const previousNight = inPreviousNight(hours);
+      const warsawDay = sql<string>`to_char((${bookings.startsAt} at time zone 'Europe/Warsaw') - case when ${previousNight} then interval '1 day' else interval '0' end, 'YYYY-MM-DD')`;
+      // Hours of the club's day, so 00:30 on a late night sorts after 23:00 (as 24)
+      const startHour = sql<number>`(extract(hour from ${bookings.startsAt} at time zone 'Europe/Warsaw') + case when ${previousNight} then 24 else 0 end)::int`;
 
       const [rentalByDay, foodByDay, byTable, byHour] = await Promise.all([
         db
@@ -176,17 +202,16 @@ export const adminStatsRoutes: FastifyPluginAsyncTypebox = async admin => {
           .groupBy(bookings.tableId),
         db
           .select({
-            hour: sql<number>`extract(hour from ${bookings.startsAt} at time zone 'Europe/Warsaw')::int`,
+            hour: startHour,
             bookings: count()
           })
           .from(bookings)
           .where(confirmedInWindow)
-          .groupBy(sql`extract(hour from ${bookings.startsAt} at time zone 'Europe/Warsaw')`)
+          .groupBy(startHour)
       ]);
 
       const rentalMap = new Map(rentalByDay.map(r => [r.date, r]));
       const foodMap = new Map(foodByDay.map(f => [f.date, f.foodGrosz]));
-      const { hours } = await admin.venueConfig.get();
 
       // Dense series: every day in the window, oldest first
       const daily = [];

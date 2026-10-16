@@ -8,6 +8,7 @@ import {
   isIsoDate,
   isValidBookingWindow,
   MAX_BOOKING_MINUTES,
+  MAX_CLOSE_HOUR,
   MAX_SPORT_CARDS_PER_BOOKING,
   MAX_SPOT_ID,
   MAX_UPCOMING_BOOKINGS_PER_PHONE,
@@ -23,7 +24,7 @@ import { and, count, eq, gt, sql } from 'drizzle-orm';
 import { blacklist, bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { BILLIARD_GAME } from '../lib/schemas.ts';
-import { MINUTE_MS, warsawDateOf, warsawInstant, warsawInstantAt } from '../lib/time.ts';
+import { clubDayOf, clubDayRange, MINUTE_MS, warsawInstantAt } from '../lib/time.ts';
 import { createManageToken, insertOrderItems, mustLoadBookingDto } from './bookings.ts';
 import { isClosedFor } from './closures.ts';
 import type { FastifyInstance } from 'fastify';
@@ -32,10 +33,10 @@ import type { FastifyInstance } from 'fastify';
 export const NEW_BOOKING_FIELDS = {
   tableId: Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }),
   date: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
-  /** Minutes after local midnight — 18:00 or 18:30, never 18:15 */
+  /** Minutes after local midnight — 18:00 or 18:30, never 18:15; past 1440 on a late night */
   startMinute: Type.Integer({
     minimum: 0,
-    maximum: 24 * 60 - SLOT_MINUTES,
+    maximum: MAX_CLOSE_HOUR * 60 - SLOT_MINUTES,
     multipleOf: SLOT_MINUTES
   }),
   /** 60, 90, 120 … — an hour at least, in half-hour steps */
@@ -123,13 +124,15 @@ export async function createBooking(
     if (blocked) return refuse(403, 'phone_blocked');
   }
 
-  const today = warsawDateOf(new Date());
+  const { rates, hours } = await app.venueConfig.get();
+  // The club's today: until a late night closes, 00:30 on the calendar is
+  // still the evening before
+  const today = clubDayOf(new Date(), hours).date;
   // The wizard only offers the next BOOKING_DAYS_AHEAD days; the API holds the
   // same line, or one script could fill the calendar years ahead
   if (policy.kind === 'guest' && date > addDays(today, BOOKING_DAYS_AHEAD - 1)) {
     return refuse(422, 'booking_too_far');
   }
-  const { rates, hours } = await app.venueConfig.get();
   // Also refuses a start off the half-hour grid or a length under an hour,
   // should a caller get past the schema
   if (!isValidBookingWindow(date, startMinute, durationMinutes, hours)) {
@@ -139,7 +142,7 @@ export async function createBooking(
   const startsAt = warsawInstantAt(date, startMinute);
   const endsAt = new Date(startsAt.getTime() + durationMinutes * MINUTE_MS);
   const earliestStart =
-    policy.kind === 'guest' ? Date.now() - START_GRACE_MS : warsawInstant(today, 0).getTime();
+    policy.kind === 'guest' ? Date.now() - START_GRACE_MS : clubDayRange(today, hours)[0].getTime();
   if (startsAt.getTime() < earliestStart) return refuse(422, 'start_in_past');
 
   // The rate follows the spot, so an unknown id must fail before pricing

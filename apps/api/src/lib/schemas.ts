@@ -1,5 +1,5 @@
 import { Type, type Static } from 'typebox';
-import { MAX_HOURLY_RATE_GROSZ } from '@repo/shared';
+import { MAX_CLOSE_HOUR, MAX_HOURLY_RATE_GROSZ } from '@repo/shared';
 import type {
   AdminAnalyticsDto,
   AdminCustomerDto,
@@ -84,7 +84,8 @@ export const AVAILABILITY_RESPONSE = Type.Object({
 
 export const DAY_HOURS = Type.Object({
   open: Type.Integer({ minimum: 0, maximum: 24 }),
-  close: Type.Integer({ minimum: 0, maximum: 24 })
+  /** Past 24 is the next morning: 25 = 01:00 */
+  close: Type.Integer({ minimum: 0, maximum: MAX_CLOSE_HOUR })
 });
 
 /** Exactly seven, index = JS weekday, so the tuple mirrors `WeeklyHours`. */

@@ -1,13 +1,15 @@
 import type { ClosedSpan, DayClosure, DayHours } from '@repo/shared';
 import { m } from '../paraglide/messages.js';
-import { formatHour } from './format';
+import { formatClock, formatHour } from './format';
 
 /** One closed stretch of a day in words: "Closed from 18:00", "Closed all day"… */
 export function closedSpanText(span: Pick<ClosedSpan, 'from' | 'to'>, day: DayHours): string {
   if (span.from <= day.open && span.to >= day.close) return m.closed_all_day();
-  if (span.to >= day.close) return m.closed_from({ time: formatHour(span.from) });
+  // A start at 24 on a late night is midnight, "00:00", not the closing "24:00"
+  const from = formatClock(span.from * 60);
+  if (span.to >= day.close) return m.closed_from({ time: from });
   if (span.from <= day.open) return m.closed_until({ time: formatHour(span.to) });
-  return m.closed_between({ from: formatHour(span.from), to: formatHour(span.to) });
+  return m.closed_between({ from, to: formatHour(span.to) });
 }
 
 /** …and the reason staff gave, when they gave one: "Closed from 18:00 — private event". */
@@ -35,5 +37,5 @@ export function partlyClosedTag(closure: DayClosure, day: DayHours): string {
   if (left === null) return m.date_partly_closed();
   return left.open === day.open
     ? m.date_open_until({ time: formatHour(left.close) })
-    : m.date_open_from({ time: formatHour(left.open) });
+    : m.date_open_from({ time: formatClock(left.open * 60) });
 }

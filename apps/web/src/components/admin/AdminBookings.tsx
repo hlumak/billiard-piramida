@@ -38,7 +38,7 @@ import { PHASE_LABELS, PHASE_STYLES, mutationErrorText } from '../booking/phase'
 import { AdminDatePicker } from './AdminDatePicker';
 import { AdminEditBooking } from './AdminBookingModal';
 import { AdminBookingOrder } from './AdminBookingOrder';
-import { useVenueConfig } from '../../lib/venue-config';
+import { bookingClubDate, useVenueConfig } from '../../lib/venue-config';
 
 const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[] = [
   { value: undefined, label: m.admin_all_statuses },
@@ -96,7 +96,7 @@ function RowActions({ booking }: { booking: BookingDto }) {
   const extend = useMutation({
     // Through the staff edit, not the guest endpoint (that needs the guest's secret)
     mutationFn: () => {
-      const { start, end } = bookingMinutes(booking);
+      const { start, end } = bookingMinutes(booking, venueHours);
       return adminApi.updateBooking(booking.id, {
         durationMinutes: end - start + EXTEND_STEP_MINUTES
       });
@@ -119,8 +119,8 @@ function RowActions({ booking }: { booking: BookingDto }) {
   const live = booking.phase === 'upcoming' || booking.phase === 'active';
   // Hide +30 min when it would run past closing time or the longest booking
   // (the API would reject it)
-  const closeMinute = hoursForDate(warsawDate(booking.startsAt), venueHours).close * 60;
-  const { start, end } = bookingMinutes(booking);
+  const closeMinute = hoursForDate(bookingClubDate(booking, venueHours), venueHours).close * 60;
+  const { start, end } = bookingMinutes(booking, venueHours);
   const canExtend =
     live &&
     end + EXTEND_STEP_MINUTES <= closeMinute &&

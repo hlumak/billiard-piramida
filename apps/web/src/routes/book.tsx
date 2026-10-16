@@ -11,8 +11,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { m as msg } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
-import { warsawMinute, warsawToday } from '../lib/format';
-import { firstOpenDay, useVenueConfig } from '../lib/venue-config';
+import { clubMoment, firstOpenDay, useVenueConfig } from '../lib/venue-config';
 import { PageLayout } from '../components/site/PageLayout';
 import { BookingStepper } from '../components/wizard/BookingStepper';
 import { WhenStep } from '../components/wizard/WhenStep';
@@ -120,7 +119,8 @@ function BookingWizard() {
   // first day the club is open, so step 1 shows its hours straight away
   // (client-only mutations).
   useEffect(() => {
-    const today = warsawToday();
+    const now = clubMoment(hours);
+    const today = now.date;
     resetIfDateStale(today);
     const { date, start } = prefill;
     // Only a day the wizard itself would offer: not past, not beyond the window
@@ -134,7 +134,7 @@ function BookingWizard() {
       selectTime(start * 60, MIN_BOOKING_MINUTES);
       void navigate({ to: '/book', search: {}, replace: true });
     } else if (wizardStore.state.date === null) {
-      const day = firstOpenDay(today, warsawMinute(Date.now()), hours, closures);
+      const day = firstOpenDay(today, now.minute, hours, closures);
       if (day !== null) selectDate(day);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

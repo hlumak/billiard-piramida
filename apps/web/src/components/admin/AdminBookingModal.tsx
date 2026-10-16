@@ -14,25 +14,19 @@ import {
   type BilliardGame,
   type BookingDto,
   type IsoDate,
-  type TableAvailabilityDto
+  type TableAvailabilityDto,
+  type WeeklyHours
 } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
 import { adminApi, adminBlacklistQuery } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
-import {
-  bookingMinutes,
-  formatClock,
-  formatDuration,
-  warsawDate,
-  warsawMinute,
-  warsawToday
-} from '../../lib/format';
+import { bookingMinutes, formatClock, formatDuration } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { gameName, spotName } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
 import { AdminDatePicker } from './AdminDatePicker';
 import { PhoneField } from '../PhoneField';
-import { useVenueConfig } from '../../lib/venue-config';
+import { bookingClubDate, clubMoment, useVenueConfig } from '../../lib/venue-config';
 
 const chip = (selected: boolean, disabled = false) =>
   `h-9 min-w-14 rounded-[10px] px-2.5 text-sm font-semibold transition-colors ${
@@ -80,13 +74,15 @@ interface FormSeed {
   prefill?: NewBookingPrefill | undefined;
   /** Present in edit mode: the booking whose window the form starts from */
   booking?: BookingDto | undefined;
+  /** The week in force: a booking in a late night's small hours is the evening's */
+  hours: WeeklyHours;
 }
 
-function initialForm({ prefill, booking }: FormSeed): FormState {
+function initialForm({ prefill, booking, hours }: FormSeed): FormState {
   if (booking) {
     return {
-      date: warsawDate(booking.startsAt),
-      startMinute: warsawMinute(booking.startsAt),
+      date: bookingClubDate(booking, hours),
+      startMinute: bookingMinutes(booking, hours).start,
       duration: Math.round((Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 60_000),
       tableId: booking.tableId,
       name: booking.customerName,
@@ -96,7 +92,7 @@ function initialForm({ prefill, booking }: FormSeed): FormState {
     };
   }
   return {
-    date: prefill?.date ?? warsawToday(),
+    date: prefill?.date ?? clubMoment(hours).date,
     startMinute: prefill?.startMinute ?? null,
     duration: MIN_BOOKING_MINUTES,
     tableId: prefill?.tableId ?? null,
@@ -175,13 +171,14 @@ interface SlotWindow {
 function isFreeForWindow(
   table: TableAvailabilityDto,
   { date, startMinute, duration }: SlotWindow,
-  booking: BookingDto | undefined
+  booking: BookingDto | undefined,
+  hours: WeeklyHours
 ): boolean {
   const held =
     booking !== undefined &&
     booking.tableId === table.tableId &&
-    warsawDate(booking.startsAt) === date
-      ? bookingMinutes(booking)
+    bookingClubDate(booking, hours) === date
+      ? bookingMinutes(booking, hours)
       : null;
   const slotByStart = new Map(table.slots.map(s => [s.startMinute, s]));
   for (let t = startMinute; t < startMinute + duration; t += SLOT_MINUTES) {
@@ -261,14 +258,18 @@ export function AdminBookingModal({
   const queryClient = useQueryClient();
   // Remounted by the caller on a prefill/booking change (keyed), so the initial
   // state never needs syncing back from props.
-  const [form, dispatch] = useReducer(formReducer, { prefill, booking }, initialForm);
+  const { hours: venueHours } = useVenueConfig();
+  const [form, dispatch] = useReducer(
+    formReducer,
+    { prefill, booking, hours: venueHours },
+    initialForm
+  );
   const { date, startMinute, duration, tableId, name, phone, sportCards, game } = form;
 
   const { data: availability } = useQuery({ ...availabilityQuery(date), enabled: isOpen });
   // The desk may book a black-listed number; it should know it is doing so
   const { data: blacklist } = useQuery({ ...adminBlacklistQuery(), enabled: isOpen });
   const phoneBlacklisted = blacklist?.some(entry => entry.phone === phone) ?? false;
-  const { hours: venueHours } = useVenueConfig();
 
   // Bounded by closing time rather than a fixed list: a 15:00 start on a day
   // that runs to 23:00 can legitimately be booked for eight hours, and the API
@@ -303,7 +304,7 @@ export function AdminBookingModal({
       // An edit can move a booking off its old day, leaving that grid stale
       if (booking) {
         queryClient.invalidateQueries({
-          queryKey: availabilityQuery(warsawDate(booking.startsAt)).queryKey
+          queryKey: availabilityQuery(bookingClubDate(booking, venueHours)).queryKey
         });
       }
       onOpenChange(false);
@@ -334,7 +335,12 @@ export function AdminBookingModal({
               <div className="flex flex-col gap-4">
                 <AdminDatePicker
                   value={date}
-                  onChange={next => dispatch({ type: 'date', date: next ?? warsawToday() })}
+                  onChange={next =>
+                    dispatch({
+                      type: 'date',
+                      date: next ?? clubMoment(venueHours).date
+                    })
+                  }
                 />
 
                 <div>
@@ -379,7 +385,8 @@ export function AdminBookingModal({
                     <div className="flex flex-wrap gap-1.5">
                       {availability.tables.map(table => {
                         const free =
-                          slotWindow !== null && isFreeForWindow(table, slotWindow, booking);
+                          slotWindow !== null &&
+                          isFreeForWindow(table, slotWindow, booking, venueHours);
                         return (
                           <button
                             key={table.tableId}

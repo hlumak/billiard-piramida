@@ -4,9 +4,9 @@ import { ArrowRight, ChevronRight, Phone } from 'lucide-react';
 import { hoursForDate, isClosedAllDay } from '@repo/shared';
 import { BrandLogo } from '../BrandLogo';
 import { LocaleSwitcher } from '../LocaleSwitcher';
-import { formatHour, warsawToday } from '../../lib/format';
+import { formatHour } from '../../lib/format';
 import { VENUE, VENUE_PHONE_HREF } from '../../lib/venue';
-import { useVenueConfig } from '../../lib/venue-config';
+import { clubMoment, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { MENU_LINKS } from './nav';
 
@@ -28,7 +28,8 @@ export function MenuContent({
   /** A tournament is taking sign-ups: worth a badge on its row */
   tournamentsOpen?: boolean;
 }) {
-  const today = hoursForDate(warsawToday(), useVenueConfig().hours);
+  const { hours } = useVenueConfig();
+  const today = hoursForDate(clubMoment(hours).date, hours);
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-7">

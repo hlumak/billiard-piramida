@@ -5,6 +5,7 @@ import {
   isIsoDate,
   isValidBookingWindow,
   MAX_BOOKING_MINUTES,
+  MAX_CLOSE_HOUR,
   MAX_ORDER_ITEM_QUANTITY,
   MAX_SPORT_CARDS_PER_BOOKING,
   MAX_SPOT_ID,
@@ -29,13 +30,12 @@ import {
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
 import {
+  clubDayOf,
+  clubDayRange,
   HOUR_MS,
   minutesBetween,
   MINUTE_MS,
-  warsawDateOf,
-  warsawDayRange,
-  warsawInstantAt,
-  warsawMinuteOf
+  warsawInstantAt
 } from '../lib/time.ts';
 import { normalizePhone } from '@repo/shared/phone';
 import {
@@ -101,7 +101,8 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
       const filters = [];
       if (date !== undefined) {
         if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
-        const [dayStart, dayEnd] = warsawDayRange(date);
+        // The club's day: a late night's small hours are listed under its evening
+        const [dayStart, dayEnd] = clubDayRange(date, (await admin.venueConfig.get()).hours);
         filters.push(gte(bookings.startsAt, dayStart), lt(bookings.startsAt, dayEnd));
       }
       if (status !== undefined) filters.push(eq(bookings.status, status));
@@ -207,7 +208,9 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         .update(bookings)
         .set({ status: 'cancelled' })
         .where(eq(bookings.id, booking.id));
-      admin.availabilityHub.notify(warsawDateOf(booking.startsAt));
+      admin.availabilityHub.notify(
+        clubDayOf(booking.startsAt, (await admin.venueConfig.get()).hours).date
+      );
       return mustLoadBookingDto(admin.db, booking.id);
     }
   );
@@ -246,7 +249,9 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
           .values({ phone: booking.customerPhone, reason: 'no_show', bookingId: booking.id })
           .onConflictDoNothing();
       });
-      admin.availabilityHub.notify(warsawDateOf(booking.startsAt));
+      admin.availabilityHub.notify(
+        clubDayOf(booking.startsAt, (await admin.venueConfig.get()).hours).date
+      );
       return mustLoadBookingDto(admin.db, booking.id);
     }
   );
@@ -271,7 +276,7 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
             startMinute: Type.Optional(
               Type.Integer({
                 minimum: 0,
-                maximum: 24 * 60 - SLOT_MINUTES,
+                maximum: MAX_CLOSE_HOUR * 60 - SLOT_MINUTES,
                 multipleOf: SLOT_MINUTES
               })
             ),
@@ -311,15 +316,17 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         .where(eq(bookings.id, request.params.id));
       if (!booking) return reply.code(404).send({ error: 'not_found' });
 
-      const previousDate = warsawDateOf(booking.startsAt);
+      const { rates, hours } = await admin.venueConfig.get();
+      // Read on the club's day, so a 00:30 on a late night stays the evening's
+      const previous = clubDayOf(booking.startsAt, hours);
+      const previousDate = previous.date;
       // Any one of the three may move; the other two hold their current value,
       // so "just make it two hours" needs no date or start from the caller.
       const date = patch.date ?? previousDate;
       if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
-      const startMinute = patch.startMinute ?? warsawMinuteOf(booking.startsAt);
+      const startMinute = patch.startMinute ?? previous.minute;
       const durationMinutes =
         patch.durationMinutes ?? minutesBetween(booking.startsAt, booking.endsAt);
-      const { rates, hours } = await admin.venueConfig.get();
       // Only a change to when the booking runs is judged against today's
       // hours: correcting a name or phone on a booking that no longer fits
       // since staff moved closing time must still go through

@@ -20,14 +20,25 @@ export const BOOKING_DAYS_AHEAD = 14;
  */
 export const MAX_UPCOMING_BOOKINGS_PER_PHONE = 3;
 export const VENUE_TIMEZONE = 'Europe/Warsaw';
+/**
+ * Latest closing time, as an hour of the club's day: 26 is 02:00 the next
+ * morning. Clocks change between 02:00 and 03:00 on two nights a year; ending
+ * by 02:00 keeps every booking exactly as long as the clock on the wall says.
+ */
+export const MAX_CLOSE_HOUR = 26;
 
 /** A calendar date in YYYY-MM-DD form — narrow via `isIsoDate`, never cast at call sites. */
 export type IsoDate = `${number}-${number}-${number}`;
 
+/**
+ * One club day's opening hours. The club's day is the evening it opens: a
+ * night that runs to 01:00 closes at 25, and a booking at 00:30 belongs to
+ * the day before on the calendar.
+ */
 export interface DayHours {
-  /** First bookable hour (local Warsaw time), inclusive */
+  /** First bookable hour (local Warsaw time), inclusive, 0–23 */
   open: number;
-  /** Closing hour (local Warsaw time) — last booking must end by this hour */
+  /** Closing hour — last booking must end by it; past 24 is the next morning (25 = 01:00) */
   close: number;
 }
 
@@ -139,4 +150,44 @@ export function isValidBookingWindow(
 /** A day the club does not open at all — `open >= close` leaves no bookable slot. */
 export function isClosedAllDay(day: DayHours): boolean {
   return day.open >= day.close;
+}
+
+/** Minutes of the next calendar morning a day's night runs into (0 when it ends by midnight). */
+export function nightTailMinutes(day: DayHours): number {
+  return isClosedAllDay(day) ? 0 : Math.max(0, day.close - 24) * 60;
+}
+
+/**
+ * A week staff may save: each day shut (open = close) or open from a whole
+ * hour 0–23 to a later one no later than MAX_CLOSE_HOUR, and a night past
+ * midnight over before the next day opens — otherwise one moment would
+ * belong to two club days.
+ */
+export function isValidWeek(hours: WeeklyHours): boolean {
+  return hours.every((day, weekday) => {
+    if (!Number.isInteger(day.open) || !Number.isInteger(day.close)) return false;
+    if (day.open === day.close) return day.open >= 0 && day.open <= 24;
+    if (day.open < 0 || day.open > 23 || day.close <= day.open || day.close > MAX_CLOSE_HOUR) {
+      return false;
+    }
+    const next = hours[(weekday + 1) % 7];
+    return next === undefined || isClosedAllDay(next) || nightTailMinutes(day) <= next.open * 60;
+  });
+}
+
+/**
+ * The club day a wall-clock moment belongs to: a moment in the small hours
+ * that the previous evening's night still covers is that evening's, at
+ * 24:00 + its time (00:30 → 1470). Anything else is its own calendar day.
+ */
+export function clubDateAt(
+  isoDate: IsoDate,
+  minuteOfDay: number,
+  hours: WeeklyHours
+): { date: IsoDate; minute: number } {
+  const previous = addDays(isoDate, -1);
+  if (minuteOfDay < nightTailMinutes(hoursForDate(previous, hours))) {
+    return { date: previous, minute: minuteOfDay + 24 * 60 };
+  }
+  return { date: isoDate, minute: minuteOfDay };
 }
