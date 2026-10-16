@@ -7,6 +7,7 @@ import {
   closureSpanOn,
   hallOf,
   hoursForDate,
+  SLOT_MINUTES,
   sizeOf,
   type BookingDto,
   type ClosedSpan,
@@ -20,7 +21,15 @@ import { closedSpanText } from '../../lib/closures';
 import { tablesQuery } from '../../lib/queries';
 import { activityName, gameName, spotName } from '../../lib/spots';
 import { availabilityLive } from '../../lib/availability-live';
-import { addDays, bookingHours, formatHour, warsawHour, warsawToday } from '../../lib/format';
+import {
+  addDays,
+  bookingMinutes,
+  formatClock,
+  formatClockRange,
+  formatHour,
+  warsawMinute,
+  warsawToday
+} from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { QueryError } from '../QueryError';
@@ -30,14 +39,15 @@ import { useNowMinute } from '../../lib/use-now';
 import { AdminBookingModal, type NewBookingPrefill } from './AdminBookingModal';
 import { AdminClosureModal } from './AdminClosures';
 
-/** (tableId, hour) → the confirmed booking covering that hour. Bookings are
- *  hour-aligned and never cross midnight; one may end at 24 (see bookingHours). */
+/** (tableId, slot start) → the confirmed booking covering that half hour.
+ *  Bookings sit on the half-hour grid and never cross midnight; one may end
+ *  at 24:00 (see bookingMinutes). */
 function occupancyOf(bookings: BookingDto[]): Map<string, BookingDto> {
   const map = new Map<string, BookingDto>();
   for (const booking of bookings) {
-    const { start, end } = bookingHours(booking);
-    for (let h = start; h < end; h++) {
-      map.set(`${booking.tableId}:${h}`, booking);
+    const { start, end } = bookingMinutes(booking);
+    for (let t = start; t < end; t += SLOT_MINUTES) {
+      map.set(`${booking.tableId}:${t}`, booking);
     }
   }
   return map;
@@ -51,7 +61,7 @@ const BLOCK_TONES: Record<BlockTone, string> = {
   done: 'bg-creme/8 text-grey-cool hover:bg-creme/12'
 };
 
-/** A booking as one block spanning its hours; clicking it pulls the booking up. */
+/** A booking as one block spanning its half hours; clicking it pulls the booking up. */
 function BookingCell({
   booking,
   span,
@@ -59,13 +69,13 @@ function BookingCell({
   onShowBooking
 }: {
   booking: BookingDto;
-  /** Grid columns covered, clamped to the grid's closing hour */
+  /** Half-hour columns covered, clamped to the grid's closing time */
   span: number;
   tone: BlockTone;
   onShowBooking: (phone: string) => void;
 }) {
-  const { start, end } = bookingHours(booking);
-  const time = `${formatHour(start)}–${formatHour(end)}`;
+  const { start, end } = bookingMinutes(booking);
+  const time = formatClockRange(start, end - start);
   const game = booking.game ? gameName(booking.game).toLocaleLowerCase(getLocale()) : null;
   return (
     <button
@@ -93,16 +103,27 @@ function BookingCell({
   );
 }
 
-/** A free hour: a button that seeds a new booking at that hour. Past free
- *  hours stay clickable so staff can log a game that already started today
- *  (the admin create endpoint allows past-today starts). */
-function FreeCell({ label, past, onPick }: { label: string; past: boolean; onPick: () => void }) {
+/** A free half hour: a button that seeds a new booking there, showing its
+ *  time on hover (the cell is too narrow for words). Past free slots stay
+ *  clickable so staff can log a game that already started today (the admin
+ *  create endpoint allows past-today starts). */
+function FreeCell({
+  label,
+  time,
+  past,
+  onPick
+}: {
+  label: string;
+  time: string;
+  past: boolean;
+  onPick: () => void;
+}) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onPick}
-      className={`group relative z-10 h-12.5 rounded-[10px] border border-dashed border-creme/14 text-[13px] font-bold text-golden-light transition-colors hover:border-[1.5px] hover:border-golden hover:bg-golden/8 focus-visible:border-golden focus-visible:bg-golden/8 ${
+      className={`group relative z-10 h-12.5 rounded-[10px] border border-dashed border-creme/14 text-xs font-bold text-golden-light tabular-nums transition-colors hover:border-[1.5px] hover:border-golden hover:bg-golden/8 focus-visible:border-golden focus-visible:bg-golden/8 ${
         past ? 'opacity-45' : ''
       }`}
     >
@@ -110,13 +131,13 @@ function FreeCell({ label, past, onPick }: { label: string; past: boolean; onPic
         aria-hidden
         className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
       >
-        {m.admin_book_slot()}
+        {time}
       </span>
     </button>
   );
 }
 
-/** Hours staff have closed: hatched, with the reason for the desk to read. */
+/** Time staff have closed: hatched, with the reason for the desk to read. */
 function ClosedCell({ span, reason }: { span: number; reason: string | null }) {
   return (
     <div
@@ -130,12 +151,13 @@ function ClosedCell({ span, reason }: { span: number; reason: string | null }) {
 }
 
 type RowCell =
-  | { kind: 'booking'; hour: number; span: number; booking: BookingDto }
-  | { kind: 'closed'; hour: number; span: number; reason: string | null }
-  | { kind: 'free'; hour: number };
+  | { kind: 'booking'; minute: number; span: number; booking: BookingDto }
+  | { kind: 'closed'; minute: number; span: number; reason: string | null }
+  | { kind: 'free'; minute: number };
 
 /** One spot's day, left to right: each booking and each closed stretch as a
- *  single cell spanning its hours, every other hour a cell of its own. */
+ *  single cell spanning its half hours, every other half hour a cell of its
+ *  own. `open`/`close` are whole hours, spans are counted in half hours. */
 function rowCells(
   spotId: number,
   open: number,
@@ -143,26 +165,37 @@ function rowCells(
   occupancy: Map<string, BookingDto>,
   closed: ClosedSpan[]
 ): RowCell[] {
-  const closureAt = (hour: number) => closed.find(span => span.from <= hour && hour < span.to);
+  const gridEnd = close * 60;
+  // Closures are whole hours
+  const closureAt = (minute: number) =>
+    closed.find(span => span.from * 60 <= minute && minute < span.to * 60);
   const cells: RowCell[] = [];
-  for (let hour = open; hour < close;) {
-    const booking = occupancy.get(`${spotId}:${hour}`);
-    const run = booking ? undefined : closureAt(hour);
+  for (let minute = open * 60; minute < gridEnd;) {
+    const booking = occupancy.get(`${spotId}:${minute}`);
+    const run = booking ? undefined : closureAt(minute);
     if (booking) {
-      const endHour = bookingHours(booking).end;
+      const end = bookingMinutes(booking).end;
       // A booking can outlast the grid when staff have since moved closing
       // time earlier: clamp, or it would push every following row out of place
-      cells.push({ kind: 'booking', hour, span: Math.min(endHour, close) - hour, booking });
-      hour = endHour;
+      const span = (Math.min(end, gridEnd) - minute) / SLOT_MINUTES;
+      cells.push({ kind: 'booking', minute, span, booking });
+      minute = end;
     } else if (run) {
       // Up to the end of the closure, the grid, or a booking, whichever comes first
-      let end = hour + 1;
-      while (end < close && closureAt(end) && !occupancy.has(`${spotId}:${end}`)) end++;
-      cells.push({ kind: 'closed', hour, span: end - hour, reason: run.reason });
-      hour = end;
+      let end = minute + SLOT_MINUTES;
+      while (end < gridEnd && closureAt(end) && !occupancy.has(`${spotId}:${end}`)) {
+        end += SLOT_MINUTES;
+      }
+      cells.push({
+        kind: 'closed',
+        minute,
+        span: (end - minute) / SLOT_MINUTES,
+        reason: run.reason
+      });
+      minute = end;
     } else {
-      cells.push({ kind: 'free', hour });
-      hour++;
+      cells.push({ kind: 'free', minute });
+      minute += SLOT_MINUTES;
     }
   }
   return cells;
@@ -173,8 +206,8 @@ function blockTone(booking: BookingDto, now: number): BlockTone {
   return Date.parse(booking.startsAt) <= now ? 'playing' : 'planned';
 }
 
-/** One spot's row: free hours are buttons that seed a new booking; a booking
- *  renders as a single block spanning all its hours, a closure as one too. */
+/** One spot's row: free half hours are buttons that seed a new booking; a
+ *  booking renders as a single block spanning all of it, a closure as one too. */
 function SpotRow({
   spot,
   open,
@@ -196,18 +229,20 @@ function SpotRow({
   now: number;
   isPastDate: boolean;
   isToday: boolean;
-  onPickSlot: (startHour: number) => void;
+  onPickSlot: (startMinute: number) => void;
   onShowBooking: (phone: string) => void;
 }) {
-  const nowHour = isToday ? warsawHour(now) : null;
-  const isPastHour = (hour: number) => isPastDate || (nowHour !== null && hour < nowHour);
+  const nowMinute = isToday ? warsawMinute(now) : null;
+  // Over: the whole half hour lies before now
+  const isPastSlot = (minute: number) =>
+    isPastDate || (nowMinute !== null && minute + SLOT_MINUTES <= nowMinute);
   const name = spotName(spot.kind, spot.label);
 
   const cells = rowCells(spot.id, open, close, occupancy, closed).map(cell => {
     if (cell.kind === 'booking') {
       return (
         <BookingCell
-          key={cell.hour}
+          key={cell.minute}
           booking={cell.booking}
           span={cell.span}
           tone={blockTone(cell.booking, now)}
@@ -216,14 +251,15 @@ function SpotRow({
       );
     }
     if (cell.kind === 'closed') {
-      return <ClosedCell key={cell.hour} span={cell.span} reason={cell.reason} />;
+      return <ClosedCell key={cell.minute} span={cell.span} reason={cell.reason} />;
     }
     return (
       <FreeCell
-        key={cell.hour}
-        label={`${name}, ${formatHour(cell.hour)} — ${m.admin_free()}`}
-        past={isPastHour(cell.hour)}
-        onPick={() => onPickSlot(cell.hour)}
+        key={cell.minute}
+        label={`${name}, ${formatClock(cell.minute)} — ${m.admin_free()}`}
+        time={formatClock(cell.minute)}
+        past={isPastSlot(cell.minute)}
+        onPick={() => onPickSlot(cell.minute)}
       />
     );
   });
@@ -332,18 +368,20 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
     ];
   });
   const hours = Array.from({ length: Math.max(close - open, 0) }, (_, i) => open + i);
+  // Two columns an hour: a booking may start and end on the half hour
+  const slotsPerHour = 60 / SLOT_MINUTES;
   const occupancy = occupancyOf(bookings ?? []);
+  const nowMinute = warsawMinute(now);
 
   // Where "now" falls across the opening hours, 0–1; only drawn on today's grid
   const nowFraction = (() => {
     if (!isToday || hours.length === 0) return null;
-    const minutes = warsawHour(now) * 60 + new Date(now).getUTCMinutes();
-    const fraction = (minutes - open * 60) / ((close - open) * 60);
+    const fraction = (nowMinute - open * 60) / ((close - open) * 60);
     return fraction > 0 && fraction < 1 ? fraction : null;
   })();
 
-  const pickSlot = (tableId: number, startHour: number) => {
-    setPrefill({ date, startHour, tableId });
+  const pickSlot = (tableId: number, startMinute: number) => {
+    setPrefill({ date, startMinute, tableId });
     setCreating(true);
   };
 
@@ -440,14 +478,19 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
         <div className="card overflow-x-auto px-4 pt-4.5 pb-5 md:px-5">
           <div
             className="relative grid min-w-max gap-1.5"
-            style={{ gridTemplateColumns: `110px repeat(${hours.length}, minmax(5.5rem, 1fr))` }}
+            style={{
+              gridTemplateColumns: `110px repeat(${hours.length * slotsPerHour}, minmax(2.75rem, 1fr))`
+            }}
           >
             <div className="sticky left-0 z-20 bg-card" />
             {hours.map(hour => (
               <div
                 key={hour}
+                style={{ gridColumn: `span ${slotsPerHour}` }}
                 className={`pl-1 text-[13px] font-bold ${
-                  isToday && hour === warsawHour(now) ? 'text-golden-light' : 'text-grey-cool'
+                  isToday && hour === Math.floor(nowMinute / 60)
+                    ? 'text-golden-light'
+                    : 'text-grey-cool'
                 }`}
               >
                 {formatHour(hour)}
@@ -469,7 +512,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
                     now={now}
                     isPastDate={date < today}
                     isToday={isToday}
-                    onPickSlot={hour => pickSlot(spot.id, hour)}
+                    onPickSlot={minute => pickSlot(spot.id, minute)}
                     onShowBooking={onShowBooking}
                   />
                 ))}
@@ -482,7 +525,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
                 style={{ left: `calc(116px + (100% - 116px) * ${nowFraction})` }}
               >
                 <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 rounded-md bg-golden px-1.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-btn-text">
-                  {`${String(warsawHour(now)).padStart(2, '0')}:${String(new Date(now).getUTCMinutes()).padStart(2, '0')}`}
+                  {formatClock(nowMinute)}
                 </span>
               </div>
             ) : null}
@@ -505,7 +548,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
 
       {prefill ? (
         <AdminBookingModal
-          key={`${prefill.date}:${prefill.startHour}:${prefill.tableId}`}
+          key={`${prefill.date}:${prefill.startMinute}:${prefill.tableId}`}
           isOpen={creating}
           onOpenChange={setCreating}
           prefill={prefill}

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowRight, LoaderCircle } from 'lucide-react';
 import { formatPln, sizeOf } from '@repo/shared';
 import { useStore } from '@tanstack/react-store';
-import { formatDay, formatHour, intlTag } from '../../lib/format';
+import { formatClockRange, formatDay, intlTag } from '../../lib/format';
 import { useIsHydrated } from '../../lib/hydration';
 import { spotDescription } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
@@ -169,9 +169,7 @@ function BarPicks() {
   const totals = useWizardTotals();
   const money = formatPln(totals.total, intlTag());
   const time =
-    state.startHour === null
-      ? null
-      : `${formatHour(state.startHour)}–${formatHour(state.startHour + state.durationHours)}`;
+    state.startMinute === null ? null : formatClockRange(state.startMinute, state.durationMinutes);
 
   let title: string | null = null;
   if (state.tableLabel !== null && state.kind !== null) {

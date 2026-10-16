@@ -1,10 +1,15 @@
 import { TZDate } from '@date-fns/tz';
 import { addDays, dateParts, VENUE_TIMEZONE, type IsoDate } from '@repo/shared';
 
-/** UTC instant of `hour:00` local Warsaw time on `isoDate`. */
-export function warsawInstant(isoDate: IsoDate, hour: number): Date {
+/** UTC instant of `hour:minute` local Warsaw time on `isoDate`. */
+export function warsawInstant(isoDate: IsoDate, hour: number, minute = 0): Date {
   const [y, m, d] = dateParts(isoDate);
-  return new Date(new TZDate(y, m - 1, d, hour, 0, 0, VENUE_TIMEZONE).getTime());
+  return new Date(new TZDate(y, m - 1, d, hour, minute, 0, VENUE_TIMEZONE).getTime());
+}
+
+/** UTC instant of a time of day given as minutes after local midnight (18:30 = 1110). */
+export function warsawInstantAt(isoDate: IsoDate, minuteOfDay: number): Date {
+  return warsawInstant(isoDate, Math.floor(minuteOfDay / 60), minuteOfDay % 60);
 }
 
 /** Warsaw-local calendar date (YYYY-MM-DD) of a UTC instant. */
@@ -20,7 +25,19 @@ export function warsawHourOf(instant: Date): number {
   return new TZDate(instant.getTime(), VENUE_TIMEZONE).getHours();
 }
 
-export const HOUR_MS = 3_600_000;
+/** Warsaw-local wall-clock time of a UTC instant, as minutes after midnight. */
+export function warsawMinuteOf(instant: Date): number {
+  const tz = new TZDate(instant.getTime(), VENUE_TIMEZONE);
+  return tz.getHours() * 60 + tz.getMinutes();
+}
+
+export const MINUTE_MS = 60_000;
+export const HOUR_MS = 60 * MINUTE_MS;
+
+/** Whole minutes between two instants — a booking's length. */
+export function minutesBetween(start: Date, end: Date): number {
+  return Math.round((end.getTime() - start.getTime()) / MINUTE_MS);
+}
 
 /**
  * [start, end) of a venue-local calendar day as UTC instants: local midnight

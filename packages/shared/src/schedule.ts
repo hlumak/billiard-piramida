@@ -1,6 +1,15 @@
-export const MIN_BOOKING_HOURS = 1;
+/**
+ * Bookings run on a half-hour grid: they start on :00 or :30 and last a whole
+ * number of slots. Times of day are minutes after local midnight (18:30 = 1110),
+ * lengths are minutes — opening hours stay whole hours.
+ */
+export const SLOT_MINUTES = 30;
+/** Shortest booking — one hour, so 1:00, 1:30, 2:00 … */
+export const MIN_BOOKING_MINUTES = 60;
 /** Upper bound on a single booking, whatever the day's closing time allows. */
-export const MAX_BOOKING_HOURS = 8;
+export const MAX_BOOKING_MINUTES = 8 * 60;
+/** What one press of "extend" adds; it may be pressed again while the next slot is free. */
+export const EXTEND_STEP_MINUTES = SLOT_MINUTES;
 /** How far ahead a guest may book: today plus this many days minus one. */
 export const BOOKING_DAYS_AHEAD = 14;
 /**
@@ -95,30 +104,36 @@ export function hoursForDate(isoDate: IsoDate, hours: WeeklyHours): DayHours {
   return day;
 }
 
-/** Hourly slot start times (local hours) for a given date. */
+/** A whole number of minutes on the half-hour grid (a start of day or a length). */
+export function isOnSlotGrid(minutes: number): boolean {
+  return Number.isInteger(minutes) && minutes % SLOT_MINUTES === 0;
+}
+
+/** Half-hourly start times (minutes after midnight) a booking may take on a date. */
 export function slotStartsForDate(isoDate: IsoDate, hours: WeeklyHours): number[] {
   const { open, close } = hoursForDate(isoDate, hours);
   const starts: number[] = [];
-  for (let h = open; h <= close - MIN_BOOKING_HOURS; h++) starts.push(h);
+  for (let m = open * 60; m <= close * 60 - MIN_BOOKING_MINUTES; m += SLOT_MINUTES) starts.push(m);
   return starts;
 }
 
-/** Longest booking (in hours) that can start at `startHour` on `isoDate`. */
-export function maxDurationAt(isoDate: IsoDate, startHour: number, hours: WeeklyHours): number {
+/** Longest booking (in minutes) that can start at `startMinute` on `isoDate`. */
+export function maxDurationAt(isoDate: IsoDate, startMinute: number, hours: WeeklyHours): number {
   const { open, close } = hoursForDate(isoDate, hours);
-  if (startHour < open || startHour > close - MIN_BOOKING_HOURS) return 0;
-  return close - startHour;
+  if (!isOnSlotGrid(startMinute)) return 0;
+  if (startMinute < open * 60 || startMinute > close * 60 - MIN_BOOKING_MINUTES) return 0;
+  return close * 60 - startMinute;
 }
 
 export function isValidBookingWindow(
   isoDate: IsoDate,
-  startHour: number,
-  durationHours: number,
+  startMinute: number,
+  durationMinutes: number,
   hours: WeeklyHours
 ): boolean {
-  if (!Number.isInteger(startHour) || !Number.isInteger(durationHours)) return false;
-  if (durationHours < MIN_BOOKING_HOURS) return false;
-  return durationHours <= maxDurationAt(isoDate, startHour, hours);
+  if (!isOnSlotGrid(startMinute) || !isOnSlotGrid(durationMinutes)) return false;
+  if (durationMinutes < MIN_BOOKING_MINUTES) return false;
+  return durationMinutes <= maxDurationAt(isoDate, startMinute, hours);
 }
 
 /** A day the club does not open at all — `open >= close` leaves no bookable slot. */

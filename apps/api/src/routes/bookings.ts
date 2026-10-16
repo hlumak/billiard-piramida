@@ -2,10 +2,11 @@ import assert from 'node:assert';
 import { Type } from 'typebox';
 import {
   discountGroszFor,
+  EXTEND_STEP_MINUTES,
   hoursForDate,
-  MAX_BOOKING_HOURS,
+  MAX_BOOKING_MINUTES,
   MAX_ORDER_ITEM_QUANTITY,
-  MIN_BOOKING_HOURS
+  rentalGrosz
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, asc, desc, eq, gt } from 'drizzle-orm';
@@ -19,7 +20,7 @@ import {
   INT_ID,
   UUID
 } from '../lib/schemas.ts';
-import { HOUR_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
+import { minutesBetween, MINUTE_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
 import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
 import {
   insertOrderItems,
@@ -202,10 +203,9 @@ export function bookingRoutes(
         params: BOOKING_ID_PARAM,
         body: Type.Object(
           {
-            additionalHours: Type.Integer({
-              minimum: MIN_BOOKING_HOURS,
-              maximum: MAX_BOOKING_HOURS
-            })
+            // One half hour per call; extending again is another call,
+            // judged against the slot right after the booking each time
+            additionalMinutes: Type.Literal(EXTEND_STEP_MINUTES)
           },
           { additionalProperties: false }
         ),
@@ -222,9 +222,12 @@ export function bookingRoutes(
         return reply.code(409).send({ error: `booking_${phase}` });
       }
 
-      const newEndsAt = new Date(booking.endsAt.getTime() + request.body.additionalHours * HOUR_MS);
+      const newEndsAt = new Date(
+        booking.endsAt.getTime() + request.body.additionalMinutes * MINUTE_MS
+      );
+      const newDurationMinutes = minutesBetween(booking.startsAt, newEndsAt);
       // Extending is still one booking: the same ceiling as creating one
-      if (newEndsAt.getTime() - booking.startsAt.getTime() > MAX_BOOKING_HOURS * HOUR_MS) {
+      if (newDurationMinutes > MAX_BOOKING_MINUTES) {
         return reply.code(422).send({ error: 'booking_too_long' });
       }
       const bookingDate = warsawDateOf(booking.startsAt);
@@ -235,20 +238,17 @@ export function bookingRoutes(
       }
 
       // The discount is capped by the rental, so a longer rental can uncap it
-      // (three cards on one darts hour were clipped to 30 zł; at two hours the
+      // (three cards on one darts hour were clipped to 30 zł; at 1:30 the
       // full 45 zł applies) — recompute against the new duration, at the rate
       // this booking was written at rather than today's.
-      const newDurationHours = Math.round(
-        (newEndsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
-      );
       const discountGrosz = discountGroszFor(
         booking.sportCardCount,
-        booking.hourlyRateGrosz * newDurationHours
+        rentalGrosz(booking.hourlyRateGrosz, newDurationMinutes)
       );
 
       try {
         const closed = await app.db.transaction(async tx => {
-          // The added hours may run into time staff have closed
+          // The added half hour may run into time staff have closed
           if (await isClosedFor(tx, booking.tableId, booking.endsAt, newEndsAt)) return true;
           await tx
             .update(bookings)

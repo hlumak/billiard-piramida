@@ -1,0 +1,1 @@
+ALTER TABLE "bookings" ADD CONSTRAINT "bookings_on_half_hour_grid" CHECK (extract(epoch from "starts_at") % 1800 = 0 and extract(epoch from "ends_at") % 1800 = 0 and "ends_at" - "starts_at" >= interval '1 hour');

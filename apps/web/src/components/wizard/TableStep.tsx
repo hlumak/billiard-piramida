@@ -13,7 +13,7 @@ import {
 } from '@repo/shared';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
-import { formatDayLong, formatHour, intlTag } from '../../lib/format';
+import { formatClockRange, formatDayLong, intlTag } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
 import { useLiveAvailability } from '../../lib/availability-live';
 import { ACTIVITY_KINDS, activityName, gameName, spotName } from '../../lib/spots';
@@ -72,14 +72,14 @@ function spotGroups(spots: Spot[], kind: ActivityKind, rates: RateTable): SpotGr
 
 export function TableStep({
   date,
-  startHour,
-  durationHours,
+  startMinute,
+  durationMinutes,
   tableId,
   kind: pickedKind
 }: {
   date: IsoDate;
-  startHour: number;
-  durationHours: number;
+  startMinute: number;
+  durationMinutes: number;
   tableId: number | null;
   kind: ActivityKind | null;
 }) {
@@ -97,7 +97,7 @@ export function TableStep({
 
   // Someone else can take the picked spot meanwhile: then it is no longer
   // picked anywhere — not here, and not in the summary or its price either
-  const free = freeSpotIds(availability?.tables ?? [], startHour, durationHours);
+  const free = freeSpotIds(availability?.tables ?? [], startMinute, durationMinutes);
   const lost = availability !== undefined && tableId !== null && !free.has(tableId);
   useEffect(() => {
     if (lost) clearTable();
@@ -124,7 +124,7 @@ export function TableStep({
     setKind(spot.kind);
   };
 
-  const when = `${formatDayLong(date)} · ${formatHour(startHour)}–${formatHour(startHour + durationHours)}`;
+  const when = `${formatDayLong(date)} · ${formatClockRange(startMinute, durationMinutes)}`;
 
   return (
     <div>

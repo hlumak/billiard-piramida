@@ -147,9 +147,10 @@ test('availability reflects operating hours', async () => {
   assert.equal(monBody.open, 16);
   assert.equal(monBody.close, 21);
   assert.equal(monBody.tables.length, SPOTS_COUNT);
+  // Every half hour from opening to closing, 16:00 … 20:30
   assert.deepEqual(
-    monBody.tables[0].slots.map((s: { hour: number }) => s.hour),
-    [16, 17, 18, 19, 20]
+    monBody.tables[0].slots.map((s: { startMinute: number }) => s.startMinute),
+    [16, 16.5, 17, 17.5, 18, 18.5, 19, 19.5, 20, 20.5].map(h => h * 60)
   );
 
   const sat = await app.inject({ method: 'GET', url: `/api/availability?date=${SATURDAY}` });
@@ -169,8 +170,8 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
     payload: {
       tableId: 1,
       date: MONDAY,
-      startHour: 16,
-      durationHours: 2,
+      startMinute: 16 * 60,
+      durationMinutes: 120,
       customerName: 'Оксана Тест',
       customerPhone: '+48601234567',
       items: [{ foodItemId: fries.id, quantity: 2 }]
@@ -212,8 +213,8 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
     payload: {
       tableId: 1,
       date: MONDAY,
-      startHour: 17,
-      durationHours: 1,
+      startMinute: 17 * 60,
+      durationMinutes: 60,
       customerName: 'Conflict',
       customerPhone: '+48600000000'
     }
@@ -228,8 +229,8 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
     payload: {
       tableId: 2,
       date: MONDAY,
-      startHour: 17,
-      durationHours: 1,
+      startMinute: 17 * 60,
+      durationMinutes: 60,
       customerName: 'Sąsiad',
       customerPhone: '+48600000001'
     }
@@ -241,25 +242,57 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
   const table1 = avail.json().tables.find((t: { tableId: number }) => t.tableId === 1);
   assert.deepEqual(
     table1.slots.map((s: { available: boolean }) => s.available),
-    [false, false, true, true, true]
+    [false, false, false, false, true, true, true, true, true, true]
   );
 
-  // extend by 1h (16-19)
+  // extend by half an hour (16-18:30), and again (16-19)
+  const extendOnce = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${booking.id}/extend`,
+    headers: manage,
+    payload: { additionalMinutes: 30 }
+  });
+  assert.equal(extendOnce.statusCode, 200);
+  assert.equal(extendOnce.json().tableTotalGrosz, 2.5 * BILLIARD_HOUR);
+  assert.equal(
+    new Date(extendOnce.json().endsAt).getTime() - new Date(booking.endsAt).getTime(),
+    30 * 60_000
+  );
   const extend = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/extend`,
     headers: manage,
-    payload: { additionalHours: 1 }
+    payload: { additionalMinutes: 30 }
   });
   assert.equal(extend.statusCode, 200);
   assert.equal(extend.json().tableTotalGrosz, 3 * BILLIARD_HOUR);
 
-  // extending past closing time (21:00) → 422
+  // Only half an hour at a time — a whole hour, or a quarter, is refused
+  for (const additionalMinutes of [60, 15]) {
+    const wrongStep = await app.inject({
+      method: 'POST',
+      url: `/api/bookings/${booking.id}/extend`,
+      headers: manage,
+      payload: { additionalMinutes }
+    });
+    assert.equal(wrongStep.statusCode, 400, `additionalMinutes=${additionalMinutes}`);
+  }
+
+  // extending past closing time (21:00) → 422: up to 21:00 in four steps, then no more
+  for (let i = 0; i < 4; i++) {
+    const step = await app.inject({
+      method: 'POST',
+      url: `/api/bookings/${booking.id}/extend`,
+      headers: manage,
+      payload: { additionalMinutes: 30 }
+    });
+    assert.equal(step.statusCode, 200);
+  }
   const tooLong = await app.inject({
     method: 'POST',
     url: `/api/bookings/${booking.id}/extend`,
     headers: manage,
-    payload: { additionalHours: 5 }
+    payload: { additionalMinutes: 30 }
   });
   assert.equal(tooLong.statusCode, 422);
   assert.equal(tooLong.json().error, 'past_closing_time');
@@ -298,8 +331,8 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
     payload: {
       tableId: 1,
       date: MONDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Nowy Gość',
       customerPhone: '+48600000002'
     }
@@ -308,10 +341,13 @@ test('booking lifecycle: create with food, conflict, extend, add food, cancel', 
 });
 
 test('rejects bookings outside operating hours', async () => {
-  for (const [startHour, durationHours] of [
-    [15, 1], // Monday opens at 16
-    [20, 2], // would end at 22, Monday closes at 21
-    [21, 1] // cannot start at closing hour
+  for (const [startMinute, durationMinutes] of [
+    [15 * 60, 60], // Monday opens at 16
+    [15 * 60 + 30, 60], // still before opening
+    [20 * 60, 120], // would end at 22, Monday closes at 21
+    [19 * 60 + 30, 120], // would end at 21:30
+    [20 * 60 + 30, 60], // under an hour left before closing
+    [21 * 60, 60] // cannot start at closing hour
   ]) {
     const res = await app.inject({
       method: 'POST',
@@ -319,14 +355,115 @@ test('rejects bookings outside operating hours', async () => {
       payload: {
         tableId: 3,
         date: MONDAY,
-        startHour,
-        durationHours,
+        startMinute,
+        durationMinutes,
         customerName: 'X',
         customerPhone: '+48600000003'
       }
     });
-    assert.equal(res.statusCode, 422, `startHour=${startHour} duration=${durationHours}`);
+    assert.equal(res.statusCode, 422, `startMinute=${startMinute} duration=${durationMinutes}`);
     assert.equal(res.json().error, 'outside_operating_hours');
+  }
+});
+
+test('bookings run on the half-hour grid with an hour minimum', async () => {
+  const book = (payload: Record<string, unknown>) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/bookings',
+      headers: { 'x-forwarded-for': '198.51.100.30' },
+      payload: {
+        tableId: 2,
+        date: MONDAY,
+        customerName: 'Half Hour',
+        customerPhone: '+48 512 400 400',
+        ...payload
+      }
+    });
+
+  // Too short, off the grid, or a start at a quarter past: the schema refuses them
+  for (const [startMinute, durationMinutes] of [
+    [18 * 60, 30], // half an hour, under the minimum
+    [18 * 60, 0],
+    [18 * 60, 75], // 1:15 is not a half-hour step
+    [18 * 60, 100],
+    [18 * 60 + 15, 60], // 18:15
+    [18 * 60 + 45, 90] // 18:45
+  ]) {
+    const res = await book({ startMinute, durationMinutes });
+    assert.equal(res.statusCode, 400, `startMinute=${startMinute} duration=${durationMinutes}`);
+  }
+
+  // 18:30 for 1:30 is fine, and bills half the hourly rate for the half hour
+  const ninety = await book({ startMinute: 18 * 60 + 30, durationMinutes: 90 });
+  assert.equal(ninety.statusCode, 201);
+  const booking = ninety.json();
+  assert.equal(booking.tableTotalGrosz, 1.5 * BILLIARD_HOUR);
+  assert.equal(
+    new Date(booking.endsAt).getTime() - new Date(booking.startsAt).getTime(),
+    90 * 60_000
+  );
+
+  // The half hours it covers are taken, the ones around it still free
+  const avail = await app.inject({ method: 'GET', url: `/api/availability?date=${MONDAY}` });
+  const slots = avail
+    .json()
+    .tables.find((t: { tableId: number }) => t.tableId === 2)
+    .slots.filter(
+      (s: { startMinute: number }) => s.startMinute >= 18 * 60 && s.startMinute <= 20 * 60
+    );
+  assert.deepEqual(
+    slots.map((s: { booked: boolean }) => s.booked),
+    [false, true, true, true, false] // 18:00, 18:30, 19:00, 19:30, 20:00
+  );
+
+  // 20:00 for an hour starts right where it ends
+  const next = await book({
+    startMinute: 20 * 60,
+    durationMinutes: 60,
+    customerPhone: '+48 512 400 401'
+  });
+  assert.equal(next.statusCode, 201);
+  // …but 19:30 overlaps its last half hour
+  const overlap = await book({
+    startMinute: 19 * 60 + 30,
+    durationMinutes: 60,
+    customerPhone: '+48 512 400 402'
+  });
+  assert.equal(overlap.statusCode, 409);
+  assert.equal(overlap.json().error, 'slot_taken');
+
+  // Now 18:30–20:00 is boxed in by the 20:00 booking: no room to extend
+  const boxed = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${booking.id}/extend`,
+    headers: { 'x-booking-token': booking.manageToken },
+    payload: { additionalMinutes: 30 }
+  });
+  assert.equal(boxed.statusCode, 409);
+  assert.equal(boxed.json().error, 'slot_taken');
+});
+
+test('the database itself refuses a booking off the half-hour grid', async () => {
+  const insert = (startsAt: string, endsAt: string) =>
+    app.db.insert(bookings).values({
+      tableId: 1,
+      customerName: 'Raw',
+      customerPhone: '+48600000099',
+      startsAt: new Date(startsAt),
+      endsAt: new Date(endsAt),
+      hourlyRateGrosz: BILLIARD_HOUR
+    });
+  for (const [startsAt, endsAt] of [
+    ['2030-01-07T17:15:00Z', '2030-01-07T18:15:00Z'], // off the grid
+    ['2030-01-07T17:00:00Z', '2030-01-07T17:30:00Z'], // under an hour
+    ['2030-01-07T17:00:00Z', '2030-01-07T18:10:00Z'] // not whole half hours
+  ] as const) {
+    await assert.rejects(insert(startsAt, endsAt), (err: unknown) => {
+      const cause = (err as { cause?: { constraint?: string } }).cause ?? err;
+      assert.equal((cause as { constraint?: string }).constraint, 'bookings_on_half_hour_grid');
+      return true;
+    });
   }
 });
 
@@ -361,7 +498,7 @@ test("the staff bell lists bookings guests made online, not the desk's own", asy
   const headers = { 'x-admin-token': 'test-admin-token' };
   const tuesday = nextDate(2);
   const askedFrom = new Date(Date.now() - 1000).toISOString();
-  const slot = { date: tuesday, durationHours: 1, startHour: 18 };
+  const slot = { date: tuesday, durationMinutes: 60, startMinute: 18 * 60 };
 
   const online = await app.inject({
     method: 'POST',
@@ -417,8 +554,8 @@ test('admin stats, bookings and customers respond with data', async () => {
     payload: {
       tableId: 3,
       date: nextDate(6),
-      startHour: 17,
-      durationHours: 2,
+      startMinute: 17 * 60,
+      durationMinutes: 120,
       customerName: 'Admin Test',
       customerPhone: '+48 700 800 900',
       items: [{ foodItemId: 1, quantity: 2 }]
@@ -435,8 +572,8 @@ test('admin stats, bookings and customers respond with data', async () => {
     payload: {
       tableId: TABLE_12FT_ID,
       date: nextDate(6),
-      startHour: 17,
-      durationHours: 2,
+      startMinute: 17 * 60,
+      durationMinutes: 120,
       customerName: 'Admin Test 12ft',
       customerPhone: '+48 700 800 901'
     }
@@ -502,8 +639,8 @@ test('websocket subscribers hear availability changes', async () => {
     payload: {
       tableId: 5,
       date: SATURDAY,
-      startHour: 18,
-      durationHours: 1,
+      startMinute: 18 * 60,
+      durationMinutes: 60,
       customerName: 'WS Test',
       customerPhone: '+48 111 222 333'
     }
@@ -605,8 +742,8 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
     payload: {
       tableId: 4,
       date: MONDAY,
-      startHour: 16,
-      durationHours: 2,
+      startMinute: 16 * 60,
+      durationMinutes: 120,
       customerName: 'One Card',
       customerPhone: '+48 111 000 111',
       sportCardCount: 1
@@ -625,8 +762,8 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
     payload: {
       tableId: 4,
       date: MONDAY,
-      startHour: 18,
-      durationHours: 3,
+      startMinute: 18 * 60,
+      durationMinutes: 180,
       customerName: 'Two Cards',
       customerPhone: '+48 222 000 222',
       sportCardCount: 2
@@ -645,8 +782,8 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
     payload: {
       tableId: TABLE_12FT_ID,
       date: MONDAY,
-      startHour: 16,
-      durationHours: 4,
+      startMinute: 16 * 60,
+      durationMinutes: 240,
       customerName: 'Twelve Foot',
       customerPhone: '+48 555 000 555',
       sportCardCount: 4
@@ -666,8 +803,8 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
     payload: {
       tableId: DARTBOARD_ID,
       date: MONDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Darts Pair',
       customerPhone: '+48 444 000 444',
       sportCardCount: 2
@@ -681,14 +818,15 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
   assert.equal(dartsDto.discountGrosz, DARTS_HOUR);
   assert.equal(dartsDto.totalGrosz, 0);
 
-  // Extending uncaps a clipped discount: 2 cards = 30 zł, now under a 2h rental
+  // Extending uncaps a clipped discount: 2 cards = 30 zł, now under a 45 zł 1:30 rental
   const extended = await app.inject({
     method: 'POST',
     url: `/api/bookings/${dartsDto.id}/extend`,
     headers: { 'x-booking-token': dartsDto.manageToken },
-    payload: { additionalHours: 1 }
+    payload: { additionalMinutes: 30 }
   });
   assert.equal(extended.statusCode, 200);
+  assert.equal(extended.json().tableTotalGrosz, 1.5 * DARTS_HOUR);
   assert.equal(extended.json().discountGrosz, 2 * SPORT_CARD_DISCOUNT_GROSZ);
 
   // No cards declared — no discount
@@ -698,8 +836,8 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
     payload: {
       tableId: 5,
       date: MONDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Guest',
       customerPhone: '+48 333 000 333'
     }
@@ -716,8 +854,8 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
     payload: {
       tableId: 2,
       date: MONDAY,
-      startHour: 19,
-      durationHours: 1,
+      startMinute: 19 * 60,
+      durationMinutes: 60,
       customerName: 'Too Many',
       customerPhone: '+48 555 000 555',
       sportCardCount: 99
@@ -760,8 +898,8 @@ test('admin CRM: create walk-in booking, staff cancel, analytics, menu patch', a
     payload: {
       tableId: 2,
       date: SATURDAY,
-      startHour: 20,
-      durationHours: 1,
+      startMinute: 20 * 60,
+      durationMinutes: 60,
       customerName: 'Walk In',
       customerPhone: '+48 444 555 666'
     }
@@ -1263,8 +1401,8 @@ test('phones are validated and normalized to E.164', async () => {
     payload: {
       tableId: 5,
       date: MONDAY,
-      startHour: 17,
-      durationHours: 1,
+      startMinute: 17 * 60,
+      durationMinutes: 60,
       customerName: 'Bad Phone',
       customerPhone: '12345'
     }
@@ -1279,8 +1417,8 @@ test('phones are validated and normalized to E.164', async () => {
     payload: {
       tableId: 5,
       date: MONDAY,
-      startHour: 17,
-      durationHours: 1,
+      startMinute: 17 * 60,
+      durationMinutes: 60,
       customerName: 'National Format',
       customerPhone: '601 234 567'
     }
@@ -1295,8 +1433,8 @@ test('phones are validated and normalized to E.164', async () => {
     payload: {
       tableId: 5,
       date: MONDAY,
-      startHour: 18,
-      durationHours: 1,
+      startMinute: 18 * 60,
+      durationMinutes: 60,
       customerName: 'UA Guest',
       customerPhone: '+380 67 123 45 67'
     }
@@ -1334,8 +1472,8 @@ test('guest phone lookup returns only active bookings and normalizes the query',
     payload: {
       tableId: 3,
       date: MONDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Lookup Guest',
       customerPhone: '+48 512 100 100'
     }
@@ -1420,8 +1558,8 @@ test('out-of-range input is a clean 4xx, never a 500', async () => {
     payload: {
       tableId: 1,
       date: SATURDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Overflow',
       customerPhone: '+48 601 000 111',
       items: [{ foodItemId: 3_000_000_000, quantity: 1 }]
@@ -1465,8 +1603,8 @@ test('out-of-range input is a clean 4xx, never a 500', async () => {
     payload: {
       tableId: 2,
       date: SATURDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: '   ',
       customerPhone: '+48 601 000 112'
     }
@@ -1477,7 +1615,7 @@ test('out-of-range input is a clean 4xx, never a 500', async () => {
 
 test('failed create with an unknown food item leaves no phantom booking', async () => {
   const ip = { 'x-forwarded-for': '198.51.100.3' };
-  const slot = { tableId: 3, date: MONDAY, startHour: 17, durationHours: 1 };
+  const slot = { tableId: 3, date: MONDAY, startMinute: 17 * 60, durationMinutes: 60 };
 
   const bad = await app.inject({
     method: 'POST',
@@ -1512,8 +1650,8 @@ test('extend colliding with a later booking on the same table returns 409', asyn
     payload: {
       tableId: 3,
       date: MONDAY,
-      startHour: 18,
-      durationHours: 1,
+      startMinute: 18 * 60,
+      durationMinutes: 60,
       customerName: 'Extend A',
       customerPhone: '+48 512 300 300'
     }
@@ -1530,33 +1668,34 @@ test('extend colliding with a later booking on the same table returns 409', asyn
     payload: {
       tableId: 3,
       date: MONDAY,
-      startHour: 20,
-      durationHours: 1,
+      startMinute: 20 * 60,
+      durationMinutes: 60,
       customerName: 'Extend B',
       customerPhone: '+48 512 300 301'
     }
   });
   assert.equal(later.statusCode, 201);
 
-  // Extending the first to 18–21 overlaps the 20–21 booking → EXCLUDE fires
-  const collide = await app.inject({
-    method: 'POST',
-    url: `/api/bookings/${firstId}/extend`,
-    headers: { ...ip, ...firstManage },
-    payload: { additionalHours: 2 }
-  });
+  const extendFirst = () =>
+    app.inject({
+      method: 'POST',
+      url: `/api/bookings/${firstId}/extend`,
+      headers: { ...ip, ...firstManage },
+      payload: { additionalMinutes: 30 }
+    });
+
+  // Half an hour at a time into the free gap: 18–19:30, then 18–20
+  const ok = await extendFirst();
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.json().tableTotalGrosz, 1.5 * BILLIARD_HOUR);
+  const again = await extendFirst();
+  assert.equal(again.statusCode, 200);
+  assert.equal(again.json().tableTotalGrosz, 2 * BILLIARD_HOUR);
+
+  // One more would overlap the 20–21 booking → EXCLUDE fires, nothing changes
+  const collide = await extendFirst();
   assert.equal(collide.statusCode, 409);
   assert.equal(collide.json().error, 'slot_taken');
-
-  // Extending into the free gap (18–20) still succeeds
-  const ok = await app.inject({
-    method: 'POST',
-    url: `/api/bookings/${firstId}/extend`,
-    headers: { ...ip, ...firstManage },
-    payload: { additionalHours: 1 }
-  });
-  assert.equal(ok.statusCode, 200);
-  assert.equal(ok.json().tableTotalGrosz, 2 * BILLIARD_HOUR);
 });
 
 test('bookings in the past are rejected on public and admin create', async () => {
@@ -1570,8 +1709,8 @@ test('bookings in the past are rejected on public and admin create', async () =>
     payload: {
       tableId: 1,
       date: lastMonday,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Past',
       customerPhone: '+48 512 400 400'
     }
@@ -1586,8 +1725,8 @@ test('bookings in the past are rejected on public and admin create', async () =>
     payload: {
       tableId: 1,
       date: lastMonday,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Past Admin',
       customerPhone: '+48 512 400 401'
     }
@@ -1599,15 +1738,18 @@ test('bookings in the past are rejected on public and admin create', async () =>
 test('active booking: public cancel is rejected, admin cancel succeeds', async () => {
   const ip = { 'x-forwarded-for': '198.51.100.6' };
   const { db, pool } = createDb(TEST_URL);
-  const now = Date.now();
+  // On the half-hour grid, like everything the API writes: the slot that is
+  // under way now, for two hours
+  const SLOT = 30 * 60_000;
+  const slotStart = Math.floor(Date.now() / SLOT) * SLOT;
   const [row] = await db
     .insert(bookings)
     .values({
       tableId: 1,
       customerName: 'Active Now',
       customerPhone: '+48512500500',
-      startsAt: new Date(now - 30 * 60_000),
-      endsAt: new Date(now + 90 * 60_000),
+      startsAt: new Date(slotStart),
+      endsAt: new Date(slotStart + 4 * SLOT),
       // Written straight to the table, so the rate the API would have locked in
       // has to be supplied here too
       hourlyRateGrosz: BILLIARD_HOUR
@@ -1675,8 +1817,8 @@ test('auth-disabled mode: auth/admin return 503 but guest booking still works', 
       payload: {
         tableId: 1,
         date: SATURDAY,
-        startHour: 15,
-        durationHours: 1,
+        startMinute: 15 * 60,
+        durationMinutes: 60,
         customerName: 'No Auth Guest',
         customerPhone: '+48600000011'
       }
@@ -1832,8 +1974,8 @@ test('booking on a DST fall-back date computes correct Warsaw instants', async (
     payload: {
       tableId: 1,
       date,
-      startHour: 15,
-      durationHours: 2,
+      startMinute: 15 * 60,
+      durationMinutes: 120,
       customerName: 'DST Guest',
       customerPhone: '+48512600600'
     }
@@ -1853,8 +1995,8 @@ test('guests book at most 14 days ahead and hold at most 3 upcoming bookings per
       payload: {
         tableId,
         date,
-        startHour: 20,
-        durationHours: 1,
+        startMinute: 20 * 60,
+        durationMinutes: 60,
         customerName: 'Limit Guest',
         customerPhone: phone
       }
@@ -1956,8 +2098,8 @@ test('the public forms need a solved bot check once Turnstile is configured', as
         payload: {
           tableId: 1,
           date: MONDAY,
-          startHour: 18,
-          durationHours: 1,
+          startMinute: 18 * 60,
+          durationMinutes: 60,
           customerName: 'Bot Check',
           customerPhone: '+48 602 111 336'
         }
@@ -2024,8 +2166,8 @@ test('public booking creation is limited per IP', async () => {
         payload: {
           tableId: 1,
           date: MONDAY,
-          startHour: 3,
-          durationHours: 1,
+          startMinute: 3 * 60,
+          durationMinutes: 60,
           customerName: 'X',
           customerPhone: '+48 602 111 335'
         }
@@ -2460,8 +2602,8 @@ test('admin edits a booking: duration, table, customer, cards, restore', async (
     payload: {
       tableId: TABLE_12FT_ID,
       date: SATURDAY,
-      startHour: 15,
-      durationHours: 1,
+      startMinute: 15 * 60,
+      durationMinutes: 60,
       customerName: 'Phone Caller',
       customerPhone: '+48512700700'
     }
@@ -2475,7 +2617,7 @@ test('admin edits a booking: duration, table, customer, cards, restore', async (
     method: 'PATCH',
     url: `/api/admin/bookings/${id}`,
     headers,
-    payload: { durationHours: 2 }
+    payload: { durationMinutes: 120 }
   });
   assert.equal(longer.statusCode, 200);
   assert.equal(spanHours(longer.json()), 2);
@@ -2487,7 +2629,7 @@ test('admin edits a booking: duration, table, customer, cards, restore', async (
     method: 'PATCH',
     url: `/api/admin/bookings/${id}`,
     headers,
-    payload: { startHour: 18, tableId: TABLE_12FT_ID + 1 }
+    payload: { startMinute: 18 * 60, tableId: TABLE_12FT_ID + 1 }
   });
   assert.equal(moved.statusCode, 200);
   assert.equal(moved.json().tableId, TABLE_12FT_ID + 1);
@@ -2527,7 +2669,7 @@ test('admin edits a booking: duration, table, customer, cards, restore', async (
     method: 'PATCH',
     url: `/api/admin/bookings/${id}`,
     headers,
-    payload: { startHour: 22 }
+    payload: { startMinute: 22 * 60 }
   });
   assert.equal(tooLate.statusCode, 422);
   assert.equal(tooLate.json().error, 'outside_operating_hours');
@@ -2548,8 +2690,8 @@ test('admin edits a booking: duration, table, customer, cards, restore', async (
     payload: {
       tableId: TABLE_12FT_ID + 2,
       date: SATURDAY,
-      startHour: 18,
-      durationHours: 2,
+      startMinute: 18 * 60,
+      durationMinutes: 120,
       customerName: 'Neighbour',
       customerPhone: '+48512700702'
     }
@@ -2590,8 +2732,8 @@ test('admin runs the food tab: add lines, fix a quantity, strike one', async () 
     payload: {
       tableId: TABLE_12FT_ID + 3,
       date: SATURDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Tab Runner',
       customerPhone: '+48512700800'
     }
@@ -2697,7 +2839,7 @@ test('venue config is public, editable by staff, and drives the window rules', a
     url: `/api/availability?date=${MONDAY}`
   });
   assert.equal(availability.json().open, 15);
-  assert.equal(availability.json().tables[0].slots[0].hour, 15);
+  assert.equal(availability.json().tables[0].slots[0].startMinute, 15 * 60);
 
   // A booking in the newly opened hour is now accepted where it would have been
   // outside_operating_hours a moment ago
@@ -2708,8 +2850,8 @@ test('venue config is public, editable by staff, and drives the window rules', a
     payload: {
       tableId: 2,
       date: MONDAY,
-      startHour: 15,
-      durationHours: 1,
+      startMinute: 15 * 60,
+      durationMinutes: 60,
       customerName: 'Early Bird',
       customerPhone: '+48512900900'
     }
@@ -2781,8 +2923,8 @@ test('a day closed in the config takes no bookings', async () => {
     payload: {
       tableId: 1,
       date: wednesday,
-      startHour: 18,
-      durationHours: 1,
+      startMinute: 18 * 60,
+      durationMinutes: 60,
       customerName: 'Closed Day',
       customerPhone: '+48512901000'
     }
@@ -2809,8 +2951,8 @@ test('game choice: 9ft tables take either, 12ft is pyramid-only, dartboards take
     payload: {
       tableId: 2,
       date: SATURDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Pool Player',
       customerPhone: '+48512800100',
       game: 'pool'
@@ -2829,8 +2971,8 @@ test('game choice: 9ft tables take either, 12ft is pyramid-only, dartboards take
     payload: {
       tableId: 3,
       date: SATURDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'No Preference',
       customerPhone: '+48512800101'
     }
@@ -2846,8 +2988,8 @@ test('game choice: 9ft tables take either, 12ft is pyramid-only, dartboards take
     payload: {
       tableId: TABLE_12FT_ID,
       date: SATURDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Pool On 12ft',
       customerPhone: '+48512800102',
       game: 'pool'
@@ -2864,8 +3006,8 @@ test('game choice: 9ft tables take either, 12ft is pyramid-only, dartboards take
     payload: {
       tableId: DARTBOARD_ID,
       date: SATURDAY,
-      startHour: 16,
-      durationHours: 1,
+      startMinute: 16 * 60,
+      durationMinutes: 60,
       customerName: 'Darts Player',
       customerPhone: '+48512800103'
     }
@@ -2880,8 +3022,8 @@ test('game choice: 9ft tables take either, 12ft is pyramid-only, dartboards take
     payload: {
       tableId: DARTBOARD_ID,
       date: SATURDAY,
-      startHour: 18,
-      durationHours: 1,
+      startMinute: 18 * 60,
+      durationMinutes: 60,
       customerName: 'Darts Pool',
       customerPhone: '+48512800104',
       game: 'pool'
@@ -2900,8 +3042,8 @@ test('staff edit the game, and a move to a 12ft table settles it to pyramid', as
     payload: {
       tableId: 4,
       date: SATURDAY,
-      startHour: 20,
-      durationHours: 1,
+      startMinute: 20 * 60,
+      durationMinutes: 60,
       customerName: 'Walk In',
       customerPhone: '+48512800200',
       game: 'pool'
@@ -2933,7 +3075,7 @@ test('staff edit the game, and a move to a 12ft table settles it to pyramid', as
     method: 'PATCH',
     url: `/api/admin/bookings/${id}`,
     headers,
-    payload: { durationHours: 2 }
+    payload: { durationMinutes: 120 }
   });
   assert.equal(longer.statusCode, 200);
   assert.equal(longer.json().game, 'pool');
@@ -2944,7 +3086,7 @@ test('staff edit the game, and a move to a 12ft table settles it to pyramid', as
     method: 'PATCH',
     url: `/api/admin/bookings/${id}`,
     headers,
-    payload: { tableId: TABLE_12FT_ID + 1, startHour: 20 }
+    payload: { tableId: TABLE_12FT_ID + 1, startMinute: 20 * 60 }
   });
   assert.equal(moved.statusCode, 200);
   assert.equal(moved.json().tableId, TABLE_12FT_ID + 1);
@@ -2981,8 +3123,8 @@ test('a signed-in guest manages their own bookings from any device, others canno
     payload: {
       tableId: 5,
       date: nextDate(2),
-      startHour: 20,
-      durationHours: 1,
+      startMinute: 20 * 60,
+      durationMinutes: 60,
       customerName: 'Owner',
       customerPhone: '+48 602 900 100'
     }
@@ -3179,8 +3321,8 @@ test('black list: a no-show blocks online booking, frees the slot, staff can for
   const booking = {
     tableId: 3,
     date: WEDNESDAY,
-    startHour: 17,
-    durationHours: 1,
+    startMinute: 17 * 60,
+    durationMinutes: 60,
     customerName: 'Ghost Guest',
     customerPhone: '+48 512 971 971'
   };
@@ -3259,7 +3401,7 @@ test('black list: a no-show blocks online booking, frees the slot, staff can for
     method: 'POST',
     url: '/api/bookings',
     headers: guestHeaders,
-    payload: { ...booking, startHour: 19 }
+    payload: { ...booking, startMinute: 19 * 60 }
   });
   assert.equal(again.statusCode, 201, again.body);
 });
@@ -3335,8 +3477,8 @@ test('closures: refused over bookings, close slots, block every way of booking i
     payload: {
       tableId: 2,
       date: SUNDAY,
-      startHour: 17,
-      durationHours: 2,
+      startMinute: 17 * 60,
+      durationMinutes: 120,
       customerName: 'Closure Guest',
       customerPhone: '+48601555001'
     }
@@ -3392,7 +3534,11 @@ test('closures: refused over bookings, close slots, block every way of booking i
     avail
       .json()
       .tables.find((t: { tableId: number }) => t.tableId === id)
-      .slots.filter((s: { hour: number }) => s.hour >= 17 && s.hour <= 21);
+      // The slots on the hour, 17:00 … 21:00
+      .slots.filter(
+        (s: { startMinute: number }) =>
+          s.startMinute % 60 === 0 && s.startMinute >= 17 * 60 && s.startMinute <= 21 * 60
+      );
   assert.deepEqual(
     slotsOf(4).map((s: { closed: boolean; available: boolean }) => [s.closed, s.available]),
     [
@@ -3412,8 +3558,8 @@ test('closures: refused over bookings, close slots, block every way of booking i
     payload: {
       tableId: 4,
       date: SUNDAY,
-      startHour: 17,
-      durationHours: 2,
+      startMinute: 17 * 60,
+      durationMinutes: 120,
       customerName: 'Too Late',
       customerPhone: '+48601555002'
     }
@@ -3427,8 +3573,8 @@ test('closures: refused over bookings, close slots, block every way of booking i
     payload: {
       tableId: 4,
       date: SUNDAY,
-      startHour: 20,
-      durationHours: 1,
+      startMinute: 20 * 60,
+      durationMinutes: 60,
       customerName: 'Desk',
       customerPhone: '+48601555003'
     }
@@ -3497,21 +3643,18 @@ test('closures: refused over bookings, close slots, block every way of booking i
 
   // The guest can't stretch the game into it: 19–20 is free, 20–21 is not
   const manage = { 'x-booking-token': booking.manageToken };
-  const stretched = await app.inject({
-    method: 'POST',
-    url: `/api/bookings/${booking.id}/extend`,
-    headers: manage,
-    payload: { additionalHours: 2 }
-  });
+  const stretch = () =>
+    app.inject({
+      method: 'POST',
+      url: `/api/bookings/${booking.id}/extend`,
+      headers: manage,
+      payload: { additionalMinutes: 30 }
+    });
+  assert.equal((await stretch()).statusCode, 200); // to 19:30
+  assert.equal((await stretch()).statusCode, 200); // to 20:00
+  const stretched = await stretch();
   assert.equal(stretched.statusCode, 409);
   assert.equal(stretched.json().error, 'slot_closed');
-  const oneMore = await app.inject({
-    method: 'POST',
-    url: `/api/bookings/${booking.id}/extend`,
-    headers: manage,
-    payload: { additionalHours: 1 }
-  });
-  assert.equal(oneMore.statusCode, 200);
 
   // Opening again
   for (const id of [clubClosure.id, table4Closure.id]) {

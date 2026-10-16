@@ -1,23 +1,25 @@
 import { useState } from 'react';
 import { Button, Modal } from '@heroui/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { BookingDto } from '@repo/shared';
+import { EXTEND_STEP_MINUTES, type BookingDto } from '@repo/shared';
 import { api } from '../../lib/api';
+import { bookingMinutes, formatClock } from '../../lib/format';
 import { bookingQuery } from '../../lib/queries';
 import { m } from '../../paraglide/messages.js';
 import { isStaleBookingError, mutationErrorText } from './phase';
 
-export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxExtend: number }) {
+/**
+ * Half an hour more per confirmation — the one step the club sells. After it
+ * the button is back on the booking page, so the guest extends again while
+ * the table stays free (the API refuses the half hour once it is taken).
+ */
+export function ExtendModal({ booking }: { booking: BookingDto }) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
-  const [hours, setHours] = useState(1);
-
-  // Clamp against the current remaining window: after a prior extend, maxExtend
-  // shrinks, and a stale `hours` would otherwise submit more than fits and 422.
-  const effectiveHours = Math.min(hours, maxExtend);
+  const newEnd = formatClock(bookingMinutes(booking).end + EXTEND_STEP_MINUTES);
 
   const extend = useMutation({
-    mutationFn: () => api.extendBooking(booking.id, effectiveHours),
+    mutationFn: () => api.extendBooking(booking.id),
     onSuccess: updated => {
       queryClient.setQueryData(bookingQuery(booking.id).queryKey, updated);
       setOpen(false);
@@ -35,7 +37,6 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
       <Button
         className="btn-gold h-12.5 w-full px-4 text-[15px]"
         onPress={() => {
-          setHours(1);
           extend.reset();
           setOpen(true);
         }}
@@ -47,22 +48,10 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
           <Modal.Dialog className="sm:max-w-90">
             <Modal.CloseTrigger />
             <Modal.Header>
-              <Modal.Heading>{m.extend_by()}</Modal.Heading>
+              <Modal.Heading>{m.extend_title()}</Modal.Heading>
             </Modal.Header>
             <Modal.Body>
-              <div className="flex flex-wrap gap-2">
-                {Array.from({ length: maxExtend }, (_, i) => i + 1).map(count => (
-                  <button
-                    key={count}
-                    type="button"
-                    aria-pressed={effectiveHours === count}
-                    onClick={() => setHours(count)}
-                    className="chip h-11 min-w-18 px-4"
-                  >
-                    {m.hours_n({ n: count })}
-                  </button>
-                ))}
-              </div>
+              <p className="text-[15px] text-cream-soft">{m.extend_until({ time: newEnd })}</p>
               <p className="mt-2 text-xs text-grey-cool">{m.err_past_closing()}</p>
               {extend.error ? (
                 <p className="mt-2 text-sm text-danger-soft-foreground">
@@ -76,7 +65,7 @@ export function ExtendModal({ booking, maxExtend }: { booking: BookingDto; maxEx
                 isPending={extend.isPending}
                 onPress={() => extend.mutate()}
               >
-                {m.extend()} · {m.hours_n({ n: effectiveHours })}
+                {m.extend()} · {m.extend_30m()}
               </Button>
             </Modal.Footer>
           </Modal.Dialog>

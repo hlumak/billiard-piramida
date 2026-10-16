@@ -4,12 +4,14 @@ import {
   hourlyRateGrosz,
   isIsoDate,
   isValidBookingWindow,
-  MAX_BOOKING_HOURS,
+  MAX_BOOKING_MINUTES,
   MAX_ORDER_ITEM_QUANTITY,
   MAX_SPORT_CARDS_PER_BOOKING,
   MAX_SPOT_ID,
-  MIN_BOOKING_HOURS,
+  MIN_BOOKING_MINUTES,
   defaultGameFor,
+  rentalGrosz,
+  SLOT_MINUTES,
   resolveBookingGame,
   type BilliardGame
 } from '@repo/shared';
@@ -26,7 +28,15 @@ import {
 } from '../lib/schemas.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
-import { HOUR_MS, warsawDateOf, warsawDayRange, warsawHourOf, warsawInstant } from '../lib/time.ts';
+import {
+  HOUR_MS,
+  minutesBetween,
+  MINUTE_MS,
+  warsawDateOf,
+  warsawDayRange,
+  warsawInstantAt,
+  warsawMinuteOf
+} from '../lib/time.ts';
 import { normalizePhone } from '@repo/shared/phone';
 import {
   insertOrderItems,
@@ -258,9 +268,19 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
           {
             tableId: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID })),
             date: Type.Optional(Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' })),
-            startHour: Type.Optional(Type.Integer({ minimum: 0, maximum: 23 })),
-            durationHours: Type.Optional(
-              Type.Integer({ minimum: MIN_BOOKING_HOURS, maximum: MAX_BOOKING_HOURS })
+            startMinute: Type.Optional(
+              Type.Integer({
+                minimum: 0,
+                maximum: 24 * 60 - SLOT_MINUTES,
+                multipleOf: SLOT_MINUTES
+              })
+            ),
+            durationMinutes: Type.Optional(
+              Type.Integer({
+                minimum: MIN_BOOKING_MINUTES,
+                maximum: MAX_BOOKING_MINUTES,
+                multipleOf: SLOT_MINUTES
+              })
             ),
             customerName: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })),
             customerPhone: Type.Optional(Type.String({ minLength: 5, maxLength: 25 })),
@@ -293,22 +313,21 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
 
       const previousDate = warsawDateOf(booking.startsAt);
       // Any one of the three may move; the other two hold their current value,
-      // so "just make it two hours" needs no date or hour from the caller.
+      // so "just make it two hours" needs no date or start from the caller.
       const date = patch.date ?? previousDate;
       if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
-      const startHour = patch.startHour ?? warsawHourOf(booking.startsAt);
-      const durationHours =
-        patch.durationHours ??
-        Math.round((booking.endsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS);
+      const startMinute = patch.startMinute ?? warsawMinuteOf(booking.startsAt);
+      const durationMinutes =
+        patch.durationMinutes ?? minutesBetween(booking.startsAt, booking.endsAt);
       const { rates, hours } = await admin.venueConfig.get();
       // Only a change to when the booking runs is judged against today's
       // hours: correcting a name or phone on a booking that no longer fits
       // since staff moved closing time must still go through
       const timeChanged =
         patch.date !== undefined ||
-        patch.startHour !== undefined ||
-        patch.durationHours !== undefined;
-      if (timeChanged && !isValidBookingWindow(date, startHour, durationHours, hours)) {
+        patch.startMinute !== undefined ||
+        patch.durationMinutes !== undefined;
+      if (timeChanged && !isValidBookingWindow(date, startMinute, durationMinutes, hours)) {
         return reply.code(422).send({ error: 'outside_operating_hours' });
       }
 
@@ -344,9 +363,12 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
       // Cards and duration both feed the cap, so the discount is recomputed
       // whenever either could have moved — same rule as extend.
       const sportCardCount = patch.sportCardCount ?? booking.sportCardCount;
-      const startsAt = warsawInstant(date, startHour);
-      const endsAt = new Date(startsAt.getTime() + durationHours * HOUR_MS);
-      const discountGrosz = discountGroszFor(sportCardCount, hourlyRate * durationHours);
+      const startsAt = warsawInstantAt(date, startMinute);
+      const endsAt = new Date(startsAt.getTime() + durationMinutes * MINUTE_MS);
+      const discountGrosz = discountGroszFor(
+        sportCardCount,
+        rentalGrosz(hourlyRate, durationMinutes)
+      );
 
       // Moving it, or bringing it back, must not land it in a closed time;
       // a new name or phone on it is not judged at all

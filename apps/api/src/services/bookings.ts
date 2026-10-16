@@ -1,10 +1,16 @@
 import assert from 'node:assert';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import type { BookingDto, BookingPhase, BookingStatus, NewOrderItem } from '@repo/shared';
+import {
+  rentalGrosz,
+  type BookingDto,
+  type BookingPhase,
+  type BookingStatus,
+  type NewOrderItem
+} from '@repo/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.ts';
 import { bookings, foodItems, orderItems, tables } from '../db/schema.ts';
-import { HOUR_MS } from '../lib/time.ts';
+import { minutesBetween } from '../lib/time.ts';
 
 /** A fresh manage secret (256 bits) and the hash that is stored in its place. */
 export function createManageToken(): { token: string; hash: string } {
@@ -52,12 +58,12 @@ function composeDto(
   items: BookingDto['items'],
   now: Date
 ): BookingDto {
-  const durationHours = Math.round(
-    (booking.endsAt.getTime() - booking.startsAt.getTime()) / HOUR_MS
-  );
   // The rate locked onto the row, never today's — repricing the club leaves
   // every existing receipt exactly as it was quoted.
-  const tableTotalGrosz = booking.hourlyRateGrosz * durationHours;
+  const tableTotalGrosz = rentalGrosz(
+    booking.hourlyRateGrosz,
+    minutesBetween(booking.startsAt, booking.endsAt)
+  );
   const foodTotalGrosz = items.reduce((sum, i) => sum + i.quantity * i.unitPriceGrosz, 0);
   return {
     id: booking.id,

@@ -2,9 +2,16 @@ import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { MapPin, Phone } from 'lucide-react';
-import { formatPln, hoursForDate, MAX_BOOKING_HOURS, sizeOf, type BookingDto } from '@repo/shared';
+import {
+  EXTEND_STEP_MINUTES,
+  formatPln,
+  hoursForDate,
+  MAX_BOOKING_MINUTES,
+  sizeOf,
+  type BookingDto
+} from '@repo/shared';
 import { useVenueConfig } from '../../lib/venue-config';
-import { bookingHours, formatDayLong, intlTag, warsawDate, warsawTime } from '../../lib/format';
+import { bookingMinutes, formatDayLong, intlTag, warsawDate, warsawTime } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { spotDescription, spotRentalLabel } from '../../lib/spots';
 import { VENUE } from '../../lib/venue';
@@ -36,13 +43,14 @@ export function BookingDetails({
   const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
 
   const date = warsawDate(booking.startsAt);
-  const closeHour = hoursForDate(date, useVenueConfig().hours).close;
-  const { start, end } = bookingHours(booking);
-  // Up to closing time, and never past the longest booking the API accepts
-  const maxExtend =
-    booking.status === 'confirmed'
-      ? Math.max(0, Math.min(closeHour - end, MAX_BOOKING_HOURS - (end - start)))
-      : 0;
+  const closeMinute = hoursForDate(date, useVenueConfig().hours).close * 60;
+  const { start, end } = bookingMinutes(booking);
+  // Half an hour more must still end by closing time and stay within the
+  // longest booking the API accepts; whether the table is free then, the API says
+  const canExtend =
+    booking.status === 'confirmed' &&
+    end + EXTEND_STEP_MINUTES <= closeMinute &&
+    end - start + EXTEND_STEP_MINUTES <= MAX_BOOKING_MINUTES;
 
   const canManage = booking.phase === 'upcoming' || booking.phase === 'active';
   const celebrate = justCreated && booking.phase !== 'cancelled';
@@ -125,7 +133,7 @@ export function BookingDetails({
 
           {canManage ? (
             <div className="mt-6.5 grid gap-3 border-t border-line pt-5.5 sm:auto-cols-fr sm:grid-flow-col">
-              {maxExtend > 0 ? <ExtendModal booking={booking} maxExtend={maxExtend} /> : null}
+              {canExtend ? <ExtendModal booking={booking} /> : null}
               <AddFoodModal booking={booking} />
               {booking.phase === 'upcoming' ? <CancelModal booking={booking} /> : null}
             </div>

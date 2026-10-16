@@ -5,6 +5,7 @@ import {
   hourlyRateGrosz,
   DEFAULT_HOURLY_RATE_GROSZ,
   MAX_SPORT_CARDS_PER_BOOKING,
+  rentalGrosz,
   spotPriceGrosz,
   SPORT_CARD_DISCOUNT_GROSZ,
   type RateTable
@@ -26,9 +27,18 @@ test('rates are per rate tier, and billiard tiers split by cloth size', () => {
   assert.equal(DEFAULT_HOURLY_RATE_GROSZ['9ft'], 50_00);
   assert.equal(DEFAULT_HOURLY_RATE_GROSZ['12ft'], 70_00);
   assert.equal(dartsHour, 30_00);
-  assert.equal(spotPriceGrosz(table9ft, 3, RATES), 150_00);
-  assert.equal(spotPriceGrosz(table12ft, 3, RATES), 210_00);
-  assert.equal(spotPriceGrosz(dartboard, 2, RATES), 60_00);
+  assert.equal(spotPriceGrosz(table9ft, 3 * 60, RATES), 150_00);
+  assert.equal(spotPriceGrosz(table12ft, 3 * 60, RATES), 210_00);
+  assert.equal(spotPriceGrosz(dartboard, 2 * 60, RATES), 60_00);
+});
+
+test('a half hour bills half the hourly rate', () => {
+  assert.equal(spotPriceGrosz(table9ft, 90, RATES), 75_00); // 1:30 on a 50 zł table
+  assert.equal(spotPriceGrosz(table12ft, 150, RATES), 175_00); // 2:30 at 70 zł
+  assert.equal(spotPriceGrosz(dartboard, 90, RATES), 45_00);
+  // An odd rate in grosze rounds to a whole grosz instead of leaving half of one
+  assert.equal(rentalGrosz(49_99, 90), 74_99);
+  assert.equal(rentalGrosz(49_99, 30), 25_00);
 });
 
 test('the venue bills tables 1-5 at 9ft and 6-9 at 12ft', () => {
@@ -67,7 +77,7 @@ test('non-counts are treated as no card', () => {
 });
 
 test('each card takes a flat amount off, and they stack', () => {
-  const threeHours = spotPriceGrosz(table9ft, 3, RATES);
+  const threeHours = spotPriceGrosz(table9ft, 3 * 60, RATES);
   assert.equal(discountGroszFor(1, threeHours), SPORT_CARD_DISCOUNT_GROSZ);
   assert.equal(discountGroszFor(2, threeHours), 2 * SPORT_CARD_DISCOUNT_GROSZ);
 });
@@ -77,7 +87,7 @@ test('policy examples', () => {
   assert.equal(billiardHour - discountGroszFor(1, billiardHour), 35_00);
   // The owner's worked example: four players with a card each take a 9ft table
   // for four hours — 4 × 50 = 200, less 4 × 15, so 140, i.e. 35 each.
-  const fourHours = spotPriceGrosz(table9ft, 4, RATES);
+  const fourHours = spotPriceGrosz(table9ft, 4 * 60, RATES);
   assert.equal(fourHours - discountGroszFor(4, fourHours), 140_00);
   // One darts hour, one card: 30 − 15 = 15 PLN
   assert.equal(dartsHour - discountGroszFor(1, dartsHour), 15_00);
@@ -103,9 +113,9 @@ test('a repriced table bills at the new rate, the others are untouched', () => {
   const repriced: RateTable = { ...DEFAULT_HOURLY_RATE_GROSZ, '9ft': 60_00 };
 
   assert.equal(hourlyRateGrosz(table9ft, repriced), 60_00);
-  assert.equal(spotPriceGrosz(table9ft, 3, repriced), 180_00);
+  assert.equal(spotPriceGrosz(table9ft, 3 * 60, repriced), 180_00);
   assert.equal(hourlyRateGrosz(table12ft, repriced), DEFAULT_HOURLY_RATE_GROSZ['12ft']);
   assert.equal(hourlyRateGrosz(dartboard, repriced), DEFAULT_HOURLY_RATE_GROSZ.darts);
   // The discount cap follows the new rental, not the old one
-  assert.equal(discountGroszFor(9, spotPriceGrosz(dartboard, 1, repriced)), 30_00);
+  assert.equal(discountGroszFor(9, spotPriceGrosz(dartboard, 1 * 60, repriced)), 30_00);
 });

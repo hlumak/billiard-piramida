@@ -10,8 +10,8 @@ import { ApiError } from '../../lib/api';
 /** All picks made in earlier steps — non-null by construction (see book.tsx). */
 export interface BookingDraft {
   date: IsoDate;
-  startHour: number;
-  durationHours: number;
+  startMinute: number;
+  durationMinutes: number;
   tableId: number;
   kind: ActivityKind;
   tableLabel: string;

@@ -19,8 +19,8 @@ const fries: MenuItemDto = {
 
 const billiard: BookingDraft = {
   date: '2026-10-12',
-  startHour: 18,
-  durationHours: 2,
+  startMinute: 18 * 60 + 30,
+  durationMinutes: 90,
   tableId: 4,
   kind: 'billiard',
   tableLabel: '4',
@@ -42,8 +42,8 @@ test('the request carries the picks, trimmed contact details and the priced line
   );
   expect(request).toEqual({
     date: '2026-10-12',
-    startHour: 18,
-    durationHours: 2,
+    startMinute: 18 * 60 + 30,
+    durationMinutes: 90,
     tableId: 4,
     game: 'pool',
     customerName: 'Ola',
