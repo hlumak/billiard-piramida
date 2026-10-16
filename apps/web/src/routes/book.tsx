@@ -47,7 +47,7 @@ export const Route = createFileRoute('/book')({
     // Number(true) is 1, which would hand the wizard a start nobody picked
     const raw = search.start;
     const start =
-      typeof raw === 'number' || (typeof raw === 'string' && /^d{1,2}$/.test(raw))
+      typeof raw === 'number' || (typeof raw === 'string' && /^\d{1,2}$/.test(raw))
         ? Number(raw)
         : Number.NaN;
     return {
