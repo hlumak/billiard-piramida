@@ -262,6 +262,15 @@ body,
   min-height: 100%;
 }
 
+/* Nothing may widen the page sideways: an entrance that starts off to the
+   side (a wizard step, a card) would otherwise let a phone pan right onto a
+   bare green strip. `clip`, not `hidden`: carried to the viewport it still
+   scrolls vertically, and it never makes a scroll container, so sticky
+   headers keep working. Inner carousels scroll inside their own boxes. */
+html {
+  overflow-x: clip;
+}
+
 /* `scrollbar-gutter: stable` used to live here to stop centered pages shifting
  * when content height crosses the viewport (switching admin tabs). It was
  * removed: on classic-scrollbar platforms (Windows/Linux Chrome) it reserves a
@@ -635,8 +644,18 @@ html:has(dialog[open]) {
     animation: hero-zoom 1.8s cubic-bezier(0.2, 0, 0, 1) backwards;
   }
 
+  /* Slides in from the side only where it sits beside the hero (lg). On a
+     phone it spans the column, so a sideways start would stick out past the
+     screen edge — and Android Chrome keeps a page that was wider at load
+     pannable sideways — so there it rises like the rest of the column. */
   .anim-enter-right {
-    animation: enter-right 0.7s cubic-bezier(0.2, 0, 0, 1) backwards;
+    animation: fade-up-in 0.4s ease-out backwards;
+  }
+
+  @media (min-width: 64rem) {
+    .anim-enter-right {
+      animation: enter-right 0.7s cubic-bezier(0.2, 0, 0, 1) backwards;
+    }
   }
 
   .anim-bar-fill {
