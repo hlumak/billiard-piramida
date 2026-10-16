@@ -3741,3 +3741,150 @@ test('closures: whole days close every slot; nonsense is refused', async () => {
   const anonymous = await app.inject({ method: 'GET', url: '/api/admin/closures' });
   assert.equal(anonymous.statusCode, 401);
 });
+
+test('a night past midnight: book into the small hours, listed under the evening', async () => {
+  const headers = staff('198.51.100.40');
+  const published = await app.inject({ method: 'GET', url: '/api/venue-config' });
+  const { rates, hours: week } = published.json();
+  type Day = { open: number; close: number };
+  const thursday = nextDate(4);
+  const morningAfter = new Date(`${thursday}T00:00:00Z`);
+  morningAfter.setUTCDate(morningAfter.getUTCDate() + 1);
+  const friday = morningAfter.toISOString().slice(0, 10);
+  const save = (hours: Day[]) =>
+    app.inject({
+      method: 'PUT',
+      url: '/api/admin/venue-config',
+      headers,
+      payload: { rates, hours }
+    });
+  const withDays = (days: Record<number, Day>) =>
+    week.map((day: Day, weekday: number) => days[weekday] ?? day);
+
+  // Later than 02:00 is refused, and so is a night that runs into the next day's opening
+  assert.equal((await save(withDays({ 4: { open: 16, close: 27 } }))).statusCode, 400);
+  const clash = await save(withDays({ 4: { open: 16, close: 25 }, 5: { open: 0, close: 23 } }));
+  assert.equal(clash.statusCode, 422);
+  assert.equal(clash.json().error, 'invalid_hours');
+
+  // Thursday 16:00–01:00
+  const saved = await save(withDays({ 4: { open: 16, close: 25 } }));
+  assert.equal(saved.statusCode, 200);
+  assert.deepEqual(saved.json().hours[4], { open: 16, close: 25 });
+
+  // The grid runs on past midnight: the last half hour is 00:30–01:00
+  const avail = await app.inject({ method: 'GET', url: `/api/availability?date=${thursday}` });
+  assert.equal(avail.json().close, 25);
+  assert.equal(avail.json().tables[0].slots.at(-1).startMinute, 24 * 60 + 30);
+
+  // The desk books 23:30 for 1:30, across midnight, to 01:00 on Friday
+  const late = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: 3,
+      date: thursday,
+      startMinute: 23 * 60 + 30,
+      durationMinutes: 90,
+      customerName: 'Nocny Marek',
+      customerPhone: '+48512600600'
+    }
+  });
+  assert.equal(late.statusCode, 201);
+  const lateBooking = late.json();
+  assert.equal(lateBooking.tableTotalGrosz, 1.5 * BILLIARD_HOUR);
+  const warsaw = (instant: string) =>
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Warsaw',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    }).format(new Date(instant));
+  assert.equal(warsaw(lateBooking.startsAt), `${thursday}, 23:30`);
+  assert.equal(warsaw(lateBooking.endsAt), `${friday}, 01:00`);
+
+  // A guest takes the last start of the night, 00:00 for an hour…
+  const guest = (payload: Record<string, unknown>) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/bookings',
+      headers: { 'x-forwarded-for': '198.51.100.41' },
+      payload: {
+        date: thursday,
+        customerName: 'Nocna Ola',
+        customerPhone: '+48512600601',
+        ...payload
+      }
+    });
+  const midnight = await guest({ tableId: 4, startMinute: 24 * 60, durationMinutes: 60 });
+  assert.equal(midnight.statusCode, 201);
+  assert.equal(warsaw(midnight.json().startsAt), `${friday}, 00:00`);
+  // …but nothing that would end after 01:00
+  const tooLate = await guest({ tableId: 5, startMinute: 24 * 60 + 30, durationMinutes: 60 });
+  assert.equal(tooLate.statusCode, 422);
+  assert.equal(tooLate.json().error, 'outside_operating_hours');
+
+  // Neither can be stretched past closing time
+  const stretch = await app.inject({
+    method: 'POST',
+    url: `/api/bookings/${midnight.json().id}/extend`,
+    headers: {
+      'x-forwarded-for': '198.51.100.41',
+      'x-booking-token': midnight.json().manageToken
+    },
+    payload: { additionalMinutes: 30 }
+  });
+  assert.equal(stretch.statusCode, 422);
+  assert.equal(stretch.json().error, 'past_closing_time');
+  const longer = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${lateBooking.id}`,
+    headers,
+    payload: { durationMinutes: 120 }
+  });
+  assert.equal(longer.statusCode, 422);
+
+  // A new name keeps it where it was: Thursday night at 23:30
+  const renamed = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${lateBooking.id}`,
+    headers,
+    payload: { customerName: 'Nocny Marek K.' }
+  });
+  assert.equal(renamed.statusCode, 200);
+  assert.equal(renamed.json().startsAt, lateBooking.startsAt);
+  assert.equal(renamed.json().endsAt, lateBooking.endsAt);
+
+  // Both are on Thursday's list and grid; Friday's list has neither
+  const ids = async (date: string) =>
+    (await app.inject({ method: 'GET', url: `/api/admin/bookings?date=${date}`, headers }))
+      .json()
+      .map((b: { id: string }) => b.id);
+  const thursdayIds = await ids(thursday);
+  assert.ok(thursdayIds.includes(lateBooking.id));
+  assert.ok(thursdayIds.includes(midnight.json().id));
+  const fridayIds = await ids(friday);
+  assert.ok(!fridayIds.includes(lateBooking.id));
+  assert.ok(!fridayIds.includes(midnight.json().id));
+  const grid = await app.inject({ method: 'GET', url: `/api/availability?date=${thursday}` });
+  const table4 = grid.json().tables.find((t: { tableId: number }) => t.tableId === 4);
+  assert.equal(
+    table4.slots.find((s: { startMinute: number }) => s.startMinute === 24 * 60).booked,
+    true
+  );
+
+  // Back to the published week, the bookings out of the way
+  for (const id of [lateBooking.id, midnight.json().id]) {
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/api/admin/bookings/${id}/cancel`,
+      headers
+    });
+    assert.equal(cancelled.statusCode, 200);
+  }
+  assert.equal((await save(week)).statusCode, 200);
+});

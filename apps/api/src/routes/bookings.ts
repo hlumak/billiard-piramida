@@ -20,7 +20,7 @@ import {
   INT_ID,
   UUID
 } from '../lib/schemas.ts';
-import { minutesBetween, MINUTE_MS, warsawDateOf, warsawInstant } from '../lib/time.ts';
+import { clubDayOf, minutesBetween, MINUTE_MS, warsawInstantAt } from '../lib/time.ts';
 import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
 import {
   insertOrderItems,
@@ -230,9 +230,10 @@ export function bookingRoutes(
       if (newDurationMinutes > MAX_BOOKING_MINUTES) {
         return reply.code(422).send({ error: 'booking_too_long' });
       }
-      const bookingDate = warsawDateOf(booking.startsAt);
       const { hours } = await app.venueConfig.get();
-      const closesAt = warsawInstant(bookingDate, hoursForDate(bookingDate, hours).close);
+      // The club day it was booked on — after midnight on a late night, the evening before
+      const bookingDate = clubDayOf(booking.startsAt, hours).date;
+      const closesAt = warsawInstantAt(bookingDate, hoursForDate(bookingDate, hours).close * 60);
       if (newEndsAt.getTime() > closesAt.getTime()) {
         return reply.code(422).send({ error: 'past_closing_time' });
       }
@@ -313,7 +314,9 @@ export function bookingRoutes(
       }
 
       await app.db.update(bookings).set({ status: 'cancelled' }).where(eq(bookings.id, booking.id));
-      app.availabilityHub.notify(warsawDateOf(booking.startsAt));
+      app.availabilityHub.notify(
+        clubDayOf(booking.startsAt, (await app.venueConfig.get()).hours).date
+      );
       return mustLoadBookingDto(app.db, booking.id);
     }
   );

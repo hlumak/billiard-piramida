@@ -1,0 +1,1 @@
+ALTER TABLE "venue_hours" DROP CONSTRAINT "venue_hours_closes_range", ADD CONSTRAINT "venue_hours_closes_range" CHECK ("closes" between 0 and 26);

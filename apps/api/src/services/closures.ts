@@ -140,7 +140,8 @@ export async function findClosureConflicts(
 export function datesTouched(startsAt: Date, endsAt: Date): IsoDate[] {
   const last = warsawDateOf(new Date(endsAt.getTime() - 1));
   const dates: IsoDate[] = [];
-  for (let day = warsawDateOf(startsAt); day <= last; day = addDays(day, 1)) {
+  // From the day before: a closure in the small hours may fall on its late night
+  for (let day = addDays(warsawDateOf(startsAt), -1); day <= last; day = addDays(day, 1)) {
     dates.push(day);
     if (dates.length > MAX_CLOSURE_DAYS + 1) break;
   }

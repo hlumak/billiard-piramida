@@ -1,11 +1,11 @@
 import { Type } from 'typebox';
 import type { AvailabilityDto, TableAvailabilityDto } from '@repo/shared';
-import { hoursForDate, isIsoDate, SLOT_MINUTES } from '@repo/shared';
+import { hoursForDate, isIsoDate, MAX_BOOKING_MINUTES, SLOT_MINUTES } from '@repo/shared';
 import { and, eq, gt, gte, lt } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { AVAILABILITY_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
 import { loadClosuresBetween } from '../services/closures.ts';
-import { MINUTE_MS, warsawInstant, warsawInstantAt } from '../lib/time.ts';
+import { MINUTE_MS, warsawInstantAt } from '../lib/time.ts';
 import type { AppInstance } from '../app.ts';
 
 export function availabilityRoutes(app: AppInstance) {
@@ -26,8 +26,9 @@ export function availabilityRoutes(app: AppInstance) {
       }
 
       const { open, close } = hoursForDate(date, (await app.venueConfig.get()).hours);
-      const dayStart = warsawInstant(date, open);
-      const dayEnd = warsawInstant(date, close);
+      // close may be past midnight (25 = 01:00 the next morning)
+      const dayStart = warsawInstantAt(date, open * 60);
+      const dayEnd = warsawInstantAt(date, close * 60);
       const now = new Date();
 
       const [allTables, dayBookings, dayClosures] = await Promise.all([
@@ -42,10 +43,13 @@ export function availabilityRoutes(app: AppInstance) {
           .where(
             and(
               eq(bookings.status, 'confirmed'),
-              // Bookings never cross midnight, so nothing starting before the
-              // day's own midnight can reach into it: this lower bound lets the
-              // (status, starts_at) index scan one day instead of all history
-              gte(bookings.startsAt, warsawInstant(date, 0)),
+              // Nothing longer than the longest booking can reach into the day
+              // from before it: this lower bound lets the (status, starts_at)
+              // index scan one day instead of all history
+              gte(
+                bookings.startsAt,
+                new Date(dayStart.getTime() - MAX_BOOKING_MINUTES * MINUTE_MS)
+              ),
               lt(bookings.startsAt, dayEnd),
               gt(bookings.endsAt, dayStart)
             )
