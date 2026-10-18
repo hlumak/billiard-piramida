@@ -4,6 +4,8 @@
 #   docker compose --profile app up -d --build the whole site in containers:
 #                                              migrations, API, web, nginx on :8080
 # Values come from .env next to this file (see .env.example).
+# A server sets API_IMAGE / WEB_IMAGE to the images CI publishes and pulls
+# them instead of building (README, "Production").
 # Docker keeps a container's output forever by default (json-file, no cap):
 # rotate it, so the request logs, with visitor addresses in them, neither fill
 # the disk nor pile up for good. Up to 5 × 10 MB per service.
@@ -45,7 +47,7 @@ services:
     build:
       context: .
       target: api
-    image: piramida-api:local
+    image: ${API_IMAGE:-piramida-api:local}
     command: ['node', 'src/db/migrate.ts']
     environment:
       DATABASE_URL: *database-url
@@ -59,7 +61,7 @@ services:
 
   api:
     profiles: [app]
-    image: piramida-api:local
+    image: ${API_IMAGE:-piramida-api:local}
     restart: unless-stopped
     environment:
       DATABASE_URL: *database-url
@@ -92,7 +94,7 @@ services:
       args:
         VITE_SITE_URL: ${VITE_SITE_URL:-}
         VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
-    image: piramida-web:local
+    image: ${WEB_IMAGE:-piramida-web:local}
     restart: unless-stopped
     environment:
       # SSR talks to the API container directly, never back through nginx
