@@ -91,4 +91,4 @@ deploy can set `ROBOTS_DISALLOW_ALL=1`.
 ## Checks
 
 `pnpm lint` · `pnpm fmt:check` · `pnpm typecheck` · `pnpm test` (the API tests need
-the Postgres container) · `pnpm build` — all run in CI (`.github/workflows/ci.yml`).
+the Postgres container) · `pnpm build` — all run in CI (`.github/workflows/ci.yaml`).
