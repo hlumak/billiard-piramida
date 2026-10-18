@@ -2,75 +2,46 @@
   "version": "8",
   "dialect": "postgres",
   "id": "26e49ac6-2c27-458c-af63-4e413d9e6e2d",
-  "prevIds": [
-    "aa243aad-1fb2-45f0-bc9d-56cfa87df5b2"
-  ],
+  "prevIds": ["aa243aad-1fb2-45f0-bc9d-56cfa87df5b2"],
   "ddl": [
     {
-      "values": [
-        "billiard",
-        "darts"
-      ],
+      "values": ["billiard", "darts"],
       "name": "activity_kind",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": [
-        "pool",
-        "piramida"
-      ],
+      "values": ["pool", "piramida"],
       "name": "billiard_game",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": [
-        "no_show",
-        "manual"
-      ],
+      "values": ["no_show", "manual"],
       "name": "blacklist_reason",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": [
-        "confirmed",
-        "cancelled",
-        "no_show"
-      ],
+      "values": ["confirmed", "cancelled", "no_show"],
       "name": "booking_status",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": [
-        "multisport",
-        "medicover",
-        "fitprofit"
-      ],
+      "values": ["multisport", "medicover", "fitprofit"],
       "name": "sport_card_type",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": [
-        "pending",
-        "confirmed",
-        "cancelled"
-      ],
+      "values": ["pending", "confirmed", "cancelled"],
       "name": "tournament_registration_status",
       "entityType": "enums",
       "schema": "public"
     },
     {
-      "values": [
-        "draft",
-        "registration",
-        "closed",
-        "completed",
-        "cancelled"
-      ],
+      "values": ["draft", "registration", "closed", "completed", "cancelled"],
       "name": "tournament_status",
       "entityType": "enums",
       "schema": "public"
@@ -1601,14 +1572,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "booking_id"
-      ],
+      "columns": ["booking_id"],
       "schemaTo": "public",
       "tableTo": "bookings",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "name": "blacklist_booking_id_bookings_id_fkey",
@@ -1618,14 +1585,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "table_id"
-      ],
+      "columns": ["table_id"],
       "schemaTo": "public",
       "tableTo": "tables",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "bookings_table_id_tables_id_fkey",
@@ -1635,14 +1598,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "schemaTo": "public",
       "tableTo": "users",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "bookings_user_id_users_id_fkey",
@@ -1652,14 +1611,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "food_item_id"
-      ],
+      "columns": ["food_item_id"],
       "schemaTo": "public",
       "tableTo": "food_items",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "food_item_translations_food_item_id_food_items_id_fkey",
@@ -1669,14 +1624,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "news_item_id"
-      ],
+      "columns": ["news_item_id"],
       "schemaTo": "public",
       "tableTo": "news_items",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "news_item_translations_news_item_id_news_items_id_fkey",
@@ -1686,14 +1637,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "booking_id"
-      ],
+      "columns": ["booking_id"],
       "schemaTo": "public",
       "tableTo": "bookings",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "order_items_booking_id_bookings_id_fkey",
@@ -1703,14 +1650,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "food_item_id"
-      ],
+      "columns": ["food_item_id"],
       "schemaTo": "public",
       "tableTo": "food_items",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "order_items_food_item_id_food_items_id_fkey",
@@ -1720,14 +1663,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "tournament_id"
-      ],
+      "columns": ["tournament_id"],
       "schemaTo": "public",
       "tableTo": "tournaments",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "tournament_registrations_tournament_id_tournaments_id_fkey",
@@ -1737,14 +1676,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "user_id"
-      ],
+      "columns": ["user_id"],
       "schemaTo": "public",
       "tableTo": "users",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "tournament_registrations_user_id_users_id_fkey",
@@ -1754,14 +1689,10 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "tournament_id"
-      ],
+      "columns": ["tournament_id"],
       "schemaTo": "public",
       "tableTo": "tournaments",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "tournament_translations_tournament_id_tournaments_id_fkey",
@@ -1770,10 +1701,7 @@
       "table": "tournament_translations"
     },
     {
-      "columns": [
-        "food_item_id",
-        "locale"
-      ],
+      "columns": ["food_item_id", "locale"],
       "nameExplicit": false,
       "name": "food_item_translations_pkey",
       "entityType": "pks",
@@ -1781,10 +1709,7 @@
       "table": "food_item_translations"
     },
     {
-      "columns": [
-        "news_item_id",
-        "locale"
-      ],
+      "columns": ["news_item_id", "locale"],
       "nameExplicit": false,
       "name": "news_item_translations_pkey",
       "entityType": "pks",
@@ -1792,10 +1717,7 @@
       "table": "news_item_translations"
     },
     {
-      "columns": [
-        "tournament_id",
-        "locale"
-      ],
+      "columns": ["tournament_id", "locale"],
       "nameExplicit": false,
       "name": "tournament_translations_pkey",
       "entityType": "pks",
@@ -1803,9 +1725,7 @@
       "table": "tournament_translations"
     },
     {
-      "columns": [
-        "phone"
-      ],
+      "columns": ["phone"],
       "nameExplicit": false,
       "name": "blacklist_pkey",
       "schema": "public",
@@ -1813,9 +1733,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "bookings_pkey",
       "schema": "public",
@@ -1823,9 +1741,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "closures_pkey",
       "schema": "public",
@@ -1833,9 +1749,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "food_items_pkey",
       "schema": "public",
@@ -1843,9 +1757,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "news_items_pkey",
       "schema": "public",
@@ -1853,9 +1765,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "order_items_pkey",
       "schema": "public",
@@ -1863,9 +1773,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "tables_pkey",
       "schema": "public",
@@ -1873,9 +1781,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "tournament_registrations_pkey",
       "schema": "public",
@@ -1883,9 +1789,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "tournaments_pkey",
       "schema": "public",
@@ -1893,9 +1797,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "nameExplicit": false,
       "name": "users_pkey",
       "schema": "public",
@@ -1903,9 +1805,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "weekday"
-      ],
+      "columns": ["weekday"],
       "nameExplicit": false,
       "name": "venue_hours_pkey",
       "schema": "public",
@@ -1913,9 +1813,7 @@
       "entityType": "pks"
     },
     {
-      "columns": [
-        "tier"
-      ],
+      "columns": ["tier"],
       "nameExplicit": false,
       "name": "venue_rates_pkey",
       "schema": "public",
@@ -1924,9 +1822,7 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "slug"
-      ],
+      "columns": ["slug"],
       "nullsNotDistinct": false,
       "name": "food_items_slug_key",
       "schema": "public",
@@ -1935,9 +1831,7 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "slug"
-      ],
+      "columns": ["slug"],
       "nullsNotDistinct": false,
       "name": "news_items_slug_key",
       "schema": "public",
@@ -1946,9 +1840,7 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "slug"
-      ],
+      "columns": ["slug"],
       "nullsNotDistinct": false,
       "name": "tournaments_slug_key",
       "schema": "public",
@@ -1957,9 +1849,7 @@
     },
     {
       "nameExplicit": false,
-      "columns": [
-        "phone"
-      ],
+      "columns": ["phone"],
       "nullsNotDistinct": false,
       "name": "users_phone_key",
       "schema": "public",
