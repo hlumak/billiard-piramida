@@ -49,10 +49,57 @@ jobs:
       - run: pnpm build
       - run: pnpm audit --prod
 
+  # The server only pulls these: building on its 1 vCPU / 2 GB took ~3 min a
+  # deploy and left the Docker daemon holding ~1 GB. Pull requests just build;
+  # main publishes, once the checks pass, as :main and :<commit sha>.
   docker:
     name: Docker images
+    needs: checks
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Public values: both end up in every page the site serves
+      VITE_SITE_URL: https://billiard-piramida.pl
+      VITE_TURNSTILE_SITE_KEY: 0x4AAAAAAFX8pa-ypgfhyR9M
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: docker build --target api --tag piramida-api:ci .
-      - run: docker build --target web --tag piramida-web:ci --build-arg VITE_SITE_URL=https://ci.example .
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - if: github.event_name == 'push'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: api
+          platforms: linux/amd64
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ghcr.io/hlumak/piramida-api:main
+            ghcr.io/hlumak/piramida-api:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: web
+          platforms: linux/amd64
+          push: ${{ github.event_name == 'push' }}
+          build-args: |
+            VITE_SITE_URL=${{ env.VITE_SITE_URL }}
+            VITE_TURNSTILE_SITE_KEY=${{ env.VITE_TURNSTILE_SITE_KEY }}
+          tags: |
+            ghcr.io/hlumak/piramida-web:main
+            ghcr.io/hlumak/piramida-web:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
