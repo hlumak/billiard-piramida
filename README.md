@@ -61,6 +61,28 @@ docker compose --profile app up -d --build   # postgres, migrations, API, web, n
 docker compose --profile app run --rm migrate node src/db/seed.ts   # first deploy only
 ```
 
+On a small server, pull the images CI publishes for each commit on `main`
+instead of building them there. Set in `.env`:
+
+```sh
+API_IMAGE=ghcr.io/hlumak/piramida-api:main
+WEB_IMAGE=ghcr.io/hlumak/piramida-web:main
+```
+
+and deploy, once CI on `main` is green:
+
+```sh
+git pull --ff-only
+docker compose --profile app pull migrate web
+docker compose --profile app run --rm migrate
+docker compose --profile app up -d --wait
+docker image prune -f                          # the images this deploy replaced
+```
+
+Each image is also tagged with its commit sha (`…:<sha>` in `.env` rolls back),
+and `docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}'`
+names the commit an image was built from.
+
 nginx listens on `127.0.0.1:8080`; put the TLS-terminating proxy in front of it.
 The API and web containers run as an unprivileged user on read-only filesystems;
 staff uploads live in the `uploads` volume, the database in `pgdata`. A staging
@@ -69,4 +91,4 @@ deploy can set `ROBOTS_DISALLOW_ALL=1`.
 ## Checks
 
 `pnpm lint` · `pnpm fmt:check` · `pnpm typecheck` · `pnpm test` (the API tests need
-the Postgres container) · `pnpm build` — all run in CI (`.github/workflows/ci.yml`).
+the Postgres container) · `pnpm build` — all run in CI (`.github/workflows/ci.yaml`).
