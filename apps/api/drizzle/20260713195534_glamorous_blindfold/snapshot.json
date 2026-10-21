@@ -1,46 +1,205 @@
 {
-  "version": "8",
+  "type": "base",
+  "version": "9",
   "dialect": "postgres",
   "id": "4c83fa12-53a1-40aa-a23d-2f56d2fe0108",
   "prevIds": ["00000000-0000-0000-0000-000000000000"],
+  "footprints": [
+    {
+      "statementType": "create_enum",
+      "statementTarget": ["enum", "public", "booking_status"],
+      "writes": [
+        "s|enum|public.booking_status",
+        "n|enum|public.booking_status",
+        "e|enum|public.booking_status",
+        "n|type|public.booking_status"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "bookings"],
+      "writes": [
+        "s|tbl|public.bookings",
+        "n|tbl|public.bookings",
+        "e|tbl|public.bookings",
+        "n|rel|public.bookings",
+        "n|type|public.bookings",
+        "n|rel|public.bookings_pkey"
+      ],
+      "reads": ["n|sch|public", "n|enum|public.booking_status"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "food_item_translations"],
+      "writes": [
+        "s|tbl|public.food_item_translations",
+        "n|tbl|public.food_item_translations",
+        "e|tbl|public.food_item_translations",
+        "n|rel|public.food_item_translations",
+        "n|type|public.food_item_translations",
+        "n|rel|public.food_item_translations_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "food_items"],
+      "writes": [
+        "s|tbl|public.food_items",
+        "n|tbl|public.food_items",
+        "e|tbl|public.food_items",
+        "n|rel|public.food_items",
+        "n|type|public.food_items",
+        "n|rel|public.food_items_pkey",
+        "n|rel|public.food_items_slug_key"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "order_items"],
+      "writes": [
+        "s|tbl|public.order_items",
+        "n|tbl|public.order_items",
+        "e|tbl|public.order_items",
+        "n|rel|public.order_items",
+        "n|type|public.order_items",
+        "n|rel|public.order_items_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "tables"],
+      "writes": [
+        "s|tbl|public.tables",
+        "n|tbl|public.tables",
+        "e|tbl|public.tables",
+        "n|rel|public.tables",
+        "n|type|public.tables",
+        "n|rel|public.tables_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "bookings"],
+      "writes": [
+        "s|fk|public.bookings.bookings_table_id_tables_id_fkey",
+        "n|fk|public.bookings.bookings_table_id_tables_id_fkey",
+        "e|fk|public.bookings.bookings_table_id_tables_id_fkey",
+        "n|con|public.bookings.bookings_table_id_tables_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.bookings",
+        "n|sch|public",
+        "n|tbl|public.tables",
+        "n|sch|public",
+        "n|col|public.bookings.table_id",
+        "n|col|public.tables.id",
+        "e|uniqueness|public.tables.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "food_item_translations"],
+      "writes": [
+        "s|fk|public.food_item_translations.food_item_translations_food_item_id_food_items_id_fkey",
+        "n|fk|public.food_item_translations.food_item_translations_food_item_id_food_items_id_fkey",
+        "e|fk|public.food_item_translations.food_item_translations_food_item_id_food_items_id_fkey",
+        "n|con|public.food_item_translations.food_item_translations_food_item_id_food_items_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.food_item_translations",
+        "n|sch|public",
+        "n|tbl|public.food_items",
+        "n|sch|public",
+        "n|col|public.food_item_translations.food_item_id",
+        "n|col|public.food_items.id",
+        "e|uniqueness|public.food_items.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "order_items"],
+      "writes": [
+        "s|fk|public.order_items.order_items_booking_id_bookings_id_fkey",
+        "n|fk|public.order_items.order_items_booking_id_bookings_id_fkey",
+        "e|fk|public.order_items.order_items_booking_id_bookings_id_fkey",
+        "n|con|public.order_items.order_items_booking_id_bookings_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.order_items",
+        "n|sch|public",
+        "n|tbl|public.bookings",
+        "n|sch|public",
+        "n|col|public.order_items.booking_id",
+        "n|col|public.bookings.id",
+        "e|uniqueness|public.bookings.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "order_items"],
+      "writes": [
+        "s|fk|public.order_items.order_items_food_item_id_food_items_id_fkey",
+        "n|fk|public.order_items.order_items_food_item_id_food_items_id_fkey",
+        "e|fk|public.order_items.order_items_food_item_id_food_items_id_fkey",
+        "n|con|public.order_items.order_items_food_item_id_food_items_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.order_items",
+        "n|sch|public",
+        "n|tbl|public.food_items",
+        "n|sch|public",
+        "n|col|public.order_items.food_item_id",
+        "n|col|public.food_items.id",
+        "e|uniqueness|public.food_items.id"
+      ]
+    }
+  ],
   "ddl": [
     {
-      "values": ["confirmed", "cancelled"],
-      "name": "booking_status",
-      "entityType": "enums",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "bookings",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "food_item_translations",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "food_items",
-      "entityType": "tables",
-      "schema": "public"
+      "isRlsEnabled": false,
+      "entityType": "tables"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "public",
       "name": "order_items",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
       "isRlsEnabled": false,
-      "name": "tables",
-      "entityType": "tables",
-      "schema": "public"
+      "entityType": "tables"
     },
     {
+      "schema": "public",
+      "name": "tables",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "public",
+      "name": "booking_status",
+      "values": ["confirmed", "cancelled"],
+      "entityType": "enums"
+    },
+    {
+      "schema": "public",
+      "table": "bookings",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -48,12 +207,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "bookings"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "bookings",
+      "name": "table_id",
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -61,25 +220,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "table_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "bookings"
+      "entityType": "columns"
     },
     {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "bookings",
       "name": "customer_name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "bookings"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -87,25 +233,25 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "bookings",
       "name": "customer_phone",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "bookings"
-    },
-    {
-      "type": "timestamp with time zone",
+      "type": "text",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "bookings",
       "name": "starts_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "bookings"
-    },
-    {
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -113,12 +259,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "ends_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "bookings"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "bookings",
+      "name": "ends_at",
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "bookings",
+      "name": "status",
       "type": "booking_status",
       "typeSchema": "public",
       "notNull": true,
@@ -126,12 +285,12 @@
       "default": "'confirmed'",
       "generated": null,
       "identity": null,
-      "name": "status",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "bookings"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "bookings",
+      "name": "created_at",
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -139,12 +298,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "bookings"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "food_item_translations",
+      "name": "food_item_id",
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -152,25 +311,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "food_item_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_item_translations"
+      "entityType": "columns"
     },
     {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "food_item_translations",
       "name": "locale",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_item_translations"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -178,12 +324,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_item_translations"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "food_item_translations",
+      "name": "name",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "food_item_translations",
+      "name": "description",
       "type": "text",
       "typeSchema": null,
       "notNull": false,
@@ -191,12 +350,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "description",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_item_translations"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "food_items",
+      "name": "id",
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -213,25 +372,12 @@
         "cache": 1,
         "cycle": false
       },
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_items"
+      "entityType": "columns"
     },
     {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "food_items",
       "name": "slug",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_items"
-    },
-    {
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -239,12 +385,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "category",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_items"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "food_items",
+      "name": "category",
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "food_items",
+      "name": "price_grosz",
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -252,12 +411,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "price_grosz",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_items"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "food_items",
+      "name": "is_available",
       "type": "boolean",
       "typeSchema": null,
       "notNull": true,
@@ -265,12 +424,12 @@
       "default": "true",
       "generated": null,
       "identity": null,
-      "name": "is_available",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "food_items"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "order_items",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -278,12 +437,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "order_items"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "order_items",
+      "name": "booking_id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -291,25 +450,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "booking_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "order_items"
+      "entityType": "columns"
     },
     {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
+      "schema": "public",
+      "table": "order_items",
       "name": "food_item_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "order_items"
-    },
-    {
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -317,12 +463,12 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "order_items",
       "name": "quantity",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "order_items"
-    },
-    {
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -330,12 +476,25 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "unit_price_grosz",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "order_items"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "order_items",
+      "name": "unit_price_grosz",
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "entityType": "columns"
+    },
+    {
+      "schema": "public",
+      "table": "order_items",
+      "name": "created_at",
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -343,12 +502,12 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "order_items"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "tables",
+      "name": "id",
       "type": "integer",
       "typeSchema": null,
       "notNull": true,
@@ -356,12 +515,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tables"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "tables",
+      "name": "label",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -369,12 +528,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "label",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "tables"
+      "entityType": "columns"
     },
     {
+      "schema": "public",
+      "table": "bookings",
+      "name": "bookings_table_id_tables_id_fkey",
       "nameExplicit": false,
       "columns": ["table_id"],
       "schemaTo": "public",
@@ -382,12 +541,12 @@
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "bookings_table_id_tables_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "bookings"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "food_item_translations",
+      "name": "food_item_translations_food_item_id_food_items_id_fkey",
       "nameExplicit": false,
       "columns": ["food_item_id"],
       "schemaTo": "public",
@@ -395,12 +554,12 @@
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "food_item_translations_food_item_id_food_items_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "food_item_translations"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "order_items",
+      "name": "order_items_booking_id_bookings_id_fkey",
       "nameExplicit": false,
       "columns": ["booking_id"],
       "schemaTo": "public",
@@ -408,12 +567,12 @@
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "name": "order_items_booking_id_bookings_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "order_items"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "order_items",
+      "name": "order_items_food_item_id_food_items_id_fkey",
       "nameExplicit": false,
       "columns": ["food_item_id"],
       "schemaTo": "public",
@@ -421,60 +580,56 @@
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "order_items_food_item_id_food_items_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "order_items"
+      "entityType": "fks"
     },
     {
+      "schema": "public",
+      "table": "food_item_translations",
+      "name": "food_item_translations_pkey",
       "columns": ["food_item_id", "locale"],
       "nameExplicit": false,
-      "name": "food_item_translations_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "food_item_translations"
+      "entityType": "pks"
     },
     {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "bookings_pkey",
       "schema": "public",
       "table": "bookings",
+      "name": "bookings_pkey",
+      "columns": ["id"],
+      "nameExplicit": false,
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "food_items_pkey",
       "schema": "public",
       "table": "food_items",
+      "name": "food_items_pkey",
+      "columns": ["id"],
+      "nameExplicit": false,
       "entityType": "pks"
     },
     {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "order_items_pkey",
       "schema": "public",
       "table": "order_items",
-      "entityType": "pks"
-    },
-    {
+      "name": "order_items_pkey",
       "columns": ["id"],
       "nameExplicit": false,
-      "name": "tables_pkey",
-      "schema": "public",
-      "table": "tables",
       "entityType": "pks"
     },
     {
+      "schema": "public",
+      "table": "tables",
+      "name": "tables_pkey",
+      "columns": ["id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "schema": "public",
+      "table": "food_items",
+      "name": "food_items_slug_key",
       "nameExplicit": false,
       "columns": ["slug"],
       "nullsNotDistinct": false,
-      "name": "food_items_slug_key",
-      "schema": "public",
-      "table": "food_items",
       "entityType": "uniques"
     }
-  ],
-  "renames": []
+  ]
 }
