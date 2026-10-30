@@ -59,13 +59,14 @@ COPY apps/web apps/web
 # release build refuses to run without a real one. The API URL stays empty:
 # the browser calls /api/… on the site's own origin, through nginx.
 # The Turnstile site key is public too; empty builds forms without the widget.
+# Its build arg says PUBLIC so Docker's name-based secrets check (any *_KEY in
+# ARG/ENV) lets it through; the build step hands it to Vite under its own name.
 ARG VITE_SITE_URL
-ARG VITE_TURNSTILE_SITE_KEY
+ARG TURNSTILE_PUBLIC_SITE_KEY
 ENV RELEASE_BUILD=1 \
   VITE_SITE_URL=${VITE_SITE_URL} \
-  VITE_TURNSTILE_SITE_KEY=${VITE_TURNSTILE_SITE_KEY} \
   VITE_API_URL=
-RUN pnpm --filter @repo/web build
+RUN VITE_TURNSTILE_SITE_KEY="$TURNSTILE_PUBLIC_SITE_KEY" pnpm --filter @repo/web build
 # Every client asset the server-rendered HTML names must exist in the client
 # build. When they diverged (two different stylesheets), every page painted
 # unstyled until hydration; fail the image build instead of shipping that.

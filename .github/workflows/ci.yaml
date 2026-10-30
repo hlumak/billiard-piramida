@@ -94,7 +94,7 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           build-args: |
             VITE_SITE_URL=${{ env.VITE_SITE_URL }}
-            VITE_TURNSTILE_SITE_KEY=${{ env.VITE_TURNSTILE_SITE_KEY }}
+            TURNSTILE_PUBLIC_SITE_KEY=${{ env.VITE_TURNSTILE_SITE_KEY }}
           tags: |
             ghcr.io/hlumak/piramida-web:main
             ghcr.io/hlumak/piramida-web:${{ github.sha }}

@@ -93,7 +93,7 @@ services:
       target: web
       args:
         VITE_SITE_URL: ${VITE_SITE_URL:-}
-        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
+        TURNSTILE_PUBLIC_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
     image: ${WEB_IMAGE:-piramida-web:local}
     restart: unless-stopped
     environment:
