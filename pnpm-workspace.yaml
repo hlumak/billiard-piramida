@@ -6,10 +6,6 @@ allowBuilds:
   lightningcss: true
 # Delay newly-published versions for a day before installing (supply-chain guard)
 minimumReleaseAge: 1440
-# Exact versions let through early; prune once they are older than a day
-minimumReleaseAgeExclude:
-  - 'drizzle-orm@1.0.0-rc.5'
-  - 'drizzle-kit@1.0.0-rc.5'
 # Where approved agent skills are linked. Named explicitly: without it pnpm only
 # knows the folder when it detects a coding agent, and every other install (a
 # terminal, CI, the Docker build) fails with ERR_PNPM_NO_AGENT_SKILLS_DIR.
@@ -18,11 +14,14 @@ skills:
     - .claude/skills
 # What each dependency may do beyond being installed. Agent skills: only TanStack
 # Start's (linked into .claude/skills); drizzle-kit's are committed there already,
-# and the devtools ones are for building devtools, which this project does not do.
+# the devtools ones are for building devtools, which this project does not do, and
+# the router's (new in 1.170.46) is declined to keep one TanStack skill linked.
 permissions:
   '@tanstack/devtools-event-client':
     skills: false
   '@tanstack/devtools-vite':
+    skills: false
+  '@tanstack/react-router':
     skills: false
   '@tanstack/react-start':
     skills: true
