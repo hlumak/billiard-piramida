@@ -8,7 +8,7 @@ ARG NODE_IMAGE=node:26.12.1-alpine3.24
 # ---------------------------------------------------------------- shared base
 FROM ${NODE_IMAGE} AS base
 # Node 26 ships no corepack: install exactly the pnpm package.json declares
-RUN npm install --global pnpm@12.14.0 && npm cache clean --force
+RUN npm install --global pnpm@12.16.1 && npm cache clean --force
 WORKDIR /repo
 # Manifests only, so the dependency layers below are cached until one changes
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
