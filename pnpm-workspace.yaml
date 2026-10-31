@@ -6,6 +6,12 @@ allowBuilds:
   lightningcss: true
 # Delay newly-published versions for a day before installing (supply-chain guard)
 minimumReleaseAge: 1440
+# @fastify/static 10.1.8 still asks for glob ^13, and only glob 14.0.2+ (with
+# minimatch 11) fixes GHSA-3g3m-2fjr-6pw4 and GHSA-g3hv-75wg-m249. Its one call,
+# glob('**/**', { cwd, absolute, follow, nodir, dot, ignore }), is unchanged in
+# 14. Drop this once @fastify/static depends on glob 14 itself.
+overrides:
+  '@fastify/static>glob': 14.0.3
 # Where approved agent skills are linked. Named explicitly: without it pnpm only
 # knows the folder when it detects a coding agent, and every other install (a
 # terminal, CI, the Docker build) fails with ERR_PNPM_NO_AGENT_SKILLS_DIR.
