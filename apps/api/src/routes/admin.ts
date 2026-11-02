@@ -1,7 +1,12 @@
 import { Type } from 'typebox';
 import { ERROR_RESPONSE } from '../lib/schemas.ts';
 import { ADMIN_TOKEN_COOKIE, clearAdminCookies, setAdminCookies } from '../lib/cookies.ts';
-import { issueAdminSession, secretsMatch, verifyAdminSession } from '../lib/admin-session.ts';
+import {
+  adminSessionNeedsRenewal,
+  issueAdminSession,
+  secretsMatch,
+  verifyAdminSession
+} from '../lib/admin-session.ts';
 import { FailureLimiter } from '../lib/failure-limiter.ts';
 import { adminImageRoutes } from './admin-images.ts';
 import { adminBlacklistRoutes } from './admin-blacklist.ts';
@@ -83,6 +88,14 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
         // An absent credential is a visitor, not a guess
         if (typeof header === 'string' || typeof session === 'string') failures.fail(request.ip);
         return reply.code(401).send({ error: 'unauthorized' });
+      }
+      // Sliding expiry: a device in use never reaches the 30-day limit
+      if (
+        typeof header !== 'string' &&
+        typeof session === 'string' &&
+        adminSessionNeedsRenewal(session)
+      ) {
+        setAdminCookies(reply, issueAdminSession(adminToken), app.cookieSecure);
       }
     });
 

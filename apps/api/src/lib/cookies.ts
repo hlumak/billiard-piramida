@@ -1,4 +1,5 @@
 import type { FastifyReply } from 'fastify';
+import { ADMIN_SESSION_TTL_MS } from './admin-session.ts';
 
 /**
  * Session cookies. The secret (JWT / admin token) lives in an HttpOnly cookie
@@ -40,17 +41,25 @@ export function clearUserCookies(reply: FastifyReply, secure: boolean): void {
  *  not every page request to the web server. */
 const ADMIN_COOKIE_PATH = '/api/admin';
 
+const ADMIN_MAX_AGE_S = ADMIN_SESSION_TTL_MS / 1000;
+
 /**
- * Admin cookies are browser-session scoped (no maxAge) to mirror the old
- * sessionStorage; the session value itself also expires (see admin-session.ts).
+ * Admin cookies persist across browser restarts for as long as the session
+ * value inside them is valid (see admin-session.ts); they used to be
+ * browser-session cookies, which phones drop all the time.
  */
 export function setAdminCookies(reply: FastifyReply, session: string, secure: boolean): void {
   reply.setCookie(ADMIN_TOKEN_COOKIE, session, {
     ...base(secure),
     path: ADMIN_COOKIE_PATH,
-    httpOnly: true
+    httpOnly: true,
+    maxAge: ADMIN_MAX_AGE_S
   });
-  reply.setCookie(ADMIN_FLAG_COOKIE, '1', { ...base(secure), httpOnly: false });
+  reply.setCookie(ADMIN_FLAG_COOKIE, '1', {
+    ...base(secure),
+    httpOnly: false,
+    maxAge: ADMIN_MAX_AGE_S
+  });
 }
 
 export function clearAdminCookies(reply: FastifyReply, secure: boolean): void {

@@ -1910,6 +1910,53 @@ test('admin session cookie authenticates admin requests; bad token is rejected',
   assert.equal(expired.statusCode, 401);
 });
 
+test('staff stay signed in for 30 days, renewed while the panel is in use', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.11' };
+  const DAY_MS = 24 * 3_600_000;
+  const THIRTY_DAYS_S = 30 * 24 * 3600;
+
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/admin/session',
+    headers: ip,
+    payload: { token: 'test-admin-token' }
+  });
+  // Both cookies survive a browser restart (they used to be session cookies)
+  for (const name of ['admin_token', 'piramida.admin']) {
+    assert.equal(login.cookies.find(c => c.name === name)?.maxAge, THIRTY_DAYS_S, name);
+  }
+
+  // A fresh session is not reissued on every request…
+  const fresh = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: { ...ip, cookie: `admin_token=${issueAdminSession('test-admin-token')}` }
+  });
+  assert.equal(fresh.statusCode, 200);
+  assert.equal(fresh.cookies.length, 0);
+
+  // …but one issued 20 days ago (10 left) comes back with a new 30-day one
+  const old = issueAdminSession('test-admin-token', Date.now() - 20 * DAY_MS);
+  const used = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: { ...ip, cookie: `admin_token=${old}` }
+  });
+  assert.equal(used.statusCode, 200);
+  const renewed = used.cookies.find(c => c.name === 'admin_token');
+  assert.ok(renewed && renewed.value !== old, 'session reissued');
+  assert.equal(renewed.maxAge, THIRTY_DAYS_S);
+  assert.ok(Number(renewed.value.split('.')[0]) > Date.now() + 29 * DAY_MS);
+
+  // The x-admin-token header never gets a cookie
+  const header = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: { ...ip, 'x-admin-token': 'test-admin-token' }
+  });
+  assert.equal(header.cookies.length, 0);
+});
+
 test('guessing the admin secret is throttled on every admin route', async () => {
   const ip = { 'x-forwarded-for': '198.51.100.44' };
   let throttled = false;
