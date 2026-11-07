@@ -20,14 +20,34 @@ export function localizedPageUrl(pathname: string, locale: Locale): string {
   return `${SITE_URL}${localizeHref(bare, { locale })}`;
 }
 
+/** What a phone's search result shows of a description before it cuts it (three lines). */
+export const DESCRIPTION_MAX_CHARS = 120;
+
+/**
+ * A description that fits a phone's search result. Staff-written teasers have
+ * no length limit, so a long one is cut at the last whole word and marked with
+ * an ellipsis rather than being cut mid-word by the search engine; line breaks
+ * and runs of spaces read as single spaces.
+ */
+export function clampDescription(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= DESCRIPTION_MAX_CHARS) return flat;
+  const cut = flat.slice(0, DESCRIPTION_MAX_CHARS - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  // A single huge word has no boundary to respect
+  const words = lastSpace > DESCRIPTION_MAX_CHARS / 2 ? cut.slice(0, lastSpace) : cut;
+  return `${words.replace(/[\s,;:.!?—–-]+$/, '')}…`;
+}
+
 /**
  * Standard `head` for an indexable page: the canonical and og:url name this
  * language's address, and hreflang alternates point search engines at the
  * same page in the other two (x-default: Polish, the club's own language).
  */
-export function pageHead(title: string, description: string, pathname: string, image?: string) {
+export function pageHead(title: string, fullDescription: string, pathname: string, image?: string) {
   const locale = getLocale();
   const url = localizedPageUrl(pathname, locale);
+  const description = clampDescription(fullDescription);
   // Unfurlers need an absolute image URL; app-relative covers (uploads included)
   // are same-origin with the site in production.
   const imageUrl =
