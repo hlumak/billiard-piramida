@@ -147,11 +147,11 @@
   "saved_ok": "Saved",
   "admin_tab_stats": "Statistics",
   "admin_tab_menu": "Menu",
-  "admin_chart_revenue": "Revenue, last {days} days",
-  "admin_chart_utilization": "Table utilization",
+  "admin_chart_revenue": "Revenue by day",
+  "admin_chart_utilization": "Table use, last {days} days",
   "admin_chart_hours": "Popular game start hours",
-  "admin_total_revenue": "Period total",
-  "admin_total_bookings": "Bookings in period",
+  "admin_total_revenue": "Revenue, last {days} days",
+  "admin_total_bookings": "Bookings, last {days} days",
   "admin_new_booking": "New booking",
   "admin_create_btn": "Create",
   "admin_search_phone": "Search by phone",
@@ -607,5 +607,6 @@
   "admin_view_upcoming": "Upcoming",
   "admin_col_time": "Time",
   "admin_view_cancelled": "Cancelled",
-  "admin_view_no_show": "No-shows"
+  "admin_view_no_show": "No-shows",
+  "admin_util_hours": "{booked} of {open} h"
 }

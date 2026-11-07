@@ -147,11 +147,11 @@
   "saved_ok": "Збережено",
   "admin_tab_stats": "Статистика",
   "admin_tab_menu": "Меню",
-  "admin_chart_revenue": "Виручка, останні {days} днів",
-  "admin_chart_utilization": "Завантаженість столів",
+  "admin_chart_revenue": "Виручка по днях",
+  "admin_chart_utilization": "Завантаженість столів за {days} днів",
   "admin_chart_hours": "Популярні години початку гри",
-  "admin_total_revenue": "Разом за період",
-  "admin_total_bookings": "Бронювань за період",
+  "admin_total_revenue": "Виручка за останні {days} днів",
+  "admin_total_bookings": "Бронювань за останні {days} днів",
   "admin_new_booking": "Нове бронювання",
   "admin_create_btn": "Створити",
   "admin_search_phone": "Пошук за телефоном",
@@ -632,5 +632,6 @@
   "admin_view_upcoming": "Майбутні",
   "admin_col_time": "Час",
   "admin_view_cancelled": "Скасовані",
-  "admin_view_no_show": "Неявки"
+  "admin_view_no_show": "Неявки",
+  "admin_util_hours": "{booked} з {open} год"
 }

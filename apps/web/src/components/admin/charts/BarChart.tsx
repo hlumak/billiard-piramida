@@ -73,8 +73,13 @@ export function BarChart({
                 onMouseLeave={() => setHovered(null)}
               />
               {d.label !== '' ? (
+                // Centred under its bar, but kept inside the chart: at the edges a
+                // centred label was cut off (", 9 paź")
                 <text
-                  x={i * step + step / 2}
+                  x={Math.min(
+                    Math.max(i * step + step / 2, d.label.length * 3.5),
+                    width - d.label.length * 3.5
+                  )}
                   y={height - 7}
                   textAnchor="middle"
                   className="fill-grey-cool text-[11px]"

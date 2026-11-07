@@ -147,11 +147,11 @@
   "saved_ok": "Zapisano",
   "admin_tab_stats": "Statystyki",
   "admin_tab_menu": "Menu",
-  "admin_chart_revenue": "Przychód, ostatnie {days} dni",
-  "admin_chart_utilization": "Obłożenie stołów",
+  "admin_chart_revenue": "Przychód dzień po dniu",
+  "admin_chart_utilization": "Obłożenie stołów, ostatnie {days} dni",
   "admin_chart_hours": "Popularne godziny rozpoczęcia gry",
-  "admin_total_revenue": "Razem za okres",
-  "admin_total_bookings": "Rezerwacje w okresie",
+  "admin_total_revenue": "Przychód, ostatnie {days} dni",
+  "admin_total_bookings": "Rezerwacje, ostatnie {days} dni",
   "admin_new_booking": "Nowa rezerwacja",
   "admin_create_btn": "Utwórz",
   "admin_search_phone": "Szukaj po telefonie",
@@ -610,5 +610,6 @@
   "admin_view_upcoming": "Nadchodzące",
   "admin_col_time": "Godzina",
   "admin_view_cancelled": "Anulowane",
-  "admin_view_no_show": "Nieobecności"
+  "admin_view_no_show": "Nieobecności",
+  "admin_util_hours": "{booked} z {open} godz."
 }
