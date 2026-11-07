@@ -18,7 +18,7 @@ export const Route = createFileRoute('/contacts')({
  */
 function ContactsPage() {
   return (
-    <PageLayout script="contacts" title={m.nav_contacts()}>
+    <PageLayout title={m.nav_contacts()}>
       <div className="anim-reveal grid gap-6 lg:grid-cols-[5fr_7fr]">
         <VisitCard />
         <VenueMap className="h-80 lg:h-auto" />

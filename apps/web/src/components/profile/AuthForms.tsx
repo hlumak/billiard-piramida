@@ -51,6 +51,17 @@ function authErrors(error: Error | null): { phone: string | null; form: string |
   return { phone: null, form: unauthorized ? m.auth_err_invalid() : m.err_generic() };
 }
 
+/**
+ * The first thing the submit button is still waiting for, said under it
+ * while it is disabled; null once it can be pressed.
+ */
+function missingField(phone: string, password: string): string | null {
+  if (!isValidPhone(phone)) return m.missing_phone();
+  if (password.length === 0) return m.missing_password();
+  if (password.length < 8) return m.password_too_short();
+  return null;
+}
+
 export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<AuthTab>('login');
@@ -79,6 +90,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   });
 
   const { phone: phoneError, form: errorText } = authErrors(submit.error);
+  const missing = missingField(phone, password);
 
   const idBase = useId();
   const selectTab = (entry: AuthTab) => {
@@ -156,7 +168,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
 
         <button
           type="submit"
-          disabled={!isValidPhone(phone) || password.length < 8}
+          disabled={missing !== null}
           // Not disabled while signing in: that would drop keyboard focus
           aria-disabled={submit.isPending || undefined}
           aria-busy={submit.isPending}
@@ -165,6 +177,11 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
           {submit.isPending ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : null}
           {tab === 'login' ? m.auth_tab_login() : m.auth_register_btn()}
         </button>
+        {missing ? (
+          <p role="status" className="-mt-2 text-center text-sm text-grey-cool">
+            {missing}
+          </p>
+        ) : null}
       </form>
     </div>
   );

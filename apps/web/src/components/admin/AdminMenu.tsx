@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { Button, Input, Spinner } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatPln, type AdminMenuItemDto } from '@repo/shared';
+import type { AdminMenuItemDto } from '@repo/shared';
 import { adminApi, adminMenuQuery } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { intlTag } from '../../lib/format';
 import { categoryLabel } from '../../lib/menu';
 import { parseZloty, plnUnit } from '../../lib/money';
 import { m } from '../../paraglide/messages.js';
+import { AdminSwitch } from './AdminSwitch';
+import { getLocale } from '../../paraglide/runtime.js';
+import { ConfirmAction } from './ConfirmAction';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
 import { AdminDishModal } from './AdminDishModal';
@@ -38,12 +41,16 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
   const deleteBlocked = remove.error instanceof ApiError && remove.error.code === 'has_orders';
 
   return (
-    <div className={`card p-4 ${item.isAvailable ? '' : 'opacity-60'}`}>
+    <div className="card p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-creme">{item.name}</p>
+        <div className={`min-w-0 flex-1 ${item.isAvailable ? '' : 'opacity-60'}`}>
+          {/* The name in the panel's language; the API's own pick is Ukrainian */}
+          <p className="font-medium text-creme">
+            {item.translations.find(t => t.locale === getLocale())?.name ?? item.name}
+          </p>
           <p className="text-xs text-grey-cool">
-            {categoryLabel(item.category)} · {formatPln(item.priceGrosz, intlTag())}
+            {categoryLabel(item.category)}
+            {item.isAvailable ? null : <> · {m.admin_hidden()}</>}
           </p>
         </div>
 
@@ -77,26 +84,28 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
               {m.btn_save()}
             </Button>
           ) : null}
-          <Button
-            size="sm"
-            variant={item.isAvailable ? 'outline' : 'primary'}
-            className={item.isAvailable ? 'border-golden text-creme' : ''}
-            isPending={update.isPending}
-            onPress={() => update.mutate({ isAvailable: !item.isAvailable })}
+          {/* A switch, not a button labelled with the current state: staff
+              could not tell whether pressing "In menu" would hide the dish */}
+          <AdminSwitch
+            isSelected={item.isAvailable}
+            isDisabled={update.isPending}
+            onChange={isAvailable => update.mutate({ isAvailable })}
+            className="px-1"
           >
-            {item.isAvailable ? m.admin_in_menu() : m.admin_hidden()}
-          </Button>
+            {m.admin_in_menu()}
+          </AdminSwitch>
           <AdminDishModal item={item} />
-          <Button
-            size="sm"
-            variant="danger-soft"
-            isPending={remove.isPending}
-            onPress={() => {
-              if (window.confirm(m.admin_delete_confirm())) remove.mutate();
-            }}
+          <ConfirmAction
+            title={m.admin_delete_confirm()}
+            confirmLabel={m.admin_delete_dish_action()}
+            onConfirm={() => remove.mutate()}
           >
-            {m.admin_delete_btn()}
-          </Button>
+            {open => (
+              <Button size="sm" variant="danger-soft" isPending={remove.isPending} onPress={open}>
+                {m.admin_delete_btn()}
+              </Button>
+            )}
+          </ConfirmAction>
         </div>
       </div>
       {deleteBlocked ? (

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Spinner } from '@heroui/react';
 import { Search } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,6 +31,7 @@ import {
 import { menuQuery } from '../../lib/queries';
 import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
+import { ConfirmAction } from './ConfirmAction';
 import { gameName, spotName } from '../../lib/spots';
 import { ClearButton } from '../ClearButton';
 import { QueryError } from '../QueryError';
@@ -40,11 +41,18 @@ import { AdminEditBooking } from './AdminBookingModal';
 import { AdminBookingOrder } from './AdminBookingOrder';
 import { bookingClubDate, useVenueConfig } from '../../lib/venue-config';
 
-const STATUS_FILTERS: { value: BookingStatus | undefined; label: () => string }[] = [
-  { value: undefined, label: m.admin_all_statuses },
-  { value: 'confirmed', label: m.phase_upcoming },
-  { value: 'cancelled', label: m.phase_cancelled },
-  { value: 'no_show', label: m.phase_no_show }
+type View = 'upcoming' | 'all' | 'cancelled' | 'no_show';
+
+/**
+ * What the list shows. It opens on what is still ahead, soonest first: the
+ * unfiltered list, newest first, was mostly cancelled and finished rows the
+ * desk had no use for.
+ */
+const VIEWS: { value: View; label: () => string; status?: BookingStatus; upcoming?: boolean }[] = [
+  { value: 'upcoming', label: m.admin_view_upcoming, status: 'confirmed', upcoming: true },
+  { value: 'all', label: m.admin_all_statuses },
+  { value: 'cancelled', label: m.admin_view_cancelled, status: 'cancelled' },
+  { value: 'no_show', label: m.admin_view_no_show, status: 'no_show' }
 ];
 
 const small =
@@ -146,22 +154,23 @@ function RowActions({ booking }: { booking: BookingDto }) {
           </RowButton>
         ) : null}
         {started ? (
-          <RowButton
-            pending={noShow.isPending}
-            onPress={() => {
-              if (window.confirm(m.admin_no_show_confirm())) noShow.mutate();
-            }}
-            className={danger}
+          <ConfirmAction
+            title={m.admin_no_show_title()}
+            text={m.admin_no_show_confirm()}
+            confirmLabel={m.admin_no_show_action()}
+            onConfirm={() => noShow.mutate()}
           >
-            {m.admin_no_show_btn()}
-          </RowButton>
+            {open => (
+              <RowButton pending={noShow.isPending} onPress={open} className={danger}>
+                {m.admin_no_show_btn()}
+              </RowButton>
+            )}
+          </ConfirmAction>
         ) : null}
         {booking.phase === 'cancelled' ? (
-          <RowButton
-            pending={restore.isPending}
-            onPress={() => restore.mutate()}
-            className={`btn-gold ${small}`}
-          >
+          // Quiet like the other row actions: on a list of cancelled rows a
+          // gold button each made the rarest action the loudest on screen
+          <RowButton pending={restore.isPending} onPress={() => restore.mutate()} className={quiet}>
             {m.admin_restore_btn()}
           </RowButton>
         ) : null}
@@ -180,9 +189,156 @@ function RowActions({ booking }: { booking: BookingDto }) {
   );
 }
 
+/**
+ * The list itself: one heading per day, then the rows. Its own component so
+ * the list pane above only decides what to show (error, loading, empty, rows).
+ */
+function BookingsTable({ bookings }: { bookings: BookingDto[] }) {
+  const thisYear = warsawToday().slice(0, 4);
+  // Localized dish names for the order summary (items carry only a slug)
+  const { data: menu } = useQuery(menuQuery(getLocale()));
+  const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
+  // Flag numbers that did not come before, right where staff read the booking
+  const { data: blacklist } = useQuery(adminBlacklistQuery());
+  const blacklisted = new Set(blacklist?.map(entry => entry.phone));
+  const head = 'px-3 py-3.5 text-xs font-bold tracking-[0.08em] text-grey-cool uppercase';
+
+  return (
+    <div>
+      {bookings.length >= ADMIN_BOOKINGS_LIMIT ? (
+        <p role="status" className="mb-2 text-sm text-grey-cool">
+          {m.admin_bookings_capped({ n: ADMIN_BOOKINGS_LIMIT })}
+        </p>
+      ) : null}
+      <div className="card overflow-hidden">
+        <table className="w-full border-collapse text-sm">
+          <thead className="hidden lg:table-header-group">
+            <tr className="text-left">
+              <th scope="col" className={`${head} pl-5`}>
+                {m.admin_col_time()}
+              </th>
+              <th scope="col" className={head}>
+                {m.admin_col_spot()}
+              </th>
+              <th scope="col" className={head}>
+                {m.admin_col_client()}
+              </th>
+              <th scope="col" className={`${head} text-center`}>
+                {m.admin_col_status()}
+              </th>
+              <th scope="col" className={`${head} text-right`}>
+                {m.admin_col_total()}
+              </th>
+              <th scope="col" className={`${head} pr-5`}>
+                <span className="sr-only">{m.admin_col_actions()}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {bookings.map((booking, index) => {
+              const voided = booking.phase === 'cancelled' || booking.phase === 'no_show';
+              const day = warsawDate(booking.startsAt);
+              const previous = bookings[index - 1];
+              // One heading per day, so the rows below only need their hours
+              const newDay = !previous || warsawDate(previous.startsAt) !== day;
+              return (
+                <Fragment key={booking.id}>
+                  {newDay ? (
+                    <tr className="block border-t border-line bg-club-green-dark/55 first:border-t-0 lg:table-row">
+                      <th
+                        scope="rowgroup"
+                        colSpan={6}
+                        className="block px-4 py-2 text-left text-sm font-bold text-golden-light first-letter:uppercase lg:table-cell lg:pl-5"
+                      >
+                        {/* The unfiltered list reaches back into earlier years */}
+                        {formatDay(day, { withYear: !day.startsWith(thisYear) })}
+                      </th>
+                    </tr>
+                  ) : null}
+                  <tr className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 border-t border-line px-4 py-3.5 first:border-t-0 lg:table-row lg:first:border-t lg:px-0 lg:py-0">
+                    <td className="font-bold whitespace-nowrap tabular-nums lg:py-3.5 lg:pr-3 lg:pl-5">
+                      {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)}
+                    </td>
+                    <td className="self-center justify-self-end lg:hidden">
+                      <span
+                        className={`inline-block rounded-full px-2.5 py-1 text-center text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
+                      >
+                        {PHASE_LABELS[booking.phase]()}
+                      </span>
+                    </td>
+                    <td className="col-span-2 whitespace-nowrap lg:px-3 lg:py-3.5">
+                      {spotName(booking.kind, booking.tableLabel)}
+                      {/* Which balls to rack — the one thing on this row that
+                        is an instruction to the person reading it */}
+                      {booking.game ? (
+                        <span className="text-grey-cool">
+                          {' · '}
+                          {gameName(booking.game).toLocaleLowerCase(getLocale())}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="col-span-2 lg:px-3 lg:py-3.5">
+                      <span className="block font-semibold">
+                        {booking.customerName}
+                        {blacklisted.has(booking.customerPhone) ? (
+                          <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-soft-foreground">
+                            {m.admin_blacklisted()}
+                          </span>
+                        ) : null}
+                      </span>
+                      <a
+                        href={`tel:${booking.customerPhone}`}
+                        className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
+                      >
+                        {formatPhone(booking.customerPhone)}
+                      </a>
+                      {booking.items.length > 0 ? (
+                        <span className="mt-0.5 block text-xs text-grey-cool">
+                          {booking.items
+                            .map(
+                              item => `${nameBySlug.get(item.slug) ?? item.slug} × ${item.quantity}`
+                            )
+                            .join(', ')}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="hidden text-center lg:table-cell lg:px-3 lg:py-3.5">
+                      <span
+                        className={`inline-block min-w-29.5 rounded-full px-2.5 py-1 text-center text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
+                      >
+                        {PHASE_LABELS[booking.phase]()}
+                      </span>
+                    </td>
+                    <td
+                      className={`col-span-2 font-bold whitespace-nowrap tabular-nums lg:px-3 lg:py-3.5 lg:text-right ${
+                        voided ? 'text-grey-cool' : 'text-golden-light'
+                      } ${booking.phase === 'cancelled' ? 'line-through' : ''}`}
+                    >
+                      {formatPln(booking.totalGrosz, intlTag())}
+                      {booking.discountGrosz > 0 ? (
+                        <span className="ml-1 text-xs font-medium text-grey-cool no-underline">
+                          (−{formatPln(booking.discountGrosz, intlTag())})
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="col-span-2 lg:py-3.5 lg:pr-5 lg:pl-3">
+                      <RowActions booking={booking} />
+                    </td>
+                  </tr>
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) {
   const [date, setDate] = useState<IsoDate | undefined>(undefined);
-  const [status, setStatus] = useState<BookingStatus | undefined>(undefined);
+  // A customer's phone handed over means "their history", not what is ahead
+  const [view, setView] = useState<View>(initialPhone ? 'all' : 'upcoming');
   const [phoneInput, setPhoneInput] = useState(initialPhone);
   const searchId = useId();
   const searchInput = useRef<HTMLInputElement>(null);
@@ -195,9 +351,12 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
     return () => clearTimeout(timer);
   }, [phoneInput]);
 
+  const picked = VIEWS.find(entry => entry.value === view) ?? VIEWS[0]!;
   const filters: AdminBookingFilters = {
     date,
-    status,
+    status: picked.status,
+    // A picked day shows that whole day, past hours included
+    upcoming: date === undefined ? picked.upcoming : undefined,
     phone: phone !== '' ? phone : undefined
   };
   const {
@@ -207,14 +366,6 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
     error,
     refetch
   } = useQuery(adminBookingsQuery(filters));
-  const thisYear = warsawToday().slice(0, 4);
-  // Localized dish names for the order summary (items carry only a slug)
-  const { data: menu } = useQuery(menuQuery(getLocale()));
-  const nameBySlug = new Map(menu?.map(item => [item.slug, item.name]));
-  // Flag numbers that did not come before, right where staff read the booking
-  const { data: blacklist } = useQuery(adminBlacklistQuery());
-  const blacklisted = new Set(blacklist?.map(entry => entry.phone));
-  const head = 'px-3 py-3.5 text-xs font-bold tracking-[0.08em] text-grey-cool uppercase';
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -225,12 +376,12 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
           aria-label={m.admin_all_statuses()}
           className="inline-flex flex-wrap gap-1 rounded-xl bg-club-green-dark p-1"
         >
-          {STATUS_FILTERS.map(filter => (
+          {VIEWS.map(filter => (
             <button
-              key={filter.value ?? 'all'}
+              key={filter.value}
               type="button"
-              aria-pressed={status === filter.value}
-              onClick={() => setStatus(filter.value)}
+              aria-pressed={view === filter.value}
+              onClick={() => setView(filter.value)}
               className="segment h-9 rounded-[9px] px-3.5 text-sm"
             >
               {filter.label()}
@@ -267,127 +418,7 @@ export function AdminBookings({ initialPhone = '' }: { initialPhone?: string }) 
       ) : bookings.length === 0 ? (
         <p className="card px-6 py-10 text-center text-grey-cool">{m.admin_no_results()}</p>
       ) : (
-        <div>
-          {bookings.length >= ADMIN_BOOKINGS_LIMIT ? (
-            <p role="status" className="mb-2 text-sm text-grey-cool">
-              {m.admin_bookings_capped({ n: ADMIN_BOOKINGS_LIMIT })}
-            </p>
-          ) : null}
-          <div className="card overflow-hidden">
-            <table className="w-full border-collapse text-sm">
-              <thead className="hidden lg:table-header-group">
-                <tr className="text-left">
-                  <th scope="col" className={`${head} pl-5`}>
-                    {m.admin_col_when()}
-                  </th>
-                  <th scope="col" className={head}>
-                    {m.admin_col_spot()}
-                  </th>
-                  <th scope="col" className={head}>
-                    {m.admin_col_client()}
-                  </th>
-                  <th scope="col" className={`${head} text-center`}>
-                    {m.admin_col_status()}
-                  </th>
-                  <th scope="col" className={`${head} text-right`}>
-                    {m.admin_col_total()}
-                  </th>
-                  <th scope="col" className={`${head} pr-5`}>
-                    <span className="sr-only">{m.admin_col_actions()}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.map(booking => {
-                  const voided = booking.phase === 'cancelled' || booking.phase === 'no_show';
-                  const day = warsawDate(booking.startsAt);
-                  return (
-                    <tr
-                      key={booking.id}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 border-t border-line px-4 py-3.5 first:border-t-0 lg:table-row lg:first:border-t lg:px-0 lg:py-0"
-                    >
-                      <td className="whitespace-nowrap lg:py-3.5 lg:pr-3 lg:pl-5">
-                        <span className="block font-bold first-letter:uppercase">
-                          {/* The unfiltered list reaches back into earlier years */}
-                          {formatDay(day, { withYear: !day.startsWith(thisYear) })}
-                        </span>
-                        <span className="text-grey-cool tabular-nums">
-                          {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)}
-                        </span>
-                      </td>
-                      <td className="self-center justify-self-end lg:hidden">
-                        <span
-                          className={`inline-block rounded-full px-2.5 py-1 text-center text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
-                        >
-                          {PHASE_LABELS[booking.phase]()}
-                        </span>
-                      </td>
-                      <td className="col-span-2 whitespace-nowrap lg:px-3 lg:py-3.5">
-                        {spotName(booking.kind, booking.tableLabel)}
-                        {/* Which balls to rack — the one thing on this row that
-                            is an instruction to the person reading it */}
-                        {booking.game ? (
-                          <span className="text-grey-cool">
-                            {' · '}
-                            {gameName(booking.game).toLocaleLowerCase(getLocale())}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="col-span-2 lg:px-3 lg:py-3.5">
-                        <span className="block font-semibold">
-                          {booking.customerName}
-                          {blacklisted.has(booking.customerPhone) ? (
-                            <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-soft-foreground">
-                              {m.admin_blacklisted()}
-                            </span>
-                          ) : null}
-                        </span>
-                        <a
-                          href={`tel:${booking.customerPhone}`}
-                          className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
-                        >
-                          {formatPhone(booking.customerPhone)}
-                        </a>
-                        {booking.items.length > 0 ? (
-                          <span className="mt-0.5 block text-xs text-grey-cool">
-                            {booking.items
-                              .map(
-                                item =>
-                                  `${nameBySlug.get(item.slug) ?? item.slug} × ${item.quantity}`
-                              )
-                              .join(', ')}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="hidden text-center lg:table-cell lg:px-3 lg:py-3.5">
-                        <span
-                          className={`inline-block min-w-29.5 rounded-full px-2.5 py-1 text-center text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
-                        >
-                          {PHASE_LABELS[booking.phase]()}
-                        </span>
-                      </td>
-                      <td
-                        className={`col-span-2 font-bold whitespace-nowrap tabular-nums lg:px-3 lg:py-3.5 lg:text-right ${
-                          voided ? 'text-grey-cool' : 'text-golden-light'
-                        } ${booking.phase === 'cancelled' ? 'line-through' : ''}`}
-                      >
-                        {formatPln(booking.totalGrosz, intlTag())}
-                        {booking.discountGrosz > 0 ? (
-                          <span className="ml-1 text-xs font-medium text-grey-cool no-underline">
-                            (−{formatPln(booking.discountGrosz, intlTag())})
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="col-span-2 lg:py-3.5 lg:pr-5 lg:pl-3">
-                        <RowActions booking={booking} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <BookingsTable bookings={bookings} />
       )}
     </div>
   );

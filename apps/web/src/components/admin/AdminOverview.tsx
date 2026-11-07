@@ -399,7 +399,8 @@ export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void 
           }
         />
         <Kpi
-          highlight
+          // Gold only while someone plays: a gold zero was the loudest tile
+          highlight={(loaded ? playing.length : stats.activeNow) > 0}
           label={m.admin_active_now()}
           value={String(loaded ? playing.length : stats.activeNow)}
           note={playing.map(booking => spotName(booking.kind, booking.tableLabel)).join(' · ')}

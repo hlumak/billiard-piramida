@@ -917,6 +917,21 @@ test('admin CRM: create walk-in booking, staff cancel, analytics, menu patch', a
   assert.equal(searched.statusCode, 200);
   assert.ok(searched.json().some((b: { id: string }) => b.id === dto.id));
 
+  // The desk's default list: bookings not over yet, soonest first
+  const upcoming = await app.inject({
+    method: 'GET',
+    url: '/api/admin/bookings?upcoming=true',
+    headers
+  });
+  assert.equal(upcoming.statusCode, 200);
+  const upcomingList: { id: string; startsAt: string; endsAt: string }[] = upcoming.json();
+  assert.ok(upcomingList.some(b => b.id === dto.id));
+  assert.ok(upcomingList.every(b => Date.parse(b.endsAt) > Date.now()));
+  assert.deepEqual(
+    upcomingList.map(b => b.startsAt),
+    upcomingList.map(b => b.startsAt).toSorted()
+  );
+
   // Staff cancel works on an upcoming booking
   const cancelled = await app.inject({
     method: 'POST',

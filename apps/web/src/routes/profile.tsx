@@ -21,7 +21,7 @@ function ProfilePage() {
   const hasToken = useFlagCookie(userAuthFlag);
 
   return (
-    <PageLayout script="profile" title={m.nav_profile()} width="medium">
+    <PageLayout title={m.nav_profile()} width="medium">
       {!ready ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

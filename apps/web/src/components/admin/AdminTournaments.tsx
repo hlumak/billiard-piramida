@@ -7,6 +7,7 @@ import { ApiError } from '../../lib/api';
 import { formatDayLong } from '../../lib/format';
 import { adminStatusLabel, rosterProgress, whenLabel } from '../../lib/tournaments';
 import { m } from '../../paraglide/messages.js';
+import { ConfirmAction } from './ConfirmAction';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
 import { AdminTournamentModal } from './AdminTournamentModal';
@@ -60,16 +61,17 @@ function TournamentRow({ item }: { item: AdminTournamentDto }) {
             {m.admin_roster()}
           </Button>
           <AdminTournamentModal item={item} />
-          <Button
-            size="sm"
-            variant="danger-soft"
-            isPending={remove.isPending}
-            onPress={() => {
-              if (window.confirm(m.admin_delete_tournament_confirm())) remove.mutate();
-            }}
+          <ConfirmAction
+            title={m.admin_delete_tournament_confirm()}
+            confirmLabel={m.admin_delete_tournament_action()}
+            onConfirm={() => remove.mutate()}
           >
-            {m.admin_delete_btn()}
-          </Button>
+            {open => (
+              <Button size="sm" variant="danger-soft" isPending={remove.isPending} onPress={open}>
+                {m.admin_delete_btn()}
+              </Button>
+            )}
+          </ConfirmAction>
         </div>
       </div>
 

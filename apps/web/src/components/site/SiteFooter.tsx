@@ -34,9 +34,7 @@ function FooterColumn({
 }) {
   return (
     <nav aria-label={title}>
-      <p className="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-golden-light">
-        {title}
-      </p>
+      <p className="mb-4 text-sm font-bold text-golden-light">{title}</p>
       <ul className="flex flex-col gap-3 text-[15px]">
         {links.map(link => (
           <li key={link.to}>
@@ -96,9 +94,7 @@ function FullFooter({ year }: { year: string }) {
           <FooterColumn title={m.footer_club()} links={FOOTER_CLUB_LINKS} />
         </div>
         <div className="flex flex-col gap-2.5 text-[15px] text-cream-soft">
-          <p className="mb-1.5 text-xs font-bold uppercase tracking-[0.18em] text-golden-light">
-            {m.nav_contacts()}
-          </p>
+          <p className="mb-1.5 text-sm font-bold text-golden-light">{m.nav_contacts()}</p>
           <span>{VENUE_ADDRESS}</span>
           <a
             href={VENUE_PHONE_HREF}

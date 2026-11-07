@@ -19,8 +19,8 @@ describe('parseArticle', () => {
       {
         type: 'list',
         items: [
-          [{ type: 'text', text: 'Tables 6–9 online' }],
-          [{ type: 'text', text: 'Own entrance' }]
+          { line: 2, inlines: [{ type: 'text', text: 'Tables 6–9 online' }] },
+          { line: 3, inlines: [{ type: 'text', text: 'Own entrance' }] }
         ],
         // A list is identified by the line its first item is on
         line: 2

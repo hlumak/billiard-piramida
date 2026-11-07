@@ -42,14 +42,14 @@ export const ADMIN_PANES = [
   { id: 'menu', group: 'club', icon: Coffee, label: m.admin_tab_menu, phone: false },
   { id: 'news', group: 'club', icon: Newspaper, label: m.admin_tab_news, phone: false },
   { id: 'tournaments', group: 'club', icon: Trophy, label: m.admin_tab_tournaments, phone: false },
-  { id: 'stats', group: 'reports', icon: ChartColumn, label: m.admin_tab_stats, phone: false },
   {
     id: 'settings',
-    group: 'reports',
+    group: 'club',
     icon: SlidersHorizontal,
     label: m.admin_tab_settings,
     phone: false
-  }
+  },
+  { id: 'stats', group: 'reports', icon: ChartColumn, label: m.admin_tab_stats, phone: false }
 ] as const satisfies readonly {
   id: string;
   group: AdminGroup;

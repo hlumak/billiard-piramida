@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Spinner } from '@heroui/react';
 import { ChevronRight } from 'lucide-react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
@@ -13,6 +13,7 @@ import { ApiError, api } from '../lib/api';
 import { userAuthFlag } from '../lib/auth';
 import { useFlagCookie } from '../lib/hydration';
 import { QueryError } from '../components/QueryError';
+import { PhoneField } from '../components/PhoneField';
 import { forgetBooking, useRecentBookings } from '../lib/recent-bookings';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
@@ -133,7 +134,7 @@ function MyBookingsList({
 function MyBookingsPage() {
   const { signedIn, ...list } = useMyBookings();
   return (
-    <PageLayout script="bookings" title={m.nav_my_bookings()} width="medium">
+    <PageLayout title={m.nav_my_bookings()} width="medium">
       <MyBookingsList {...list} />
       <LookupSection signedIn={signedIn} />
     </PageLayout>
@@ -152,9 +153,7 @@ function BookingGroup({
   if (bookings.length === 0) return null;
   return (
     <section aria-label={title}>
-      <h2 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
-        {title}
-      </h2>
+      <h2 className="text-[15px] font-bold text-golden-light">{title}</h2>
       <ul className="mt-3.5 flex flex-col gap-3">
         {bookings.map(booking => (
           <li key={booking.id} className="anim-stagger-item">
@@ -260,22 +259,19 @@ function LookupSection({ signedIn }: { signedIn: boolean }) {
           lookup.mutate(phone.trim());
         }}
       >
-        <TextField
+        {/* The same field as the booking form, with the country picker: the
+            plain field here wanted the number typed differently from there */}
+        <PhoneField
           name="phone"
-          type="tel"
           value={phone}
           onChange={value => {
             setPhone(value);
-            // A stuck isInvalid blocks native resubmission — clear on change
             setPhoneError(null);
             lookup.reset();
           }}
           isInvalid={phoneError != null}
-        >
-          <Label>{m.phone_label()}</Label>
-          <Input placeholder={m.phone_placeholder()} autoComplete="tel" />
-          <FieldError>{phoneError}</FieldError>
-        </TextField>
+          errorMessage={phoneError ?? undefined}
+        />
         {statusMessage ? (
           <p role="status" className="text-sm text-grey-cool">
             {statusMessage}

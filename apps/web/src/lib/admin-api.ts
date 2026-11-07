@@ -71,6 +71,8 @@ export interface AdminBookingFilters {
   date?: IsoDate | undefined;
   status?: BookingStatus | undefined;
   phone?: string | undefined;
+  /** Only bookings not over yet, soonest first */
+  upcoming?: boolean | undefined;
 }
 
 /** A news card as the modal submits it — `null` clears the URL columns. */
@@ -126,6 +128,7 @@ export const adminApi = {
     if (filters.date) params.set('date', filters.date);
     if (filters.status) params.set('status', filters.status);
     if (filters.phone) params.set('phone', filters.phone);
+    if (filters.upcoming) params.set('upcoming', 'true');
     params.set('limit', String(ADMIN_BOOKINGS_LIMIT));
     return request<BookingDto[]>(`/api/admin/bookings?${params}`, { signal });
   },
@@ -357,7 +360,8 @@ export const adminBookingsQuery = (filters: AdminBookingFilters) =>
       'bookings',
       filters.date ?? null,
       filters.status ?? null,
-      filters.phone ?? null
+      filters.phone ?? null,
+      filters.upcoming ?? false
     ],
     queryFn: ({ signal }) => adminApi.bookings(filters, signal),
     refetchInterval: 60_000

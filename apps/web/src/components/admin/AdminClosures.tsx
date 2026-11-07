@@ -34,6 +34,7 @@ import { spotName } from '../../lib/spots';
 import { useNowMinute } from '../../lib/use-now';
 import { useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
+import { AdminSwitch } from './AdminSwitch';
 import { QueryError } from '../QueryError';
 import { AdminDatePicker } from './AdminDatePicker';
 
@@ -386,131 +387,127 @@ export function AdminClosureModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Backdrop>
-        <Modal.Container scroll="inside">
-          <Modal.Dialog className="sm:max-w-xl">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>
-                {closure === null ? m.admin_closure_add() : m.admin_closure_edit_title()}
-              </Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="flex flex-col gap-5">
-                <ClosureScope
-                  scope={draft.scope}
-                  tableIds={draft.tableIds}
-                  spots={spots}
-                  onChange={update}
-                />
+    <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container scroll="inside">
+        <Modal.Dialog className="sm:max-w-xl">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Heading>
+              {closure === null ? m.admin_closure_add() : m.admin_closure_edit_title()}
+            </Modal.Heading>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="flex flex-col gap-5">
+              <ClosureScope
+                scope={draft.scope}
+                tableIds={draft.tableIds}
+                spots={spots}
+                onChange={update}
+              />
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <p className="text-sm font-bold">{m.admin_closure_from()}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <AdminDatePicker
-                        label={m.admin_closure_from()}
-                        clearable={false}
-                        value={draft.startDate}
-                        onChange={next => {
-                          if (next === undefined) return;
-                          // The end follows a start moved past it
-                          update({
-                            startDate: next,
-                            endDate: next > draft.endDate ? next : draft.endDate
-                          });
-                        }}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-sm font-bold">{m.admin_closure_from()}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <AdminDatePicker
+                      label={m.admin_closure_from()}
+                      clearable={false}
+                      value={draft.startDate}
+                      onChange={next => {
+                        if (next === undefined) return;
+                        // The end follows a start moved past it
+                        update({
+                          startDate: next,
+                          endDate: next > draft.endDate ? next : draft.endDate
+                        });
+                      }}
+                    />
+                    {draft.wholeDays ? null : (
+                      <HourSelect
+                        label={m.admin_closure_start_time()}
+                        value={draft.startHour}
+                        options={HOURS_FROM}
+                        onChange={startHour => update({ startHour })}
                       />
-                      {draft.wholeDays ? null : (
-                        <HourSelect
-                          label={m.admin_closure_start_time()}
-                          value={draft.startHour}
-                          options={HOURS_FROM}
-                          onChange={startHour => update({ startHour })}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{m.admin_closure_to()}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <AdminDatePicker
-                        label={m.admin_closure_to()}
-                        clearable={false}
-                        value={draft.endDate}
-                        onChange={next => {
-                          if (next !== undefined) update({ endDate: next });
-                        }}
-                      />
-                      {draft.wholeDays ? null : (
-                        <HourSelect
-                          label={m.admin_closure_end_time()}
-                          value={draft.endHour}
-                          options={HOURS_TO}
-                          onChange={endHour => update({ endHour })}
-                        />
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
-                <label className="-mt-2 inline-flex items-center gap-2.5 text-sm font-semibold">
-                  <input
-                    type="checkbox"
-                    checked={draft.wholeDays}
-                    onChange={event => update({ wholeDays: event.target.checked })}
-                    className="size-4.5 accent-golden"
-                  />
-                  {m.admin_closure_whole_days()}
-                </label>
-                {!complete && draft.scope === 'club' ? (
-                  <p className="-mt-2 text-sm text-danger-soft-foreground">
-                    {m.err_invalid_closure()}
-                  </p>
-                ) : null}
-
-                <TextField
-                  name="reason"
-                  value={draft.reason}
-                  onChange={reason => update({ reason })}
-                  maxLength={MAX_CLOSURE_REASON_LENGTH}
-                >
-                  <Label>{m.admin_closure_reason()}</Label>
-                  <Input />
-                  <Description>{m.admin_closure_reason_hint()}</Description>
-                </TextField>
-
-                <ClosureConflicts
-                  conflicts={conflicts}
-                  blocking={blocking}
-                  complete={complete}
-                  spots={spots}
-                  startDate={draft.startDate}
-                  endDate={draft.endDate}
-                  onShowBooking={showBooking}
-                />
-
-                {save.isError ? (
-                  <p role="alert" className="text-sm text-danger-soft-foreground">
-                    {closureErrorText(save.error)}
-                  </p>
-                ) : null}
+                <div>
+                  <p className="text-sm font-bold">{m.admin_closure_to()}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <AdminDatePicker
+                      label={m.admin_closure_to()}
+                      clearable={false}
+                      value={draft.endDate}
+                      onChange={next => {
+                        if (next !== undefined) update({ endDate: next });
+                      }}
+                    />
+                    {draft.wholeDays ? null : (
+                      <HourSelect
+                        label={m.admin_closure_end_time()}
+                        value={draft.endHour}
+                        options={HOURS_TO}
+                        onChange={endHour => update({ endHour })}
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button
-                className="w-full font-bold"
-                isDisabled={!complete || blocking.length > 0 || conflicts.isFetching}
-                isPending={save.isPending}
-                onPress={() => save.mutate()}
+              <AdminSwitch
+                isSelected={draft.wholeDays}
+                onChange={wholeDays => update({ wholeDays })}
+                className="-mt-2 self-start"
               >
-                {closure === null ? m.admin_closure_save() : m.btn_save()}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+                {m.admin_closure_whole_days()}
+              </AdminSwitch>
+              {!complete && draft.scope === 'club' ? (
+                <p className="-mt-2 text-sm text-danger-soft-foreground">
+                  {m.err_invalid_closure()}
+                </p>
+              ) : null}
+
+              <TextField
+                name="reason"
+                value={draft.reason}
+                onChange={reason => update({ reason })}
+                maxLength={MAX_CLOSURE_REASON_LENGTH}
+              >
+                <Label>{m.admin_closure_reason()}</Label>
+                <Input />
+                <Description>{m.admin_closure_reason_hint()}</Description>
+              </TextField>
+
+              <ClosureConflicts
+                conflicts={conflicts}
+                blocking={blocking}
+                complete={complete}
+                spots={spots}
+                startDate={draft.startDate}
+                endDate={draft.endDate}
+                onShowBooking={showBooking}
+              />
+
+              {save.isError ? (
+                <p role="alert" className="text-sm text-danger-soft-foreground">
+                  {closureErrorText(save.error)}
+                </p>
+              ) : null}
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              className="w-full font-bold"
+              isDisabled={!complete || blocking.length > 0 || conflicts.isFetching}
+              isPending={save.isPending}
+              onPress={() => save.mutate()}
+            >
+              {closure === null ? m.admin_closure_save() : m.btn_save()}
+            </Button>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }
 

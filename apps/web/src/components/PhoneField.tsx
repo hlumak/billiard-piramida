@@ -1,4 +1,14 @@
-import { useId, type ClipboardEvent, type ComponentType } from 'react';
+import { useDeferredValue, useId, useMemo, useState, type ClipboardEvent } from 'react';
+import {
+  Autocomplete,
+  Collection,
+  Header,
+  ListBox,
+  ListLayout,
+  SearchField,
+  useFilter,
+  Virtualizer
+} from '@heroui/react';
 import PhoneInput, {
   getCountryCallingCode,
   parsePhoneNumber,
@@ -18,73 +28,210 @@ import { getLocale } from '../paraglide/runtime.js';
  * `@repo/shared/phone`, so what it emits is already the E.164 string the API
  * stores — `isValidPhone` still guards the submit.
  *
- * The country list is the library's native `<select>`: on a phone that opens
- * the OS picker (scrollable, searchable by keyboard) instead of a custom
- * popover, and it needs no styling work to stay accessible.
+ * The country list is the club's own picker (HeroUI Autocomplete, so React
+ * Aria's select pattern: keyboard, focus and screen readers), with a search
+ * field that takes a country name or a dial code. It replaced the library's
+ * native `<select>`, which Windows drew as a plain list with a full-height
+ * cream bar where the 1px divider was meant to be, and no dial codes.
  */
 
 /** The library ships country names per locale; `ua` is its code for Ukrainian. */
 const LABELS: Record<Locale, Labels> = { uk: ukLabels, pl: plLabels, en: enLabels };
 
-/** The list is a native `<select>`, so a divider can only be a hairline row. */
-const DIVIDER_STYLE = { fontSize: '1px', backgroundColor: 'currentColor', color: 'inherit' };
-
 interface CountrySelectProps {
   value?: Country;
   onChange: (country: Country | undefined) => void;
   options: { value?: Country; label: string; divider?: boolean }[];
-  iconComponent: ComponentType<{ country?: Country; label: string; 'aria-hidden'?: boolean }>;
   disabled?: boolean;
   readOnly?: boolean;
 }
 
+/** Self-hosted (public/flags), loaded only as rows scroll into view. */
+function Flag({ country, className = '' }: { country: Country; className?: string }) {
+  return (
+    <img
+      src={`/flags/${country}.svg`}
+      alt=""
+      width={20}
+      height={14}
+      loading="lazy"
+      className={`h-3.5 w-5 flex-none rounded-[2px] object-cover shadow-[0_0_0_1px_rgb(0_0_0/0.25)] ${className}`}
+    />
+  );
+}
+
+/** One country as the list shows it and the search reads it. */
+interface CountryItem {
+  id: Country;
+  label: string;
+  code: string;
+}
+
+interface CountrySection {
+  id: 'common' | 'all';
+  title: string;
+  items: CountryItem[];
+}
+
+/** Row and heading heights the virtual list lays out with; the CSS below matches them. */
+const ROW_HEIGHT = 36;
+const HEADING_HEIGHT = 30;
+/** Nine rows and a heading, then the list scrolls. */
+const LIST_MAX_HEIGHT = 9 * ROW_HEIGHT + HEADING_HEIGHT;
+const LIST_PADDING = 6;
+
+function CountryRow({ item }: { item: CountryItem }) {
+  return (
+    // textValue carries the dial code too, so a screen reader reads both
+    <ListBox.Item
+      id={item.id}
+      textValue={`${item.label} +${item.code}`}
+      className="h-9 min-h-9 gap-2.5 py-0"
+    >
+      <Flag country={item.id} />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      <span className="text-sm text-grey-cool tabular-nums">+{item.code}</span>
+      <ListBox.ItemIndicator />
+    </ListBox.Item>
+  );
+}
+
 /**
- * The library's own country select shows the flag alone. This is that markup
- * (same class names, so its stylesheet still applies) with the dial code
- * spelled out next to the flag — the invisible `<select>` covers the whole
- * chip, so the code is part of the click target rather than a separate control.
+ * Takes the library's options as they come: Poland and Ukraine, a divider,
+ * then every country sorted for the visitor's language. The two before the
+ * divider become their own section at the top.
+ *
+ * The list is virtual (React Aria's Virtualizer): only the rows in view are
+ * rendered. Rendering all 245 rows and their flags on every open and every
+ * keystroke made the picker visibly slow — 150–450 ms to open on a desktop.
  */
-function CountrySelectWithCode({
-  value,
-  onChange,
-  options,
-  iconComponent: Icon,
-  disabled,
-  readOnly,
-  ...rest
-}: CountrySelectProps) {
-  const selected = options.find(option => !option.divider && option.value === value);
+function CountryPicker({ value, onChange, options, disabled, readOnly }: CountrySelectProps) {
+  const { contains } = useFilter({ sensitivity: 'base' });
+  const [query, setQuery] = useState('');
+  // The search box shows each letter at once; the list follows a beat later,
+  // so typing stays smooth on a slow phone while the list rebuilds
+  const deferredQuery = useDeferredValue(query);
+
+  const sections = useMemo(() => {
+    const split = options.findIndex(option => option.divider);
+    const toItems = (list: typeof options): CountryItem[] =>
+      list.flatMap(option =>
+        option.value === undefined
+          ? []
+          : [{ id: option.value, label: option.label, code: getCountryCallingCode(option.value) }]
+      );
+    const all: CountrySection[] = [
+      {
+        id: 'common',
+        title: m.phone_country_common(),
+        items: toItems(split < 0 ? [] : options.slice(0, split))
+      },
+      {
+        id: 'all',
+        title: m.phone_country_all(),
+        items: toItems(split < 0 ? options : options.slice(split + 1))
+      }
+    ];
+    // "+48" and "48" both find Poland; a name matches without diacritics
+    const needle = deferredQuery.trim().replace(/^\+/, '');
+    return all
+      .map(section => ({
+        id: section.id,
+        title: section.title,
+        items: needle
+          ? section.items.filter(item => contains(`${item.label} +${item.code}`, needle))
+          : section.items
+      }))
+      .filter(section => section.items.length > 0);
+  }, [options, deferredQuery, contains]);
+
+  // The virtual list needs a definite height: as tall as its rows, up to the cap
+  const rows = sections.reduce((sum, section) => sum + section.items.length, 0);
+  const listHeight = Math.min(
+    LIST_MAX_HEIGHT,
+    rows * ROW_HEIGHT + sections.length * HEADING_HEIGHT + 2 * LIST_PADDING
+  );
 
   return (
-    <div className="PhoneInputCountry">
-      <select
-        {...rest}
-        className="PhoneInputCountrySelect"
-        // "ZZ" is the library's stand-in for "no country": every `<option/>`
-        // needs a string value.
-        value={value ?? 'ZZ'}
-        onChange={event =>
-          onChange(event.target.value === 'ZZ' ? undefined : (event.target.value as Country))
-        }
-        disabled={disabled || readOnly}
+    <Autocomplete
+      aria-label={m.phone_country_label()}
+      value={value ?? null}
+      onChange={key => {
+        if (typeof key === 'string') onChange(key as Country);
+      }}
+      onOpenChange={open => {
+        if (!open) setQuery('');
+      }}
+      isDisabled={disabled === true || readOnly === true}
+      allowsEmptyCollection
+      // HeroUI's root is a top-aligned column; centred, the flag and the code
+      // sit on the same line as the number beside them
+      className="PhoneInputCountry justify-center"
+    >
+      {/* Bare inside the phone field: the field's own box is the wrapper's.
+          The right padding is the chevron's place (HeroUI positions it there). */}
+      <Autocomplete.Trigger className="h-auto min-h-0 gap-1.5 rounded-md border-0 bg-transparent py-0 ps-0 pe-5 shadow-none hover:bg-transparent data-[focus-visible=true]:outline-2 data-[focus-visible=true]:outline-offset-2 data-[focus-visible=true]:outline-golden">
+        <Autocomplete.Value className="flex items-center gap-1.5">
+          {() =>
+            value ? (
+              <>
+                <Flag country={value} />
+                <span className="PhoneInputCountryCode">+{getCountryCallingCode(value)}</span>
+              </>
+            ) : null
+          }
+        </Autocomplete.Value>
+        <Autocomplete.Indicator className="end-0 size-3.5 text-grey-cool" />
+      </Autocomplete.Trigger>
+      <Autocomplete.Popover
+        placement="bottom start"
+        // HeroUI sizes it to the trigger (here only the flag and code chip)
+        className="w-[min(22rem,calc(100vw-2.5rem))] max-w-[min(22rem,calc(100vw-2.5rem))] rounded-2xl border border-line bg-club-green-dark p-0 text-creme shadow-[0_18px_44px_rgb(0_0_0/0.45)]"
       >
-        {options.map(({ value: country, label, divider }) => (
-          <option
-            key={divider ? '|' : (country ?? 'ZZ')}
-            value={divider ? '|' : (country ?? 'ZZ')}
-            disabled={divider}
-            style={divider ? DIVIDER_STYLE : undefined}
+        <Autocomplete.Filter inputValue={query} onInputChange={setQuery}>
+          <div className="border-b border-line p-2.5">
+            <SearchField autoFocus aria-label={m.phone_country_search()} name="country-search">
+              <SearchField.Group className="rounded-xl bg-club-green-light">
+                <SearchField.SearchIcon />
+                <SearchField.Input placeholder={m.phone_country_search()} />
+                <SearchField.ClearButton />
+              </SearchField.Group>
+            </SearchField>
+          </div>
+          <Virtualizer
+            layout={ListLayout}
+            layoutOptions={{
+              rowHeight: ROW_HEIGHT,
+              headingHeight: HEADING_HEIGHT,
+              padding: LIST_PADDING
+            }}
           >
-            {label}
-          </option>
-        ))}
-      </select>
-      {selected && value ? <Icon aria-hidden country={value} label={selected.label} /> : null}
-      <div className="PhoneInputCountrySelectArrow" />
-      {value ? (
-        <span className="PhoneInputCountryCode">+{getCountryCallingCode(value)}</span>
-      ) : null}
-    </div>
+            <ListBox
+              aria-label={m.phone_country_label()}
+              items={sections}
+              style={{ height: rows === 0 ? undefined : listHeight }}
+              className="overflow-y-auto px-1.5"
+              renderEmptyState={() => (
+                <p className="px-3 py-4 text-center text-sm text-grey-cool">
+                  {m.phone_country_none()}
+                </p>
+              )}
+            >
+              {section => (
+                <ListBox.Section id={section.id}>
+                  <Header className="flex h-7.5 items-end px-2.5 pb-1 text-xs font-bold text-golden-light">
+                    {section.title}
+                  </Header>
+                  <Collection items={section.items}>
+                    {item => <CountryRow item={item} />}
+                  </Collection>
+                </ListBox.Section>
+              )}
+            </ListBox>
+          </Virtualizer>
+        </Autocomplete.Filter>
+      </Autocomplete.Popover>
+    </Autocomplete>
   );
 }
 
@@ -148,14 +295,11 @@ export function PhoneField({
         // Poland first (the club is there), then Ukraine, then everyone else.
         countryOptionsOrder={['PL', 'UA', '|', '...']}
         addInternationalOption={false}
-        countrySelectComponent={CountrySelectWithCode}
+        countrySelectComponent={CountryPicker}
         // Keep the input on the national part only: the dial code is already
         // shown by the picker, and a prefilled +380… would otherwise repeat it.
         international={false}
         labels={LABELS[getLocale()]}
-        // Self-hosted (public/flags) rather than the library's default CDN —
-        // one ~200-byte SVG for the selected country, no third-party request.
-        flagUrl="/flags/{XX}.svg"
         limitMaxLength
         autoComplete="tel"
         numberInputProps={{

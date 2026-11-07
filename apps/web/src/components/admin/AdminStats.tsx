@@ -47,21 +47,19 @@ export function AdminStats() {
     <StaggerGroup className="flex flex-col gap-4">
       <StaggerItem className="grid grid-cols-2 gap-3">
         <div className="card p-5">
-          <p className="text-xs text-grey-cool">{m.admin_total_revenue()}</p>
+          <p className="text-xs text-grey-cool">{m.admin_total_revenue({ days: DAYS })}</p>
           <p className="mt-1 text-2xl font-bold text-golden">
             {formatPln(totalRevenue, intlTag())}
           </p>
         </div>
         <div className="card p-5">
-          <p className="text-xs text-grey-cool">{m.admin_total_bookings()}</p>
+          <p className="text-xs text-grey-cool">{m.admin_total_bookings({ days: DAYS })}</p>
           <p className="mt-1 text-2xl font-bold text-golden">{totalBookings}</p>
         </div>
       </StaggerItem>
 
       <StaggerItem className="card p-5">
-        <h3 className="mb-3 font-semibold text-golden-light">
-          {m.admin_chart_revenue({ days: DAYS })}
-        </h3>
+        <h3 className="mb-3 font-semibold text-golden-light">{m.admin_chart_revenue()}</h3>
         {hasData ? (
           <BarChart data={revenueBars} formatValue={v => formatPln(v, intlTag())} />
         ) : (
@@ -70,7 +68,9 @@ export function AdminStats() {
       </StaggerItem>
 
       <StaggerItem className="card p-5">
-        <h3 className="mb-3 font-semibold text-golden-light">{m.admin_chart_utilization()}</h3>
+        <h3 className="mb-3 font-semibold text-golden-light">
+          {m.admin_chart_utilization({ days: DAYS })}
+        </h3>
         <UtilizationBars tables={data.tables} />
       </StaggerItem>
 

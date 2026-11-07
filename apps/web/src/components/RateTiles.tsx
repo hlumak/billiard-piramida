@@ -82,7 +82,7 @@ export function RateTiles({ withBooking = false }: { withBooking?: boolean }) {
               to="/book"
               className="mt-5.5 hidden text-[15px] font-bold text-golden-light transition-colors hover:text-golden-hover md:block"
             >
-              {m.book_this()} {tier === 'darts' ? title().toLocaleLowerCase(getLocale()) : tier} →
+              {m.book_this()} {tier === 'darts' ? title().toLocaleLowerCase(getLocale()) : tier}
             </Link>
           ) : null}
         </li>

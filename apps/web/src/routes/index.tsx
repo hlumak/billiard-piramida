@@ -116,17 +116,17 @@ function Home() {
           <div
             className={`grid lg:items-center lg:gap-16 lg:pt-20 ${spotlight ? 'lg:grid-cols-[minmax(0,1fr)_440px]' : ''}`}
           >
-            {/* An open sign-up is news with a deadline: on a phone it leads the
-                page, ahead of the hero; on a wide screen it stands beside it */}
+            {/* An open sign-up stands beside the hero on a wide screen. On a
+                phone it used to lead the page, which pushed the club's name and
+                "Book a table" some 700px down; there it now follows the free
+                tables, below. */}
             {spotlight ? (
               <TournamentSpotlight
                 tournament={spotlight}
-                className="mt-2 lg:col-start-2 lg:row-start-1 lg:mt-0"
+                className="hidden lg:col-start-2 lg:row-start-1 lg:block"
               />
             ) : null}
-            <div
-              className={`anim-reveal flex flex-col justify-end pb-7 lg:col-start-1 lg:row-start-1 lg:min-h-0 lg:pb-0 ${spotlight ? 'pt-7' : 'min-h-[584px]'}`}
-            >
+            <div className="anim-reveal flex min-h-[584px] flex-col justify-end pb-7 lg:col-start-1 lg:row-start-1 lg:min-h-0 lg:pb-0">
               <Pills />
               <h1 className="mt-4 max-w-[600px] text-[38px] leading-[1.06] font-bold tracking-[-0.01em] lg:mt-6.5 lg:text-[64px] lg:leading-[1.04] lg:tracking-[-0.015em]">
                 {m.home_title()}
@@ -156,6 +156,9 @@ function Home() {
             </div>
           </div>
           <FreeTables className="anim-reveal mt-3.5 [animation-delay:0.55s] lg:mt-auto lg:mb-12" />
+          {spotlight ? (
+            <TournamentSpotlight tournament={spotlight} className="mt-6 lg:hidden" />
+          ) : null}
         </section>
 
         {latestNews.length > 0 ? (
@@ -165,11 +168,12 @@ function Home() {
             aria-labelledby="home-news"
             className="mx-auto w-full max-w-[1240px] px-5 pt-15 md:px-10 lg:pt-22"
           >
-            <div className="flex items-end justify-between gap-6">
-              <SectionTitle script="news" title={m.news_title()} id="home-news" />
+            {/* Wraps under the title on a phone, where the script title takes the width */}
+            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
+              <SectionTitle title={m.news_title()} id="home-news" />
               <Link
                 to="/news"
-                className="text-sm font-semibold text-golden-light transition-colors hover:text-golden md:text-[15px]"
+                className="pb-2 text-sm font-semibold text-golden-light transition-colors hover:text-golden md:text-[15px]"
               >
                 {m.news_all()} →
               </Link>
@@ -192,10 +196,10 @@ function Home() {
           className="mx-auto w-full max-w-[1240px] px-5 pt-15 md:px-10 lg:pt-28"
         >
           <div className="flex items-end justify-between gap-6">
-            <SectionTitle script="prices" title={m.home_prices_title()} id="home-prices" />
+            <SectionTitle title={m.home_prices_title()} id="home-prices" />
             <Link
               to="/prices"
-              className="hidden text-[15px] font-semibold text-golden-light transition-colors hover:text-golden md:block"
+              className="hidden pb-2 text-[15px] font-semibold text-golden-light transition-colors hover:text-golden md:block"
             >
               {m.home_all_prices()} →
             </Link>
@@ -217,7 +221,7 @@ function Home() {
           aria-labelledby="home-find-us"
           className="mx-auto w-full max-w-[1240px] px-5 pt-15 md:px-10 lg:pt-28"
         >
-          <SectionTitle script="find us" title={m.home_find_us()} id="home-find-us" />
+          <SectionTitle title={m.home_find_us()} id="home-find-us" />
           <div className="mt-5.5 grid gap-6 md:mt-9 lg:grid-cols-[5fr_7fr]">
             <VisitCard />
             <VenueMap className="hidden lg:block" />

@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Link } from '@tanstack/react-router';
 import { dateParts, formatPln, type IsoDate, type TournamentDto } from '@repo/shared';
 import { dateTileParts, formatDaysFromNow, intlTag, warsawToday } from '../../lib/format';
@@ -47,7 +48,9 @@ export function TournamentSpotlight({
   const days = tournament.startsOn === null ? null : daysUntil(tournament.startsOn);
   const when = whenLabel(tournament);
   const fee = tournament.entryFeeGrosz;
-  const headingId = `spotlight-${tournament.id}`;
+  // useId, not the tournament id: the home page renders the card twice (beside
+  // the hero on a wide screen, below the free tables on a phone)
+  const headingId = useId();
 
   return (
     <article
@@ -55,7 +58,7 @@ export function TournamentSpotlight({
       className={`anim-enter-right rounded-[22px] border-[1.5px] border-golden/70 bg-club-green-dark p-5.5 lg:rounded-3xl lg:bg-club-green-deepest/85 lg:p-7 lg:shadow-[0_24px_60px_rgb(0_0_0/0.35)] lg:backdrop-blur-sm ${className ?? ''}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] font-bold tracking-[0.16em] text-golden-light uppercase lg:text-xs lg:tracking-[0.18em]">
+        <span className="text-[13px] font-bold text-golden-light lg:text-sm">
           {m.home_spotlight()}
         </span>
         {days !== null && days >= 0 ? (

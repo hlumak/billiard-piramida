@@ -53,7 +53,13 @@ const config = defineConfig(({ mode }) => {
         // search engines only ever saw the Polish one. The cookie and the
         // browser's preference still decide where the URL can't (API calls).
         // Keep in step with the "generate" script in package.json.
-        strategy: ['url', 'cookie', 'preferredLanguage', 'baseLocale']
+        strategy: ['url', 'cookie', 'preferredLanguage', 'baseLocale'],
+        // Real files on disk, as Paraglide 2 wrote them and as the CLI
+        // ("generate") still does. Paraglide 3's Vite default,
+        // 'virtual-modules', left the server build with two runtimes: the
+        // middleware set the request's language on one while the messages
+        // read the other, so /uk and /en pages rendered in Polish.
+        outputStructure: 'message-modules'
       }),
       // React Aria ships UI strings (and calendars) for 34 locales; keep the app's
       // three (packages/shared SUPPORTED_LOCALES) out of the client bundle's ~53 kB

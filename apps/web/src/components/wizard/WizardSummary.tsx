@@ -72,7 +72,7 @@ function cheapest(rates: RateTable): number {
   return Math.min(...Object.values(rates));
 }
 
-const caption = 'text-xs font-bold tracking-[0.12em] text-grey-cool uppercase';
+const caption = 'text-sm font-bold text-grey-cool';
 const money = (grosz: number) => formatPln(grosz, intlTag());
 
 function timeRange(state: WizardState): string {

@@ -7,6 +7,7 @@ import { adminApi, adminBlacklistQuery } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { formatDayLong, warsawDate } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
+import { ConfirmAction } from './ConfirmAction';
 import { PhoneField } from '../PhoneField';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
@@ -52,20 +53,25 @@ function EntryRow({ entry }: { entry: AdminBlacklistEntryDto }) {
           </p>
           {entry.note ? <p className="mt-1 text-sm text-creme/85">{entry.note}</p> : null}
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="border-golden text-creme"
-          isPending={remove.isPending}
-          onPress={() => {
-            if (
-              window.confirm(m.admin_blacklist_remove_confirm({ phone: formatPhone(entry.phone) }))
-            )
-              remove.mutate();
-          }}
+        <ConfirmAction
+          title={m.admin_blacklist_remove_title({ phone: formatPhone(entry.phone) })}
+          text={m.admin_blacklist_remove_confirm()}
+          confirmLabel={m.admin_blacklist_remove()}
+          tone="primary"
+          onConfirm={() => remove.mutate()}
         >
-          {m.admin_blacklist_remove()}
-        </Button>
+          {open => (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-golden text-creme"
+              isPending={remove.isPending}
+              onPress={open}
+            >
+              {m.admin_blacklist_remove()}
+            </Button>
+          )}
+        </ConfirmAction>
       </div>
       {remove.isError ? (
         <p role="alert" className={`mt-2 ${ALERT}`}>

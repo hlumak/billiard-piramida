@@ -22,7 +22,7 @@ function NewsIndexPage() {
   const { data: news, isPending, isError, error, refetch } = useQuery(newsQuery(getLocale()));
 
   return (
-    <PageLayout script="news" title={m.news_title()}>
+    <PageLayout title={m.news_title()}>
       {isError ? (
         <QueryError error={error} onRetry={() => refetch()} />
       ) : isPending || !news ? (

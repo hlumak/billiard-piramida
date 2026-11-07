@@ -90,13 +90,15 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
             ])
           ),
           phone: Type.Optional(Type.String({ maxLength: 25 })),
+          // Not over yet (playing now or ahead), soonest first: the desk's default list
+          upcoming: Type.Optional(Type.Boolean()),
           limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 }))
         }),
         response: { 200: Type.Array(BOOKING_RESPONSE), '4xx': ERROR_RESPONSE }
       }
     },
     async (request, reply) => {
-      const { date, status, phone, limit = 100 } = request.query;
+      const { date, status, phone, upcoming = false, limit = 100 } = request.query;
 
       const filters = [];
       if (date !== undefined) {
@@ -106,6 +108,7 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         filters.push(gte(bookings.startsAt, dayStart), lt(bookings.startsAt, dayEnd));
       }
       if (status !== undefined) filters.push(eq(bookings.status, status));
+      if (upcoming) filters.push(gt(bookings.endsAt, new Date()));
       if (phone !== undefined && phone.trim() !== '') {
         filters.push(ilike(bookings.customerPhone, `%${phone.trim()}%`));
       }
@@ -114,7 +117,7 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         .select()
         .from(bookings)
         .where(filters.length > 0 ? and(...filters) : undefined)
-        .orderBy(date !== undefined ? bookings.startsAt : desc(bookings.startsAt))
+        .orderBy(date !== undefined || upcoming ? bookings.startsAt : desc(bookings.startsAt))
         .limit(limit);
 
       return toBookingDtos(admin.db, rows);

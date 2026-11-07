@@ -15,6 +15,7 @@ import {
 import { spotDescription } from '../../lib/spots';
 import { useNowMinute } from '../../lib/use-now';
 import { m } from '../../paraglide/messages.js';
+import { AdminSwitch } from './AdminSwitch';
 import { PHASE_LABELS, PHASE_STYLES } from '../booking/phase';
 
 /**
@@ -305,19 +306,17 @@ export function BookingAlerts({ onShowBooking }: { onShowBooking: (phone: string
             </ul>
           )}
           <div className="flex flex-col gap-2 border-t border-line px-4 py-3 text-sm">
-            <label className="flex items-center gap-2.5">
-              <input
-                type="checkbox"
-                checked={soundOn}
-                onChange={event => {
-                  setSoundOn(event.target.checked);
-                  store(SOUND_OFF_KEY, event.target.checked ? '0' : '1');
-                  if (event.target.checked) unlockAudio();
-                }}
-                className="size-4 accent-golden"
-              />
+            <AdminSwitch
+              isSelected={soundOn}
+              onChange={on => {
+                setSoundOn(on);
+                store(SOUND_OFF_KEY, on ? '0' : '1');
+                if (on) unlockAudio();
+              }}
+              className="self-start"
+            >
               {m.admin_alerts_sound()}
-            </label>
+            </AdminSwitch>
             {permission === 'default' ? (
               <button
                 type="button"

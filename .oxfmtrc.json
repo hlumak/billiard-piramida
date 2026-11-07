@@ -8,5 +8,6 @@
   "semi": true,
   "singleQuote": true,
   "tabWidth": 2,
-  "trailingComma": "none"
+  "trailingComma": "none",
+  "ignorePatterns": [".claude/skills/"]
 }

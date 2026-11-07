@@ -80,7 +80,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body>
+      {/* Extensions such as Grammarly write their own attributes onto <body>
+          before React hydrates, which React reports as a mismatch. This covers
+          only <body>'s own attributes (it sets none), never its children. */}
+      <body suppressHydrationWarning>
         {/* First stop for keyboard users: jump past the header to the page */}
         <a
           href="#main"

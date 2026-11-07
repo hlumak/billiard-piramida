@@ -188,7 +188,7 @@ function BookingWizard() {
   }, [step]);
 
   return (
-    <PageLayout script="booking" title={msg.page_booking()} footer={false}>
+    <PageLayout title={msg.page_booking()} footer={false}>
       <BookingStepper step={step} />
       <WizardFrame>
         {/* key remounts the wrapper per step so the CSS slide-in replays;

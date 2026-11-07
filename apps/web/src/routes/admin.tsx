@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Spinner } from '@heroui/react';
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { PageLayout } from '../components/site/PageLayout';
 import { LocaleSwitcher } from '../components/LocaleSwitcher';
 import { AdminShell } from '../components/admin/AdminShell';
-import type { AdminPaneId } from '../components/admin/panes';
+import { ADMIN_PANES, type AdminPaneId } from '../components/admin/panes';
 import { AdminBookings } from '../components/admin/AdminBookings';
 import { AdminCustomers } from '../components/admin/AdminCustomers';
 import { AdminBlacklist } from '../components/admin/AdminBlacklist';
@@ -23,7 +23,25 @@ import { useFlagCookie, useIsHydrated } from '../lib/hydration';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 
+interface AdminSearch {
+  pane?: AdminPaneId;
+  /** The phone a customer, alert or header search handed to the bookings pane */
+  phone?: string;
+}
+
+const PANE_IDS = new Set<string>(ADMIN_PANES.map(entry => entry.id));
+
 export const Route = createFileRoute('/admin')({
+  // The open section lives in the address, so a refresh, Back, a bookmark or
+  // a second tab lands where the staff left off rather than on the overview
+  validateSearch: (search: Record<string, unknown>): AdminSearch => ({
+    ...(typeof search.pane === 'string' && PANE_IDS.has(search.pane)
+      ? { pane: search.pane as AdminPaneId }
+      : {}),
+    ...(typeof search.phone === 'string' && /^[\d\s+()-]{1,24}$/.test(search.phone)
+      ? { phone: search.phone }
+      : {})
+  }),
   head: () => ({ meta: noindexMeta('Admin — Piramida') }),
   component: AdminPage
 });
@@ -113,12 +131,17 @@ function AdminPage() {
   // client takes over, so SSR and the hydration render agree.
   const signedIn = useFlagCookie(adminAuthFlag);
   const ready = useIsHydrated();
-  const [pane, setPane] = useState<AdminPaneId>('overview');
-  const [bookingsPhone, setBookingsPhone] = useState('');
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const pane = search.pane ?? 'overview';
+  const bookingsPhone = pane === 'bookings' ? (search.phone ?? '') : '';
 
+  // Each section change is a history entry, so Back returns to the last one
+  const setPane = (next: AdminPaneId) => {
+    if (next !== pane) void navigate({ search: next === 'overview' ? {} : { pane: next } });
+  };
   const showCustomerBookings = (phone: string) => {
-    setBookingsPhone(phone);
-    setPane('bookings');
+    void navigate({ search: { pane: 'bookings', ...(phone ? { phone } : {}) } });
   };
 
   if (ready && signedIn) {
@@ -140,7 +163,7 @@ function AdminPage() {
   }
 
   return (
-    <PageLayout script="admin" title={m.page_admin()} footer={false}>
+    <PageLayout title={m.page_admin()} footer={false}>
       {!ready ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

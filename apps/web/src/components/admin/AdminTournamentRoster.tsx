@@ -6,6 +6,7 @@ import { formatPhone, isValidPhone } from '@repo/shared/phone';
 import { adminApi, adminRegistrationsQuery } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { m } from '../../paraglide/messages.js';
+import { ConfirmAction } from './ConfirmAction';
 import { QueryError } from '../QueryError';
 
 function statusLabel(status: TournamentRegistrationStatus): string {
@@ -75,16 +76,18 @@ function RosterRow({
             </Button>
             {/* Only offered once a seat is already released: cancelling is the
                 reversible action, this is the one that drops the record. */}
-            <Button
-              size="sm"
-              variant="danger-soft"
-              isPending={isBusy}
-              onPress={() => {
-                if (window.confirm(m.admin_registration_remove_confirm())) onRemove();
-              }}
+            <ConfirmAction
+              title={m.admin_registration_remove_title()}
+              text={m.admin_registration_remove_confirm()}
+              confirmLabel={m.admin_registration_remove()}
+              onConfirm={onRemove}
             >
-              {m.admin_registration_remove()}
-            </Button>
+              {open => (
+                <Button size="sm" variant="danger-soft" isPending={isBusy} onPress={open}>
+                  {m.admin_registration_remove()}
+                </Button>
+              )}
+            </ConfirmAction>
           </>
         ) : (
           <Button

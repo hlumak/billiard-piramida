@@ -239,6 +239,7 @@ export function TableStep({
           label: m.next_to_bar(),
           short: m.btn_next(),
           disabled: picked === null,
+          hint: m.missing_table(),
           onPress: () => goToStep('food')
         }}
         back={{ label: m.change_time(), onPress: () => goToStep('when') }}

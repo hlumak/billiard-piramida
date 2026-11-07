@@ -52,6 +52,8 @@ export interface StepAction {
   /** Submit this form instead (the details step's) */
   form?: string;
   disabled?: boolean;
+  /** Said beside a disabled action: what the guest still has to pick */
+  hint?: string;
   pending?: boolean;
 }
 
@@ -115,10 +117,17 @@ export function StepActions({
   // step from anywhere past the first
   const step = useStore(wizardStore, state => state.step);
   const previous = WIZARD_STEPS[stepIndex(step) - 1];
+  // A greyed-out button alone left the guest guessing what it waited for
+  const hint = action.disabled === true ? action.hint : undefined;
 
   const aside = (
     <div className="mt-6 text-center">
       <ActionButton action={action} label={action.label} className="h-14 w-full text-base" />
+      {hint ? (
+        <p role="status" className="mt-2.5 text-sm text-grey-cool">
+          {hint}
+        </p>
+      ) : null}
       {back ? (
         <button
           type="button"
@@ -134,6 +143,14 @@ export function StepActions({
 
   const phoneBar = (
     <div className="anim-reveal fixed inset-x-0 bottom-0 z-30 border-t border-creme/14 bg-club-green-dark px-5 pt-3.5 pb-[calc(1.375rem+env(safe-area-inset-bottom))] lg:hidden">
+      {hint ? (
+        <p
+          role="status"
+          className="mx-auto mb-2.5 max-w-[960px] text-center text-[13px] text-grey-cool"
+        >
+          {hint}
+        </p>
+      ) : null}
       <div className="mx-auto flex max-w-[960px] items-center gap-3.5">
         {previous === undefined ? null : (
           <button
@@ -198,7 +215,7 @@ function BarTotal() {
   const totals = useWizardTotals();
   return (
     <div className="flex-none">
-      <p className="text-xs font-bold tracking-[0.12em] text-grey-cool uppercase">{m.total()}</p>
+      <p className="text-sm font-bold text-grey-cool">{m.total()}</p>
       <p className="mt-0.5 text-[22px] leading-tight font-bold text-golden tabular-nums">
         {formatPln(totals.total, intlTag())}
       </p>

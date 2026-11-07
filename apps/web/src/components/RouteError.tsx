@@ -11,7 +11,7 @@ import { m } from '../paraglide/messages.js';
 export function RouteError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   return (
-    <PageLayout script="oops" title={m.page_error()} width="narrow">
+    <PageLayout title={m.page_error()} width="narrow">
       <QueryError
         error={error}
         onRetry={() => {
