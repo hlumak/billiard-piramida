@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FieldError, Input, Label, Spinner, TextField } from '@heroui/react';
+import { Spinner } from '@heroui/react';
 import { ChevronRight } from 'lucide-react';
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
@@ -13,6 +13,7 @@ import { ApiError, api } from '../lib/api';
 import { userAuthFlag } from '../lib/auth';
 import { useFlagCookie } from '../lib/hydration';
 import { QueryError } from '../components/QueryError';
+import { PhoneField } from '../components/PhoneField';
 import { forgetBooking, useRecentBookings } from '../lib/recent-bookings';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
@@ -260,22 +261,19 @@ function LookupSection({ signedIn }: { signedIn: boolean }) {
           lookup.mutate(phone.trim());
         }}
       >
-        <TextField
+        {/* The same field as the booking form, with the country picker: the
+            plain field here wanted the number typed differently from there */}
+        <PhoneField
           name="phone"
-          type="tel"
           value={phone}
           onChange={value => {
             setPhone(value);
-            // A stuck isInvalid blocks native resubmission — clear on change
             setPhoneError(null);
             lookup.reset();
           }}
           isInvalid={phoneError != null}
-        >
-          <Label>{m.phone_label()}</Label>
-          <Input placeholder={m.phone_placeholder()} autoComplete="tel" />
-          <FieldError>{phoneError}</FieldError>
-        </TextField>
+          errorMessage={phoneError ?? undefined}
+        />
         {statusMessage ? (
           <p role="status" className="text-sm text-grey-cool">
             {statusMessage}
