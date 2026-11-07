@@ -611,5 +611,11 @@
   "admin_col_time": "Godzina",
   "admin_view_cancelled": "Anulowane",
   "admin_view_no_show": "Nieobecności",
-  "admin_util_hours": "{booked} z {open} godz."
+  "admin_util_hours": "{booked} z {open} godz.",
+  "admin_pick_start_first": "Najpierw wybierz godzinę rozpoczęcia — wtedy pokażą się wolne miejsca.",
+  "missing_start": "Wybierz godzinę rozpoczęcia",
+  "missing_table": "Wybierz stół",
+  "missing_name": "Wpisz imię",
+  "missing_phone": "Wpisz numer telefonu",
+  "admin_guest_name_placeholder": "Imię gościa"
 }

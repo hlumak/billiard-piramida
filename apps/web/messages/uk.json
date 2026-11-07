@@ -633,5 +633,11 @@
   "admin_col_time": "Час",
   "admin_view_cancelled": "Скасовані",
   "admin_view_no_show": "Неявки",
-  "admin_util_hours": "{booked} з {open} год"
+  "admin_util_hours": "{booked} з {open} год",
+  "admin_pick_start_first": "Спершу виберіть час початку — тоді буде видно вільні місця.",
+  "missing_start": "Виберіть час початку",
+  "missing_table": "Виберіть стіл",
+  "missing_name": "Вкажіть ім'я",
+  "missing_phone": "Вкажіть номер телефону",
+  "admin_guest_name_placeholder": "Ім'я гостя"
 }

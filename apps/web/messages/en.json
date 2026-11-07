@@ -608,5 +608,11 @@
   "admin_col_time": "Time",
   "admin_view_cancelled": "Cancelled",
   "admin_view_no_show": "No-shows",
-  "admin_util_hours": "{booked} of {open} h"
+  "admin_util_hours": "{booked} of {open} h",
+  "admin_pick_start_first": "Pick a start time first — then the free spots show up.",
+  "missing_start": "Pick a start time",
+  "missing_table": "Pick a table",
+  "missing_name": "Enter a name",
+  "missing_phone": "Enter a phone number",
+  "admin_guest_name_placeholder": "Guest's name"
 }

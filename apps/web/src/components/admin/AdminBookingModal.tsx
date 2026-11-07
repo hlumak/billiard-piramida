@@ -1,5 +1,5 @@
 import { useReducer, useState } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { Minus, Pencil, Plus } from 'lucide-react';
 import { Button, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -317,14 +317,27 @@ export function AdminBookingModal({
   const slotWindow: SlotWindow | null =
     startMinute === null ? null : { date, startMinute, duration: effectiveDuration };
 
-  const canSubmit =
-    startMinute !== null && tableId !== null && name.trim().length > 0 && isValidPhone(phone);
+  // The first thing still missing, said next to the disabled button rather
+  // than leaving staff to work out why it does nothing
+  const missing =
+    startMinute === null
+      ? m.missing_start()
+      : tableId === null
+        ? m.missing_table()
+        : name.trim().length === 0
+          ? m.missing_name()
+          : !isValidPhone(phone)
+            ? m.missing_phone()
+            : null;
+  const canSubmit = missing === null;
+  const stepper =
+    'flex size-9 items-center justify-center rounded-full border-[1.5px] transition-colors hover:bg-creme/6 disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
       <Modal.Backdrop>
         <Modal.Container scroll="inside">
-          <Modal.Dialog className="sm:max-w-lg">
+          <Modal.Dialog className="sm:max-w-lg lg:max-w-4xl">
             <Modal.CloseTrigger />
             <Modal.Header>
               <Modal.Heading>
@@ -332,143 +345,173 @@ export function AdminBookingModal({
               </Modal.Heading>
             </Modal.Header>
             <Modal.Body>
-              <div className="flex flex-col gap-4">
-                <AdminDatePicker
-                  value={date}
-                  onChange={next =>
-                    dispatch({
-                      type: 'date',
-                      date: next ?? clubMoment(venueHours).date
-                    })
-                  }
-                />
+              {/* Two columns on a wide screen: when and where on the left, who on
+                  the right, so the phone field no longer sits below the fold */}
+              <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+                <div className="flex flex-col gap-4">
+                  <AdminDatePicker
+                    value={date}
+                    onChange={next =>
+                      dispatch({
+                        type: 'date',
+                        date: next ?? clubMoment(venueHours).date
+                      })
+                    }
+                  />
 
-                <div>
-                  <p className="mb-2 text-sm text-grey-cool">{m.admin_start_time()}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {starts.map(start => (
-                      <button
-                        key={start}
-                        type="button"
-                        aria-pressed={startMinute === start}
-                        onClick={() => dispatch({ type: 'startMinute', startMinute: start })}
-                        className={chip(startMinute === start)}
-                      >
-                        {formatClock(start)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="mb-2 text-sm text-grey-cool">{m.time_duration()}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {lengths.map(n => (
-                      <button
-                        key={n}
-                        type="button"
-                        aria-pressed={effectiveDuration === n}
-                        onClick={() => dispatch({ type: 'duration', duration: n })}
-                        className={chip(effectiveDuration === n)}
-                      >
-                        {formatDuration(n)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="mb-2 text-sm text-grey-cool">{m.admin_pick_table()}</p>
-                  {!availability ? (
-                    <Spinner size="sm" aria-label={m.loading()} />
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {availability.tables.map(table => {
-                        const free =
-                          slotWindow !== null &&
-                          isFreeForWindow(table, slotWindow, booking, venueHours);
-                        return (
-                          <button
-                            key={table.tableId}
-                            type="button"
-                            disabled={!free}
-                            aria-pressed={tableId === table.tableId}
-                            onClick={() => dispatch({ type: 'tableId', tableId: table.tableId })}
-                            className={chip(tableId === table.tableId, !free)}
-                          >
-                            {spotName(table.kind, table.label)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Only where the room actually offers a choice — hall 2's 12ft
-                    cloth and the dartboards have nothing to pick between. */}
-                {tableId !== null && gamesFor(tableId).length > 1 ? (
                   <div>
-                    <p className="mb-2 text-sm text-grey-cool">{m.game_label()}</p>
+                    <p className="mb-2 text-sm text-grey-cool">{m.admin_start_time()}</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {gamesFor(tableId).map(option => (
+                      {starts.map(start => (
                         <button
-                          key={option}
+                          key={start}
                           type="button"
-                          aria-pressed={game === option}
-                          onClick={() => dispatch({ type: 'game', game: option })}
-                          className={chip(game === option, false)}
+                          aria-pressed={startMinute === start}
+                          onClick={() => dispatch({ type: 'startMinute', startMinute: start })}
+                          className={chip(startMinute === start)}
                         >
-                          {gameName(option)}
+                          {formatClock(start)}
                         </button>
                       ))}
                     </div>
                   </div>
-                ) : null}
 
-                <div>
-                  <p className="mb-2 text-sm text-grey-cool">{m.admin_sport_cards()}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {Array.from({ length: MAX_SPORT_CARDS_PER_BOOKING + 1 }, (_, n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        aria-pressed={sportCards === n}
-                        onClick={() => dispatch({ type: 'sportCards', sportCards: n })}
-                        className={chip(sportCards === n, false)}
-                      >
-                        {n}
-                      </button>
-                    ))}
+                  <div>
+                    <p className="mb-2 text-sm text-grey-cool">{m.time_duration()}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {lengths.map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          aria-pressed={effectiveDuration === n}
+                          onClick={() => dispatch({ type: 'duration', duration: n })}
+                          className={chip(effectiveDuration === n)}
+                        >
+                          {formatDuration(n)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  <div>
+                    <p className="mb-2 text-sm text-grey-cool">{m.admin_pick_table()}</p>
+                    {!availability ? (
+                      <Spinner size="sm" aria-label={m.loading()} />
+                    ) : slotWindow === null ? (
+                      // Greyed-out spots said nothing about why they could not be picked
+                      <p className="rounded-xl border border-dashed border-creme/20 px-3 py-2.5 text-sm text-grey-cool">
+                        {m.admin_pick_start_first()}
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {availability.tables.map(table => {
+                          const free =
+                            slotWindow !== null &&
+                            isFreeForWindow(table, slotWindow, booking, venueHours);
+                          return (
+                            <button
+                              key={table.tableId}
+                              type="button"
+                              disabled={!free}
+                              aria-pressed={tableId === table.tableId}
+                              onClick={() => dispatch({ type: 'tableId', tableId: table.tableId })}
+                              className={chip(tableId === table.tableId, !free)}
+                            >
+                              {spotName(table.kind, table.label)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Only where the room actually offers a choice — hall 2's 12ft
+                    cloth and the dartboards have nothing to pick between. */}
+                  {tableId !== null && gamesFor(tableId).length > 1 ? (
+                    <div>
+                      <p className="mb-2 text-sm text-grey-cool">{m.game_label()}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {gamesFor(tableId).map(option => (
+                          <button
+                            key={option}
+                            type="button"
+                            aria-pressed={game === option}
+                            onClick={() => dispatch({ type: 'game', game: option })}
+                            className={chip(game === option, false)}
+                          >
+                            {gameName(option)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
-                <TextField
-                  name="customerName"
-                  value={name}
-                  onChange={value => dispatch({ type: 'name', name: value })}
-                >
-                  <Label>{m.name_label()}</Label>
-                  <Input placeholder={m.name_placeholder()} />
-                </TextField>
-                <PhoneField
-                  name="customerPhone"
-                  value={phone}
-                  onChange={value => dispatch({ type: 'phone', phone: value })}
-                />
-                {phoneBlacklisted ? (
-                  <p role="status" className="text-sm text-danger-soft-foreground">
-                    {m.admin_blacklisted_warning()}
-                  </p>
-                ) : null}
+                <div className="flex flex-col gap-4">
+                  <TextField
+                    name="customerName"
+                    value={name}
+                    onChange={value => dispatch({ type: 'name', name: value })}
+                  >
+                    <Label>{m.name_label()}</Label>
+                    <Input placeholder={m.admin_guest_name_placeholder()} />
+                  </TextField>
+                  <PhoneField
+                    name="customerPhone"
+                    value={phone}
+                    onChange={value => dispatch({ type: 'phone', phone: value })}
+                  />
+                  {phoneBlacklisted ? (
+                    <p role="status" className="text-sm text-danger-soft-foreground">
+                      {m.admin_blacklisted_warning()}
+                    </p>
+                  ) : null}
 
-                {create.error ? (
-                  <p className="text-sm text-danger-soft-foreground">
-                    {submitErrorMessage(create.error)}
-                  </p>
-                ) : null}
+                  {/* A counter, not eleven numbered chips */}
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-club-green px-3.5 py-2.5">
+                    <span className="text-sm text-creme">{m.admin_sport_cards()}</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        aria-label={`${m.admin_sport_cards()} −`}
+                        disabled={sportCards <= 0}
+                        onClick={() => dispatch({ type: 'sportCards', sportCards: sportCards - 1 })}
+                        className={`${stepper} border-creme/35 text-creme`}
+                      >
+                        <Minus aria-hidden className="size-4" />
+                      </button>
+                      <output
+                        aria-live="polite"
+                        className="min-w-5 text-center text-lg font-bold text-golden tabular-nums"
+                      >
+                        {sportCards}
+                      </output>
+                      <button
+                        type="button"
+                        aria-label={`${m.admin_sport_cards()} +`}
+                        disabled={sportCards >= MAX_SPORT_CARDS_PER_BOOKING}
+                        onClick={() => dispatch({ type: 'sportCards', sportCards: sportCards + 1 })}
+                        className={`${stepper} border-golden text-golden`}
+                      >
+                        <Plus aria-hidden className="size-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {create.error ? (
+                    <p className="text-sm text-danger-soft-foreground">
+                      {submitErrorMessage(create.error)}
+                    </p>
+                  ) : null}
+                </div>
               </div>
             </Modal.Body>
-            <Modal.Footer>
+            <Modal.Footer className="flex-col items-stretch gap-2">
+              {missing ? (
+                <p role="status" className="text-center text-sm text-grey-cool">
+                  {missing}
+                </p>
+              ) : null}
               <Button
                 className="w-full font-bold"
                 isDisabled={!canSubmit}
