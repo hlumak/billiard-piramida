@@ -5,6 +5,10 @@ import { Switch } from '@heroui/react';
  * The panel's on/off control: HeroUI's switch with its label beside it.
  * It replaced native checkboxes, whose unticked box was the browser's own
  * white square on the dark green.
+ *
+ * Switch.Content is the clickable <label> (React Aria's SwitchButton, with
+ * the hidden input inside), so the track must sit inside it: placed beside
+ * it, the track looked like a switch but a click on it reached nothing.
  */
 export function AdminSwitch({
   isSelected,
@@ -26,12 +30,14 @@ export function AdminSwitch({
       isDisabled={isDisabled}
       onChange={onChange}
       // The off track in the theme's default green vanished into the rows it sits on
-      className={`flex flex-row items-center gap-2 [--switch-control-bg:rgb(246_241_220/0.3)] ${className}`}
+      className={`[--switch-control-bg:rgb(246_241_220/0.3)] ${className}`}
     >
-      <Switch.Control>
-        <Switch.Thumb />
-      </Switch.Control>
-      <Switch.Content className="text-sm font-semibold text-creme">{children}</Switch.Content>
+      <Switch.Content className="flex cursor-pointer flex-row items-center gap-2 text-sm font-semibold text-creme">
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+        {children}
+      </Switch.Content>
     </Switch>
   );
 }
