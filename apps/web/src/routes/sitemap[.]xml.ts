@@ -3,14 +3,16 @@ import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '@repo/shared';
 import { api } from '../lib/api';
 import { localizedPageUrl } from '../lib/seo';
 
-/** The public pages; private ones (/book, /booking, /bookings, /admin, /profile) stay out. */
+/**
+ * The public pages; private ones (/book, /booking, /bookings, /admin, /profile)
+ * stay out, and so does /menu, a page of links marked noindex.
+ */
 const STATIC_PAGES: { path: string; priority: string }[] = [
   { path: '/', priority: '1.0' },
   { path: '/prices', priority: '0.8' },
   { path: '/contacts', priority: '0.8' },
   { path: '/tournaments', priority: '0.8' },
-  { path: '/news', priority: '0.7' },
-  { path: '/menu', priority: '0.6' }
+  { path: '/news', priority: '0.7' }
 ];
 
 const escapeXml = (value: string) => value.replace(/[<>&'"]/g, char => `&#${char.charCodeAt(0)};`);
