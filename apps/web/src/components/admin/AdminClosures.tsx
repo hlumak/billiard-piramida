@@ -34,6 +34,7 @@ import { spotName } from '../../lib/spots';
 import { useNowMinute } from '../../lib/use-now';
 import { useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
+import { AdminSwitch } from './AdminSwitch';
 import { QueryError } from '../QueryError';
 import { AdminDatePicker } from './AdminDatePicker';
 
@@ -454,15 +455,13 @@ export function AdminClosureModal({
                     </div>
                   </div>
                 </div>
-                <label className="-mt-2 inline-flex items-center gap-2.5 text-sm font-semibold">
-                  <input
-                    type="checkbox"
-                    checked={draft.wholeDays}
-                    onChange={event => update({ wholeDays: event.target.checked })}
-                    className="size-4.5 accent-golden"
-                  />
+                <AdminSwitch
+                  isSelected={draft.wholeDays}
+                  onChange={wholeDays => update({ wholeDays })}
+                  className="-mt-2 self-start"
+                >
                   {m.admin_closure_whole_days()}
-                </label>
+                </AdminSwitch>
                 {!complete && draft.scope === 'club' ? (
                   <p className="-mt-2 text-sm text-danger-soft-foreground">
                     {m.err_invalid_closure()}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Input, Spinner, Switch } from '@heroui/react';
+import { Button, Input, Spinner } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminMenuItemDto } from '@repo/shared';
 import { adminApi, adminMenuQuery } from '../../lib/admin-api';
@@ -8,6 +8,7 @@ import { intlTag } from '../../lib/format';
 import { categoryLabel } from '../../lib/menu';
 import { parseZloty, plnUnit } from '../../lib/money';
 import { m } from '../../paraglide/messages.js';
+import { AdminSwitch } from './AdminSwitch';
 import { getLocale } from '../../paraglide/runtime.js';
 import { ConfirmAction } from './ConfirmAction';
 import { QueryError } from '../QueryError';
@@ -85,20 +86,14 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
           ) : null}
           {/* A switch, not a button labelled with the current state: staff
               could not tell whether pressing "In menu" would hide the dish */}
-          <Switch
-            size="sm"
+          <AdminSwitch
             isSelected={item.isAvailable}
             isDisabled={update.isPending}
             onChange={isAvailable => update.mutate({ isAvailable })}
-            className="flex flex-row items-center gap-2 px-1"
+            className="px-1"
           >
-            <Switch.Control>
-              <Switch.Thumb />
-            </Switch.Control>
-            <Switch.Content className="text-sm font-semibold text-creme">
-              {m.admin_in_menu()}
-            </Switch.Content>
-          </Switch>
+            {m.admin_in_menu()}
+          </AdminSwitch>
           <AdminDishModal item={item} />
           <ConfirmAction
             title={m.admin_delete_confirm()}

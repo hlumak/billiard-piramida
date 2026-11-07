@@ -17,6 +17,7 @@ import { formatHour, weekdayName } from '../../lib/format';
 import { parseZloty } from '../../lib/money';
 import { WEEKDAY_DISPLAY_ORDER } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
+import { AdminSwitch } from './AdminSwitch';
 import { QueryError } from '../QueryError';
 import { AdminClosures } from './AdminClosures';
 
@@ -226,22 +227,17 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
                   isDisabled={closed}
                   onChange={close => setDay(weekday, { ...day, close })}
                 />
-                <label className="col-start-2 row-start-1 flex items-center gap-2 justify-self-end text-sm text-creme sm:col-start-4 sm:justify-self-start">
-                  <input
-                    type="checkbox"
-                    checked={closed}
-                    // Shutting a day collapses the window to nothing; reopening
-                    // restores the club's usual afternoon rather than 00:00.
-                    onChange={event =>
-                      setDay(
-                        weekday,
-                        event.target.checked ? { open: 0, close: 0 } : { open: 16, close: 22 }
-                      )
-                    }
-                    className="size-4 accent-golden"
-                  />
+                <AdminSwitch
+                  isSelected={closed}
+                  // Shutting a day collapses the window to nothing; reopening
+                  // restores the club's usual afternoon rather than 00:00.
+                  onChange={shut =>
+                    setDay(weekday, shut ? { open: 0, close: 0 } : { open: 16, close: 22 })
+                  }
+                  className="col-start-2 row-start-1 justify-self-end sm:col-start-4 sm:justify-self-start"
+                >
                   {m.admin_day_closed()}
-                </label>
+                </AdminSwitch>
               </li>
             );
           })}
