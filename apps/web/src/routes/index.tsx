@@ -116,17 +116,18 @@ function Home() {
           <div
             className={`grid lg:items-center lg:gap-16 lg:pt-20 ${spotlight ? 'lg:grid-cols-[minmax(0,1fr)_440px]' : ''}`}
           >
-            {/* An open sign-up stands beside the hero on a wide screen. On a
-                phone it used to lead the page, which pushed the club's name and
-                "Book a table" some 700px down; there it now follows the free
-                tables, below. */}
+            {/* An open sign-up is news with a deadline: on a phone it leads the
+                page, ahead of the hero; on a wide screen it stands beside it.
+                The owner wants guests to see the next tournament first. */}
             {spotlight ? (
               <TournamentSpotlight
                 tournament={spotlight}
-                className="hidden lg:col-start-2 lg:row-start-1 lg:block"
+                className="mt-2 lg:col-start-2 lg:row-start-1 lg:mt-0"
               />
             ) : null}
-            <div className="anim-reveal flex min-h-[584px] flex-col justify-end pb-7 lg:col-start-1 lg:row-start-1 lg:min-h-0 lg:pb-0">
+            <div
+              className={`anim-reveal flex flex-col justify-end pb-7 lg:col-start-1 lg:row-start-1 lg:min-h-0 lg:pb-0 ${spotlight ? 'pt-7' : 'min-h-[584px]'}`}
+            >
               <Pills />
               <h1 className="mt-4 max-w-[600px] text-[38px] leading-[1.06] font-bold tracking-[-0.01em] lg:mt-6.5 lg:text-[64px] lg:leading-[1.04] lg:tracking-[-0.015em]">
                 {m.home_title()}
@@ -156,9 +157,6 @@ function Home() {
             </div>
           </div>
           <FreeTables className="anim-reveal mt-3.5 [animation-delay:0.55s] lg:mt-auto lg:mb-12" />
-          {spotlight ? (
-            <TournamentSpotlight tournament={spotlight} className="mt-6 lg:hidden" />
-          ) : null}
         </section>
 
         {latestNews.length > 0 ? (
