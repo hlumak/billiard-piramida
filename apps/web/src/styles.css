@@ -177,6 +177,22 @@
   }
 }
 
+/* A pyramid ball: ivory, lit from the top left, a dark number on it. The
+   club's one signature mark, kept for things that really are a numbered
+   sequence (the booking steps), not a decoration for any list. */
+@utility ball {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 34% 30%, #fffdf5 0%, #f2ebd6 42%, #c9bf9f 100%);
+  color: var(--color-btn-text);
+  font-weight: 800;
+  box-shadow:
+    inset -2px -3px 5px rgb(60 50 20 / 0.28),
+    0 3px 8px rgb(0 0 0 / 0.35);
+}
+
 /* Cards that lead somewhere lift a little under the pointer */
 @utility lift {
   transition:

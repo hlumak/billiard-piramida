@@ -78,18 +78,22 @@ export function BookingStepper({ step }: { step: WizardStep }) {
           const isCurrent = index === current;
           // Ahead of this step, but the guest has been there and can go back
           const open = reachable(index);
+          // Steps done and the current one are pyramid balls; the current one
+          // sits in a gold ring. Steps not reached yet are the empty spot.
           const badge = done ? (
-            <span className="flex size-8 items-center justify-center rounded-full bg-club-green-light text-golden">
-              <Check className="size-4" strokeWidth={3} aria-hidden />
+            <span className="ball size-8">
+              <Check className="size-4" strokeWidth={3.2} aria-hidden />
+            </span>
+          ) : isCurrent ? (
+            <span className="ball size-9 text-[15px] ring-2 ring-golden ring-offset-2 ring-offset-club-green">
+              {index + 1}
             </span>
           ) : (
             <span
               className={`flex size-8 items-center justify-center rounded-full text-sm ${
-                isCurrent
-                  ? 'bg-golden font-bold text-btn-text'
-                  : open
-                    ? 'shadow-[inset_0_0_0_1.5px_var(--color-golden)]'
-                    : 'shadow-[inset_0_0_0_1.5px_rgb(246_241_220/0.35)]'
+                open
+                  ? 'shadow-[inset_0_0_0_1.5px_var(--color-golden)]'
+                  : 'shadow-[inset_0_0_0_1.5px_rgb(246_241_220/0.35)]'
               }`}
             >
               {index + 1}
