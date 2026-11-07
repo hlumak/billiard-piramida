@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Button, Input, Label, Spinner, TextField } from '@heroui/react';
+import { useEffect, useState } from 'react';
+import { Button, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useBlocker } from '@tanstack/react-router';
 import {
   MAX_CLOSE_HOUR,
   MAX_HOURLY_RATE_GROSZ,
@@ -63,23 +64,22 @@ function HourSelect({
   onChange: (hour: number) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-xs text-grey-cool">
-      {label}
-      {/* A native select: a couple of dozen fixed options need no combobox,
-          and it is the one control a phone renders as a proper wheel. */}
-      <select
-        value={value}
-        disabled={isDisabled}
-        onChange={event => onChange(Number(event.target.value))}
-        className="h-10 rounded-[10px] bg-club-green px-2 text-sm text-creme outline-none ring-1 ring-transparent focus:ring-golden disabled:opacity-40"
-      >
-        {options.map(hour => (
-          <option key={hour} value={hour}>
-            {hour > 24 ? m.hours_next_day({ time: formatHour(hour) }) : formatHour(hour)}
-          </option>
-        ))}
-      </select>
-    </label>
+    // A native select: a couple of dozen fixed options need no combobox,
+    // and it is the one control a phone renders as a proper wheel. The
+    // visible name is the column header above the rows.
+    <select
+      aria-label={label}
+      value={value}
+      disabled={isDisabled}
+      onChange={event => onChange(Number(event.target.value))}
+      className="h-10 w-full rounded-[10px] bg-club-green-light px-2.5 text-sm font-semibold text-creme tabular-nums outline-none ring-1 ring-transparent focus:ring-golden disabled:opacity-35"
+    >
+      {options.map(hour => (
+        <option key={hour} value={hour}>
+          {hour > 24 ? m.hours_next_day({ time: formatHour(hour) }) : formatHour(hour)}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -98,6 +98,16 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
 
   // Seeded from the server copy on first load, then owned by the form
   const current = draft ?? (config ? { rates: ratesToDraft(config), hours: config.hours } : null);
+  // Edited and not yet saved: the save bar shows, and leaving asks first
+  const dirty =
+    draft !== null &&
+    config !== undefined &&
+    JSON.stringify(draft) !== JSON.stringify({ rates: ratesToDraft(config), hours: config.hours });
+  const leaving = useBlocker({
+    shouldBlockFn: () => dirty,
+    enableBeforeUnload: dirty,
+    withResolver: true
+  });
 
   const save = useMutation({
     mutationFn: () => {
@@ -116,13 +126,22 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
       });
     },
     onSuccess: saved => {
-      setDraft({ rates: ratesToDraft(saved), hours: saved.hours });
+      setDraft(null);
+      queryClient.setQueryData(adminVenueConfigQuery().queryKey, saved);
       queryClient.invalidateQueries({ queryKey: ['admin'] });
       // The storefront prices, the hours card and every slot grid all move
       queryClient.invalidateQueries({ queryKey: ['venue-config'] });
       queryClient.invalidateQueries({ queryKey: ['availability'] });
     }
   });
+
+  // "Saved" answers the press, then gets out of the way
+  const { isSuccess: justSaved, reset: resetSave } = save;
+  useEffect(() => {
+    if (!justSaved) return;
+    const timer = setTimeout(resetSave, 3000);
+    return () => clearTimeout(timer);
+  }, [justSaved, resetSave]);
 
   if (isError && !config) return <QueryError error={error} onRetry={() => refetch()} />;
   if (isPending || !current) {
@@ -174,7 +193,15 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
 
       <section className="card p-5">
         <h3 className="mb-3 font-semibold text-golden-light">{m.admin_hours_title()}</h3>
-        <ul className="flex flex-col gap-2">
+        <div
+          aria-hidden
+          className="mb-1.5 hidden grid-cols-[minmax(7rem,1fr)_8.5rem_12rem_minmax(7rem,1fr)] gap-3 px-3 text-xs text-grey-cool sm:grid"
+        >
+          <span />
+          <span>{m.admin_hours_open()}</span>
+          <span>{m.admin_hours_close()}</span>
+        </div>
+        <ul className="flex flex-col gap-1.5">
           {WEEKDAY_DISPLAY_ORDER.map(weekday => {
             const day = current.hours[weekday];
             if (!day) return null;
@@ -182,11 +209,9 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
             return (
               <li
                 key={weekday}
-                className="flex flex-wrap items-end gap-3 rounded-xl bg-club-green p-3"
+                className="grid grid-cols-2 items-center gap-x-3 gap-y-2 rounded-xl bg-club-green px-3 py-2 sm:grid-cols-[minmax(7rem,1fr)_8.5rem_12rem_minmax(7rem,1fr)]"
               >
-                <span className="min-w-28 flex-1 font-medium capitalize text-creme">
-                  {weekdayName(weekday)}
-                </span>
+                <span className="font-medium capitalize text-creme">{weekdayName(weekday)}</span>
                 <HourSelect
                   label={m.admin_hours_open()}
                   options={OPEN_OPTIONS}
@@ -201,7 +226,7 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
                   isDisabled={closed}
                   onChange={close => setDay(weekday, { ...day, close })}
                 />
-                <label className="flex items-center gap-2 text-sm text-creme">
+                <label className="col-start-2 row-start-1 flex items-center gap-2 justify-self-end text-sm text-creme sm:col-start-4 sm:justify-self-start">
                   <input
                     type="checkbox"
                     checked={closed}
@@ -229,20 +254,69 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
         ) : null}
       </section>
 
-      <div className="flex items-center gap-3">
-        <Button
-          className="font-bold"
-          isDisabled={!ratesValid || !hoursValid}
-          isPending={save.isPending}
-          onPress={() => save.mutate()}
+      {/* Prices and hours save together. The bar shows up once something
+          changed and stays in reach while staff scroll the week; before, one
+          Save sat at the very bottom and nothing said an edit was pending. */}
+      {dirty || save.isPending || save.isSuccess || save.isError ? (
+        <div
+          role="status"
+          className="anim-reveal sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-golden/45 bg-club-green-dark px-4 py-3 shadow-[0_12px_32px_rgb(0_0_0/0.35)] lg:bottom-4"
         >
-          {m.btn_save()}
-        </Button>
-        {save.isSuccess ? <span className="text-sm text-golden-light">{m.saved_ok()}</span> : null}
-        {save.isError ? (
-          <span className="text-sm text-danger-soft-foreground">{m.err_generic()}</span>
-        ) : null}
-      </div>
+          <span className="mr-auto text-sm font-semibold text-creme">
+            {save.isError ? (
+              <span className="text-danger-soft-foreground">{m.err_generic()}</span>
+            ) : dirty ? (
+              m.admin_unsaved()
+            ) : (
+              <span className="text-golden-light">{m.saved_ok()}</span>
+            )}
+          </span>
+          {dirty ? (
+            <>
+              <Button variant="ghost" size="sm" onPress={() => setDraft(null)}>
+                {m.admin_discard_changes()}
+              </Button>
+              <Button
+                size="sm"
+                className="btn-gold"
+                isDisabled={!ratesValid || !hoursValid}
+                isPending={save.isPending}
+                onPress={() => save.mutate()}
+              >
+                {m.btn_save()}
+              </Button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      <Modal
+        isOpen={leaving.status === 'blocked'}
+        onOpenChange={open => {
+          if (!open) leaving.reset?.();
+        }}
+      >
+        <Modal.Backdrop>
+          <Modal.Container>
+            <Modal.Dialog className="sm:max-w-100">
+              <Modal.Header>
+                <Modal.Heading>{m.admin_leave_title()}</Modal.Heading>
+              </Modal.Header>
+              <Modal.Body>
+                <p className="text-cream-soft">{m.admin_leave_text()}</p>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="ghost" onPress={() => leaving.reset?.()}>
+                  {m.admin_stay()}
+                </Button>
+                <Button variant="danger" onPress={() => leaving.proceed?.()}>
+                  {m.admin_leave_action()}
+                </Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
     </div>
   );
 }

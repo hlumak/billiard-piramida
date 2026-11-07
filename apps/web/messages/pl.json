@@ -600,5 +600,11 @@
   "admin_no_show_title": "Klient nie przyszedł?",
   "admin_no_show_action": "Tak, nie przyszedł",
   "admin_blacklist_remove_title": "Usunąć {phone} z czarnej listy?",
-  "admin_registration_remove_title": "Usunąć wpis na stałe?"
+  "admin_registration_remove_title": "Usunąć wpis na stałe?",
+  "admin_unsaved": "Niezapisane zmiany",
+  "admin_discard_changes": "Cofnij zmiany",
+  "admin_leave_title": "Odrzucić niezapisane zmiany?",
+  "admin_leave_text": "Ceny i godziny otwarcia wrócą do zapisanych.",
+  "admin_leave_action": "Odrzuć i wyjdź",
+  "admin_stay": "Zostań"
 }

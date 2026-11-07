@@ -622,5 +622,11 @@
   "admin_no_show_title": "Клієнт не прийшов?",
   "admin_no_show_action": "Так, не прийшов",
   "admin_blacklist_remove_title": "Прибрати {phone} з чорного списку?",
-  "admin_registration_remove_title": "Видалити запис назавжди?"
+  "admin_registration_remove_title": "Видалити запис назавжди?",
+  "admin_unsaved": "Незбережені зміни",
+  "admin_discard_changes": "Скасувати зміни",
+  "admin_leave_title": "Відкинути незбережені зміни?",
+  "admin_leave_text": "Ціни й години роботи повернуться до збережених.",
+  "admin_leave_action": "Відкинути й вийти",
+  "admin_stay": "Залишитися"
 }

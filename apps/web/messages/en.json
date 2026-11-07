@@ -597,5 +597,11 @@
   "admin_no_show_title": "Client didn't come?",
   "admin_no_show_action": "Yes, didn't come",
   "admin_blacklist_remove_title": "Remove {phone} from the black list?",
-  "admin_registration_remove_title": "Delete this entry permanently?"
+  "admin_registration_remove_title": "Delete this entry permanently?",
+  "admin_unsaved": "Unsaved changes",
+  "admin_discard_changes": "Discard changes",
+  "admin_leave_title": "Discard unsaved changes?",
+  "admin_leave_text": "Prices and opening hours go back to what was saved.",
+  "admin_leave_action": "Discard and leave",
+  "admin_stay": "Stay"
 }
