@@ -14,8 +14,8 @@ function dayRangeLabel(weekdays: number[]): string {
 
 /**
  * Opening hours as rows, adjacent days with equal hours collapsed into one
- * ("Monday – Thursday 16:00–21:00"), the row that holds today highlighted and
- * tagged. Built from the live config, so a moved closing time shows at once.
+ * ("Monday – Thursday 16:00–21:00"), the row that holds today highlighted.
+ * Built from the live config, so a moved closing time shows at once.
  *
  * Closures staff set for the whole club show too: today's on today's row
  * (the usual hours struck through), the coming ones in a short list below.
@@ -57,19 +57,14 @@ export function HoursList({ className }: { className?: string }) {
               key={group.weekdays.join('-')}
               className={`-mx-2.5 grid grid-cols-[1fr_auto] items-center gap-x-3 rounded-[10px] px-2.5 py-2 ${isToday ? 'bg-golden/14' : ''}`}
             >
-              {/* Flex centres the smaller tag on the day's line; on the baseline
-                    it sat low. ::first-letter needs a block, hence inline-block. */}
-              <dt
-                className={`flex items-center gap-2 ${isToday ? 'font-semibold' : 'text-cream-soft'}`}
-              >
+              {/* The highlight alone marks today on screen; a screen reader,
+                    which cannot see it, is told in words. ::first-letter needs
+                    a block, hence inline-block. */}
+              <dt className={isToday ? 'font-semibold' : 'text-cream-soft'}>
                 <span className="inline-block first-letter:uppercase">
                   {dayRangeLabel(group.weekdays)}
                 </span>
-                {isToday ? (
-                  <span className="text-xs leading-none font-bold tracking-wide text-golden-light uppercase">
-                    {m.hours_today()}
-                  </span>
-                ) : null}
+                {isToday ? <span className="sr-only"> ({m.hours_today()})</span> : null}
               </dt>
               {/* A time range that wraps mid-dash reads as two times */}
               <dd className={`whitespace-nowrap tabular-nums ${isToday ? 'font-semibold' : ''}`}>
