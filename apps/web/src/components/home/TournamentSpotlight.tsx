@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Link } from '@tanstack/react-router';
 import { dateParts, formatPln, type IsoDate, type TournamentDto } from '@repo/shared';
 import { dateTileParts, formatDaysFromNow, intlTag, warsawToday } from '../../lib/format';
@@ -47,7 +48,9 @@ export function TournamentSpotlight({
   const days = tournament.startsOn === null ? null : daysUntil(tournament.startsOn);
   const when = whenLabel(tournament);
   const fee = tournament.entryFeeGrosz;
-  const headingId = `spotlight-${tournament.id}`;
+  // useId, not the tournament id: the home page renders the card twice (beside
+  // the hero on a wide screen, below the free tables on a phone)
+  const headingId = useId();
 
   return (
     <article
