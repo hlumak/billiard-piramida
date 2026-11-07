@@ -322,8 +322,8 @@ body {
 /* Phone field (react-phone-number-input): ONE control, not two boxes side by
    side — the field skin lives on the `.PhoneInput` wrapper, and the flag chip
    and the number input inside it are stripped bare. Reading order inside the
-   box is flag › chevron › dial code › number, and the country `<select>` is
-   the library's invisible native one stretched over the flag and the code. */
+   box is flag › dial code › chevron › number; the flag and the code are the
+   country picker's button (PhoneField's CountryPicker). */
 .PhoneInput {
   --PhoneInput-color--focus: var(--focus);
   --PhoneInputCountrySelect-marginRight: 0.5rem;
@@ -395,8 +395,6 @@ body {
   outline: 1px solid var(--danger);
 }
 
-/* The native option list is drawn by the OS, so it needs a SOLID ground of
-   its own rather than inheriting whatever the platform paints behind it. */
 /* HeroUI paints a field's error, an invalid field's label and part, and the
    required asterisk in the raw --danger (#ff383c): 2.4:1 on a card. They take
    the readable red every other error on the site uses. */
@@ -419,11 +417,6 @@ body {
   min-height: 1.5rem;
   align-items: center;
   justify-content: center;
-}
-
-.PhoneInputCountrySelect option {
-  background-color: var(--surface);
-  color: var(--surface-foreground);
 }
 
 /* Entrance animations (anim-reveal, StaggerItem) — pure CSS on purpose:

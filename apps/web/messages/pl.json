@@ -619,5 +619,10 @@
   "missing_phone": "Wpisz numer telefonu",
   "admin_guest_name_placeholder": "Imię gościa",
   "missing_password": "Wpisz hasło",
-  "password_too_short": "Hasło ma co najmniej 8 znaków"
+  "password_too_short": "Hasło ma co najmniej 8 znaków",
+  "phone_country_search": "Kraj lub kod",
+  "phone_country_common": "Najczęściej",
+  "phone_country_all": "Wszystkie kraje",
+  "phone_country_none": "Nie ma takiego kraju — spróbuj innej nazwy lub kodu.",
+  "phone_country_label": "Kraj numeru"
 }

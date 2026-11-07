@@ -15,6 +15,7 @@ function Harness({ initial = '' }: { initial?: string }) {
   );
 }
 
+/** The select is React Aria's hidden one behind the picker: it drives the same state. */
 function parts(container: HTMLElement) {
   const input = container.querySelector<HTMLInputElement>('input[type="tel"]');
   const select = container.querySelector<HTMLSelectElement>('select');
@@ -78,11 +79,14 @@ test('the picked country shows its dial code next to the flag', () => {
   expect(code()).toBe('+380');
 });
 
-test('the country list leads with Poland and Ukraine', () => {
-  const { container } = render(<Harness />);
-  const { select } = parts(container);
-  const options = [...select.options].map(option => option.value);
+test('the open list leads with Poland and Ukraine, then every country', async () => {
+  const { container, findAllByRole } = render(<Harness />);
+  const trigger = container.querySelector<HTMLElement>('[data-slot="autocomplete-trigger"]');
+  if (!trigger) throw new Error('country picker did not render');
 
-  expect(options.slice(0, 2)).toEqual(['PL', 'UA']);
+  fireEvent.click(trigger);
+  const options = await findAllByRole('option');
+
+  expect(options.slice(0, 2).map(option => option.getAttribute('data-key'))).toEqual(['PL', 'UA']);
   expect(options.length).toBeGreaterThan(200);
 });

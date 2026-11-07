@@ -616,5 +616,10 @@
   "missing_phone": "Enter a phone number",
   "admin_guest_name_placeholder": "Guest's name",
   "missing_password": "Enter your password",
-  "password_too_short": "A password has at least 8 characters"
+  "password_too_short": "A password has at least 8 characters",
+  "phone_country_search": "Country or code",
+  "phone_country_common": "Most common",
+  "phone_country_all": "All countries",
+  "phone_country_none": "No such country — try another name or code.",
+  "phone_country_label": "Number's country"
 }
