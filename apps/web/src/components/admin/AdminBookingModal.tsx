@@ -423,150 +423,148 @@ export function AdminBookingModal({
   const canSubmit = missing === null;
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-      <Modal.Backdrop>
-        <Modal.Container scroll="inside">
-          <Modal.Dialog className="sm:max-w-lg lg:max-w-4xl">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>
-                {booking ? m.admin_edit_booking() : m.admin_new_booking()}
-              </Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              {/* Two columns on a wide screen: when and where on the left, who on
+    <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container scroll="inside">
+        <Modal.Dialog className="sm:max-w-lg lg:max-w-4xl">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Heading>
+              {booking ? m.admin_edit_booking() : m.admin_new_booking()}
+            </Modal.Heading>
+          </Modal.Header>
+          <Modal.Body>
+            {/* Two columns on a wide screen: when and where on the left, who on
                   the right, so the phone field no longer sits below the fold */}
-              <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-                <div className="flex flex-col gap-4">
-                  <AdminDatePicker
-                    value={date}
-                    onChange={next =>
-                      dispatch({
-                        type: 'date',
-                        date: next ?? clubMoment(venueHours).date
-                      })
-                    }
+            <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+              <div className="flex flex-col gap-4">
+                <AdminDatePicker
+                  value={date}
+                  onChange={next =>
+                    dispatch({
+                      type: 'date',
+                      date: next ?? clubMoment(venueHours).date
+                    })
+                  }
+                />
+
+                <div>
+                  <p className="mb-2 text-sm text-grey-cool">{m.admin_start_time()}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {starts.map(start => (
+                      <button
+                        key={start}
+                        type="button"
+                        aria-pressed={startMinute === start}
+                        onClick={() => dispatch({ type: 'startMinute', startMinute: start })}
+                        className={chip(startMinute === start)}
+                      >
+                        {formatClock(start)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm text-grey-cool">{m.time_duration()}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {lengths.map(n => (
+                      <button
+                        key={n}
+                        type="button"
+                        aria-pressed={effectiveDuration === n}
+                        onClick={() => dispatch({ type: 'duration', duration: n })}
+                        className={chip(effectiveDuration === n)}
+                      >
+                        {formatDuration(n)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-sm text-grey-cool">{m.admin_pick_table()}</p>
+                  <SpotPicker
+                    tables={availability?.tables}
+                    slotWindow={slotWindow}
+                    booking={booking}
+                    venueHours={venueHours}
+                    tableId={tableId}
+                    onPick={next => dispatch({ type: 'tableId', tableId: next })}
                   />
+                </div>
 
-                  <div>
-                    <p className="mb-2 text-sm text-grey-cool">{m.admin_start_time()}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {starts.map(start => (
-                        <button
-                          key={start}
-                          type="button"
-                          aria-pressed={startMinute === start}
-                          onClick={() => dispatch({ type: 'startMinute', startMinute: start })}
-                          className={chip(startMinute === start)}
-                        >
-                          {formatClock(start)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm text-grey-cool">{m.time_duration()}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {lengths.map(n => (
-                        <button
-                          key={n}
-                          type="button"
-                          aria-pressed={effectiveDuration === n}
-                          onClick={() => dispatch({ type: 'duration', duration: n })}
-                          className={chip(effectiveDuration === n)}
-                        >
-                          {formatDuration(n)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm text-grey-cool">{m.admin_pick_table()}</p>
-                    <SpotPicker
-                      tables={availability?.tables}
-                      slotWindow={slotWindow}
-                      booking={booking}
-                      venueHours={venueHours}
-                      tableId={tableId}
-                      onPick={next => dispatch({ type: 'tableId', tableId: next })}
-                    />
-                  </div>
-
-                  {/* Only where the room actually offers a choice — hall 2's 12ft
+                {/* Only where the room actually offers a choice — hall 2's 12ft
                     cloth and the dartboards have nothing to pick between. */}
-                  {tableId !== null && gamesFor(tableId).length > 1 ? (
-                    <div>
-                      <p className="mb-2 text-sm text-grey-cool">{m.game_label()}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {gamesFor(tableId).map(option => (
-                          <button
-                            key={option}
-                            type="button"
-                            aria-pressed={game === option}
-                            onClick={() => dispatch({ type: 'game', game: option })}
-                            className={chip(game === option, false)}
-                          >
-                            {gameName(option)}
-                          </button>
-                        ))}
-                      </div>
+                {tableId !== null && gamesFor(tableId).length > 1 ? (
+                  <div>
+                    <p className="mb-2 text-sm text-grey-cool">{m.game_label()}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {gamesFor(tableId).map(option => (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={game === option}
+                          onClick={() => dispatch({ type: 'game', game: option })}
+                          className={chip(game === option, false)}
+                        >
+                          {gameName(option)}
+                        </button>
+                      ))}
                     </div>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-col gap-4">
-                  <TextField
-                    name="customerName"
-                    value={name}
-                    onChange={value => dispatch({ type: 'name', name: value })}
-                  >
-                    <Label>{m.name_label()}</Label>
-                    <Input placeholder={m.admin_guest_name_placeholder()} />
-                  </TextField>
-                  <PhoneField
-                    name="customerPhone"
-                    value={phone}
-                    onChange={value => dispatch({ type: 'phone', phone: value })}
-                  />
-                  {phoneBlacklisted ? (
-                    <p role="status" className="text-sm text-danger-soft-foreground">
-                      {m.admin_blacklisted_warning()}
-                    </p>
-                  ) : null}
-
-                  <CardCounter
-                    value={sportCards}
-                    onChange={next => dispatch({ type: 'sportCards', sportCards: next })}
-                  />
-
-                  {create.error ? (
-                    <p className="text-sm text-danger-soft-foreground">
-                      {submitErrorMessage(create.error)}
-                    </p>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </div>
-            </Modal.Body>
-            <Modal.Footer className="flex-col items-stretch gap-2">
-              {missing ? (
-                <p role="status" className="text-center text-sm text-grey-cool">
-                  {missing}
-                </p>
-              ) : null}
-              <Button
-                className="w-full font-bold"
-                isDisabled={!canSubmit}
-                isPending={create.isPending}
-                onPress={() => create.mutate()}
-              >
-                {booking ? m.btn_save() : m.admin_create_btn()}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+
+              <div className="flex flex-col gap-4">
+                <TextField
+                  name="customerName"
+                  value={name}
+                  onChange={value => dispatch({ type: 'name', name: value })}
+                >
+                  <Label>{m.name_label()}</Label>
+                  <Input placeholder={m.admin_guest_name_placeholder()} />
+                </TextField>
+                <PhoneField
+                  name="customerPhone"
+                  value={phone}
+                  onChange={value => dispatch({ type: 'phone', phone: value })}
+                />
+                {phoneBlacklisted ? (
+                  <p role="status" className="text-sm text-danger-soft-foreground">
+                    {m.admin_blacklisted_warning()}
+                  </p>
+                ) : null}
+
+                <CardCounter
+                  value={sportCards}
+                  onChange={next => dispatch({ type: 'sportCards', sportCards: next })}
+                />
+
+                {create.error ? (
+                  <p className="text-sm text-danger-soft-foreground">
+                    {submitErrorMessage(create.error)}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </Modal.Body>
+          <Modal.Footer className="flex-col items-stretch gap-2">
+            {missing ? (
+              <p role="status" className="text-center text-sm text-grey-cool">
+                {missing}
+              </p>
+            ) : null}
+            <Button
+              className="w-full font-bold"
+              isDisabled={!canSubmit}
+              isPending={create.isPending}
+              onPress={() => create.mutate()}
+            >
+              {booking ? m.btn_save() : m.admin_create_btn()}
+            </Button>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }

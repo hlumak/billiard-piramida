@@ -155,33 +155,31 @@ function LeaveDialog({
   };
 }) {
   return (
-    <Modal
+    <Modal.Backdrop
       isOpen={blocker.status === 'blocked'}
       onOpenChange={open => {
         if (!open) blocker.reset?.();
       }}
     >
-      <Modal.Backdrop>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-100">
-            <Modal.Header>
-              <Modal.Heading>{m.admin_leave_title()}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <p className="text-cream-soft">{m.admin_leave_text()}</p>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="ghost" onPress={() => blocker.reset?.()}>
-                {m.admin_stay()}
-              </Button>
-              <Button variant="danger" onPress={() => blocker.proceed?.()}>
-                {m.admin_leave_action()}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+      <Modal.Container>
+        <Modal.Dialog className="sm:max-w-100">
+          <Modal.Header>
+            <Modal.Heading>{m.admin_leave_title()}</Modal.Heading>
+          </Modal.Header>
+          <Modal.Body>
+            <p className="text-cream-soft">{m.admin_leave_text()}</p>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="ghost" onPress={() => blocker.reset?.()}>
+              {m.admin_stay()}
+            </Button>
+            <Button variant="danger" onPress={() => blocker.proceed?.()}>
+              {m.admin_leave_action()}
+            </Button>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }
 

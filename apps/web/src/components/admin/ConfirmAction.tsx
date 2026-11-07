@@ -31,9 +31,12 @@ export function ConfirmAction({
 }: ConfirmActionProps) {
   const [isOpen, setOpen] = useState(false);
   return (
-    <Modal isOpen={isOpen} onOpenChange={setOpen}>
+    <>
       {children(() => setOpen(true))}
-      <Modal.Backdrop>
+      {/* Controlled on the backdrop, not through Modal (React Aria's
+          DialogTrigger): the row buttons that open it are plain <button>s,
+          which DialogTrigger does not count as its trigger and warns about */}
+      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
         <Modal.Container>
           <Modal.Dialog className="sm:max-w-100">
             <Modal.CloseTrigger />
@@ -63,6 +66,6 @@ export function ConfirmAction({
           </Modal.Dialog>
         </Modal.Container>
       </Modal.Backdrop>
-    </Modal>
+    </>
   );
 }
