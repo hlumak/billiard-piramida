@@ -35,6 +35,24 @@ declare global {
   }
 }
 
+/** Turnstile's 'normal' and 'flexible' widgets are at least this wide. */
+const FULL_WIDGET_MIN_WIDTH = 300;
+
+/**
+ * 'flexible' fills the form, but never goes under 300px: on a 320px phone
+ * the tournament sign-up's widget stuck out of its card and the page
+ * scrolled sideways. Narrower than that, the 150px 'compact' widget. The
+ * widget's own box is hidden while empty, so the form around it is measured.
+ */
+function widgetSize(element: HTMLElement): 'flexible' | 'compact' {
+  const container = element.parentElement;
+  if (!container) return 'flexible';
+  const style = getComputedStyle(container);
+  const inner =
+    container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  return inner < FULL_WIDGET_MIN_WIDTH ? 'compact' : 'flexible';
+}
+
 let script: Promise<TurnstileApi> | null = null;
 
 /** Loaded once, on the first form that needs it, not on every page. */
@@ -89,7 +107,7 @@ class BotCheckController {
           theme: 'dark',
           language: getLocale(),
           appearance: 'interaction-only',
-          size: 'flexible',
+          size: widgetSize(element),
           'refresh-expired': 'auto',
           callback: (token: string) => this.settle(token),
           'expired-callback': () => {
