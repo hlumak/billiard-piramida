@@ -639,5 +639,7 @@
   "missing_table": "Виберіть стіл",
   "missing_name": "Вкажіть ім'я",
   "missing_phone": "Вкажіть номер телефону",
-  "admin_guest_name_placeholder": "Ім'я гостя"
+  "admin_guest_name_placeholder": "Ім'я гостя",
+  "missing_password": "Введіть пароль",
+  "password_too_short": "Пароль — щонайменше 8 символів"
 }

@@ -79,6 +79,14 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   });
 
   const { phone: phoneError, form: errorText } = authErrors(submit.error);
+  // Said under the button while it is disabled, so it never just sits there
+  const missing = !isValidPhone(phone)
+    ? m.missing_phone()
+    : password.length === 0
+      ? m.missing_password()
+      : password.length < 8
+        ? m.password_too_short()
+        : null;
 
   const idBase = useId();
   const selectTab = (entry: AuthTab) => {
@@ -156,7 +164,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
 
         <button
           type="submit"
-          disabled={!isValidPhone(phone) || password.length < 8}
+          disabled={missing !== null}
           // Not disabled while signing in: that would drop keyboard focus
           aria-disabled={submit.isPending || undefined}
           aria-busy={submit.isPending}
@@ -165,6 +173,11 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
           {submit.isPending ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : null}
           {tab === 'login' ? m.auth_tab_login() : m.auth_register_btn()}
         </button>
+        {missing ? (
+          <p role="status" className="-mt-2 text-center text-sm text-grey-cool">
+            {missing}
+          </p>
+        ) : null}
       </form>
     </div>
   );

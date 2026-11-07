@@ -471,6 +471,7 @@ function TimeOptions({
           label: m.next_to_table(),
           short: m.btn_next(),
           disabled: start === null,
+          hint: m.missing_start(),
           onPress: next
         }}
       />

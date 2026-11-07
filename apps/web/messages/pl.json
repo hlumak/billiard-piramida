@@ -617,5 +617,7 @@
   "missing_table": "Wybierz stół",
   "missing_name": "Wpisz imię",
   "missing_phone": "Wpisz numer telefonu",
-  "admin_guest_name_placeholder": "Imię gościa"
+  "admin_guest_name_placeholder": "Imię gościa",
+  "missing_password": "Wpisz hasło",
+  "password_too_short": "Hasło ma co najmniej 8 znaków"
 }
