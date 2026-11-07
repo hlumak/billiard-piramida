@@ -603,5 +603,9 @@
   "admin_leave_title": "Discard unsaved changes?",
   "admin_leave_text": "Prices and opening hours go back to what was saved.",
   "admin_leave_action": "Discard and leave",
-  "admin_stay": "Stay"
+  "admin_stay": "Stay",
+  "admin_view_upcoming": "Upcoming",
+  "admin_col_time": "Time",
+  "admin_view_cancelled": "Cancelled",
+  "admin_view_no_show": "No-shows"
 }

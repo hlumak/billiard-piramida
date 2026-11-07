@@ -606,5 +606,9 @@
   "admin_leave_title": "Odrzucić niezapisane zmiany?",
   "admin_leave_text": "Ceny i godziny otwarcia wrócą do zapisanych.",
   "admin_leave_action": "Odrzuć i wyjdź",
-  "admin_stay": "Zostań"
+  "admin_stay": "Zostań",
+  "admin_view_upcoming": "Nadchodzące",
+  "admin_col_time": "Godzina",
+  "admin_view_cancelled": "Anulowane",
+  "admin_view_no_show": "Nieobecności"
 }
