@@ -31,6 +31,7 @@ import {
 import { menuQuery } from '../../lib/queries';
 import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
+import { ConfirmAction } from './ConfirmAction';
 import { gameName, spotName } from '../../lib/spots';
 import { ClearButton } from '../ClearButton';
 import { QueryError } from '../QueryError';
@@ -146,15 +147,18 @@ function RowActions({ booking }: { booking: BookingDto }) {
           </RowButton>
         ) : null}
         {started ? (
-          <RowButton
-            pending={noShow.isPending}
-            onPress={() => {
-              if (window.confirm(m.admin_no_show_confirm())) noShow.mutate();
-            }}
-            className={danger}
+          <ConfirmAction
+            title={m.admin_no_show_title()}
+            text={m.admin_no_show_confirm()}
+            confirmLabel={m.admin_no_show_action()}
+            onConfirm={() => noShow.mutate()}
           >
-            {m.admin_no_show_btn()}
-          </RowButton>
+            {open => (
+              <RowButton pending={noShow.isPending} onPress={open} className={danger}>
+                {m.admin_no_show_btn()}
+              </RowButton>
+            )}
+          </ConfirmAction>
         ) : null}
         {booking.phase === 'cancelled' ? (
           <RowButton

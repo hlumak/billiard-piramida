@@ -8,6 +8,7 @@ import { intlTag } from '../../lib/format';
 import { categoryLabel } from '../../lib/menu';
 import { parseZloty, plnUnit } from '../../lib/money';
 import { m } from '../../paraglide/messages.js';
+import { ConfirmAction } from './ConfirmAction';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
 import { AdminDishModal } from './AdminDishModal';
@@ -87,16 +88,17 @@ function MenuRow({ item }: { item: AdminMenuItemDto }) {
             {item.isAvailable ? m.admin_in_menu() : m.admin_hidden()}
           </Button>
           <AdminDishModal item={item} />
-          <Button
-            size="sm"
-            variant="danger-soft"
-            isPending={remove.isPending}
-            onPress={() => {
-              if (window.confirm(m.admin_delete_confirm())) remove.mutate();
-            }}
+          <ConfirmAction
+            title={m.admin_delete_confirm()}
+            confirmLabel={m.admin_delete_dish_action()}
+            onConfirm={() => remove.mutate()}
           >
-            {m.admin_delete_btn()}
-          </Button>
+            {open => (
+              <Button size="sm" variant="danger-soft" isPending={remove.isPending} onPress={open}>
+                {m.admin_delete_btn()}
+              </Button>
+            )}
+          </ConfirmAction>
         </div>
       </div>
       {deleteBlocked ? (

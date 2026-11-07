@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminNewsItemDto } from '@repo/shared';
 import { adminApi, adminNewsQuery } from '../../lib/admin-api';
 import { m } from '../../paraglide/messages.js';
+import { ConfirmAction } from './ConfirmAction';
 import { localizeHref } from '../../paraglide/runtime.js';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
@@ -87,16 +88,17 @@ function NewsRow({ item, isFirst, isLast, isReordering, onMove }: RowProps) {
             {item.isPublished ? m.admin_published() : m.admin_hidden()}
           </Button>
           <AdminNewsModal item={item} />
-          <Button
-            size="sm"
-            variant="danger-soft"
-            isPending={remove.isPending}
-            onPress={() => {
-              if (window.confirm(m.admin_delete_news_confirm())) remove.mutate();
-            }}
+          <ConfirmAction
+            title={m.admin_delete_news_confirm()}
+            confirmLabel={m.admin_delete_news_action()}
+            onConfirm={() => remove.mutate()}
           >
-            {m.admin_delete_btn()}
-          </Button>
+            {open => (
+              <Button size="sm" variant="danger-soft" isPending={remove.isPending} onPress={open}>
+                {m.admin_delete_btn()}
+              </Button>
+            )}
+          </ConfirmAction>
         </div>
       </div>
       {update.isError || remove.isError ? (
