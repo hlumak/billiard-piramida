@@ -81,17 +81,14 @@ export function ArticleBody({ source, className }: { source: string; className?:
               </h2>
             );
           case 'list': {
-            // Items are consecutive lines, so the first item's line plus its
-            // position in the list is the line it sits on
-            let itemLine = block.line;
             return (
               <ul
                 key={block.line}
                 className="flex list-disc flex-col gap-1 pl-5 marker:text-golden"
               >
                 {block.items.map(item => (
-                  <li key={itemLine++}>
-                    <Inlines inlines={item} />
+                  <li key={item.line}>
+                    <Inlines inlines={item.inlines} />
                   </li>
                 ))}
               </ul>

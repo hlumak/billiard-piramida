@@ -21,11 +21,14 @@ export type Inline =
   | { type: 'strong'; text: string }
   | { type: 'link'; text: string; href: string };
 
+/** A bullet, with the source line it is on (its React key, like a block's). */
+export type ListItem = { line: number; inlines: Inline[] };
+
 /** `line` is the 1-based source line the block starts on: its identity for React keys. */
 export type Block = { line: number } & (
   | { type: 'heading'; inlines: Inline[] }
   | { type: 'paragraph'; inlines: Inline[] }
-  | { type: 'list'; items: Inline[][] }
+  | { type: 'list'; items: ListItem[] }
   | { type: 'image'; src: string; caption: string }
 );
 
@@ -74,7 +77,7 @@ export function parseArticle(source: string): Block[] {
   // The paragraph or list being collected, and the source line it began on
   let text: string[] = [];
   let textLine = 0;
-  let list: Inline[][] = [];
+  let list: ListItem[] = [];
   let listLine = 0;
 
   const flush = () => {
@@ -113,7 +116,7 @@ export function parseArticle(source: string): Block[] {
       // A list interrupts a paragraph, but list items stay together
       if (text.length > 0) flush();
       if (list.length === 0) listLine = lineNumber;
-      list.push(parseInlines(item[1]));
+      list.push({ line: lineNumber, inlines: parseInlines(item[1]) });
       continue;
     }
     if (list.length > 0) flush();
