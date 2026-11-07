@@ -347,9 +347,13 @@ body {
 
 /* The number input is only the text run: the box around it is the wrapper's.
    min-width: 0 lets it shrink below the browser's default ~20-character width,
-   which on a phone made every form with a phone field wider than the screen. */
+   which on a phone made every form with a phone field wider than the screen.
+   width: 0 (it still grows to fill, flex: 1) stops that default width from
+   counting toward the field's narrowest size: with the country picker's chip
+   beside it, "Find a booking" pushed the page 11px sideways at 360px. */
 .PhoneInputInput {
   min-width: 0;
+  width: 0;
   padding: 0;
   border: 0;
   background: none;
