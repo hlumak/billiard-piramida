@@ -36,7 +36,7 @@ function PricesPage() {
   const { data: menu, isPending, isError, error, refetch } = useQuery(menuQuery(getLocale()));
 
   return (
-    <PageLayout script="prices" title={m.menu_prices()}>
+    <PageLayout title={m.menu_prices()}>
       <section className="anim-reveal">
         <SectionHead title={m.prices_rent()} note={m.prices_rent_note()} />
         <div className="mt-4 md:mt-5">
@@ -56,7 +56,7 @@ function PricesPage() {
         ) : (
           groupMenu(menu).map(({ category, items }) => (
             <section key={category} className="anim-reveal">
-              <h3 className="mt-3.5 text-xs font-bold tracking-[0.18em] text-golden-light uppercase md:mt-6 md:text-[13px]">
+              <h3 className="mt-3.5 text-sm font-bold text-golden-light md:mt-6 md:text-[15px]">
                 {categoryLabel(category)}
               </h3>
               <ul className="mt-1.5 grid grid-cols-1 md:mt-3 md:grid-cols-2 md:gap-x-14">

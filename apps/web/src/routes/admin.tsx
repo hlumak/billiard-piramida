@@ -163,7 +163,7 @@ function AdminPage() {
   }
 
   return (
-    <PageLayout script="admin" title={m.page_admin()} footer={false}>
+    <PageLayout title={m.page_admin()} footer={false}>
       {!ready ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

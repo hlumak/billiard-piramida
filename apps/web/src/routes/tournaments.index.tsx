@@ -28,9 +28,7 @@ function TournamentGroup({ title, tournaments }: { title: string; tournaments: T
   if (tournaments.length === 0) return null;
   return (
     <section aria-label={title}>
-      <h2 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
-        {title}
-      </h2>
+      <h2 className="text-[15px] font-bold text-golden-light">{title}</h2>
       <ul className="mt-3.5 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
         {tournaments.map(tournament => (
           <li key={tournament.id} className="anim-stagger-item">
@@ -78,7 +76,7 @@ function TournamentList() {
 
 function TournamentsPage() {
   return (
-    <PageLayout script="tournaments" title={m.menu_tournaments()}>
+    <PageLayout title={m.menu_tournaments()}>
       <TournamentList />
     </PageLayout>
   );

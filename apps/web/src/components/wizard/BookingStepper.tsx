@@ -33,7 +33,7 @@ export function BookingStepper({ step }: { step: WizardStep }) {
   return (
     <nav aria-label={m.booking_steps()} className="mx-auto mb-7 w-full max-w-[760px] md:mb-9">
       <div className="md:hidden">
-        <p className="text-[13px] font-bold tracking-[0.2em] text-cream-soft uppercase">
+        <p className="text-[15px] font-bold text-cream-soft">
           {m.step_of({ step: current + 1, total: WIZARD_STEPS.length })} · {LABELS[step]()}
         </p>
         <div aria-hidden className="mt-2.5 grid grid-cols-4 gap-1.5">

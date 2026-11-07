@@ -43,7 +43,7 @@ function TournamentShell({
   showTitle?: boolean;
 }) {
   return (
-    <PageLayout script="tournament" title={m.tournament_badge()} showTitle={showTitle}>
+    <PageLayout title={m.tournament_badge()} showTitle={showTitle}>
       {children}
     </PageLayout>
   );

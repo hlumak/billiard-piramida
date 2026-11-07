@@ -39,7 +39,7 @@ export function NewsListItem({ item }: { item: NewsItemDto }) {
         ) : null}
         {href !== null ? (
           <span className="mt-auto pt-2 text-sm font-bold text-golden-light md:text-[15px]">
-            {m.news_read_more()} →
+            {m.news_read_more()}
           </span>
         ) : null}
       </div>

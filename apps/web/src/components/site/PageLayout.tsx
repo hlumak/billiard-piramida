@@ -11,14 +11,13 @@ const WIDTHS = {
 } as const;
 
 /**
- * Every page except home: header, the script-and-caption title, the page's
+ * Every page except home: header, the page's title, the page's
  * own content in a centred column, the compact footer and "back to top" (both
  * left out of the booking flow and the staff sign-in). The column is a flex
  * child of a full-height page, so the footer always reaches the bottom of the
  * window.
  */
 export function PageLayout({
-  script,
   title,
   decorativeTitle = false,
   showTitle = true,
@@ -26,7 +25,6 @@ export function PageLayout({
   footer = true,
   children
 }: {
-  script: string;
   title: string;
   /** The page carries its own h1 further down (an article, a tournament) */
   decorativeTitle?: boolean;
@@ -41,12 +39,7 @@ export function PageLayout({
     <div className="flex min-h-dvh flex-col">
       <SiteHeader />
       {showTitle ? (
-        <PageTitle
-          script={script}
-          title={title}
-          decorative={decorativeTitle}
-          className="px-5 pt-8 md:pt-10"
-        />
+        <PageTitle title={title} decorative={decorativeTitle} className="px-5 pt-8 md:pt-10" />
       ) : null}
       <main
         id="main"

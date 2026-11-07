@@ -45,7 +45,7 @@ function ArticleShell({
   showTitle?: boolean;
 }) {
   return (
-    <PageLayout script="news" title={m.news_title()} showTitle={showTitle} width="medium">
+    <PageLayout title={m.news_title()} showTitle={showTitle} width="medium">
       {children}
     </PageLayout>
   );

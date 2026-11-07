@@ -100,9 +100,7 @@ export function HoursList({ className }: { className?: string }) {
 
       {changes.length > 0 ? (
         <div className="mt-3.5 border-t border-creme/12 pt-3.5">
-          <p className="text-xs font-bold tracking-[0.12em] text-grey-cool uppercase">
-            {m.hours_changes()}
-          </p>
+          <p className="text-sm font-bold text-grey-cool">{m.hours_changes()}</p>
           <ul className="mt-2 flex flex-col gap-1.5 text-sm">
             {changes.map(change => (
               <li key={change.date} className="flex justify-between gap-3">

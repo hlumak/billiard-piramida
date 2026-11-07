@@ -18,9 +18,7 @@ export function MenuPicker({
     <div className="@container flex flex-col gap-7">
       {groupMenu(items).map(({ category, items: categoryItems }) => (
         <section key={category}>
-          <h3 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
-            {categoryLabel(category)}
-          </h3>
+          <h3 className="text-[15px] font-bold text-golden-light">{categoryLabel(category)}</h3>
           <ul className="mt-3 grid grid-cols-1 gap-3 @xl:grid-cols-2">
             {categoryItems.map(item => {
               const quantity = quantities[item.id] ?? 0;

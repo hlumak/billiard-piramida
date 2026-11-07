@@ -215,7 +215,7 @@ function BarTotal() {
   const totals = useWizardTotals();
   return (
     <div className="flex-none">
-      <p className="text-xs font-bold tracking-[0.12em] text-grey-cool uppercase">{m.total()}</p>
+      <p className="text-sm font-bold text-grey-cool">{m.total()}</p>
       <p className="mt-0.5 text-[22px] leading-tight font-bold text-golden tabular-nums">
         {formatPln(totals.total, intlTag())}
       </p>

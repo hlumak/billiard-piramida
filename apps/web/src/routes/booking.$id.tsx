@@ -35,7 +35,7 @@ export const Route = createFileRoute('/booking/$id')({
   head: () => ({ meta: noindexMeta(m.booking_title()) }),
   component: BookingPage,
   notFoundComponent: () => (
-    <PageLayout script="booking" title={m.booking_title()}>
+    <PageLayout title={m.booking_title()}>
       <BookingMissing message={m.booking_not_found()} />
     </PageLayout>
   )
@@ -61,7 +61,7 @@ function BookingPage() {
   const celebrate = justCreated === true && booking !== undefined && booking.phase !== 'cancelled';
 
   return (
-    <PageLayout script="booking" title={m.booking_title()} showTitle={!celebrate}>
+    <PageLayout title={m.booking_title()} showTitle={!celebrate}>
       {isPending ? (
         <div className="flex justify-center py-16">
           <Spinner aria-label={m.loading()} />

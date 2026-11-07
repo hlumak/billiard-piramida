@@ -134,7 +134,7 @@ function MyBookingsList({
 function MyBookingsPage() {
   const { signedIn, ...list } = useMyBookings();
   return (
-    <PageLayout script="bookings" title={m.nav_my_bookings()} width="medium">
+    <PageLayout title={m.nav_my_bookings()} width="medium">
       <MyBookingsList {...list} />
       <LookupSection signedIn={signedIn} />
     </PageLayout>
@@ -153,9 +153,7 @@ function BookingGroup({
   if (bookings.length === 0) return null;
   return (
     <section aria-label={title}>
-      <h2 className="text-[13px] font-bold tracking-[0.18em] text-golden-light uppercase">
-        {title}
-      </h2>
+      <h2 className="text-[15px] font-bold text-golden-light">{title}</h2>
       <ul className="mt-3.5 flex flex-col gap-3">
         {bookings.map(booking => (
           <li key={booking.id} className="anim-stagger-item">

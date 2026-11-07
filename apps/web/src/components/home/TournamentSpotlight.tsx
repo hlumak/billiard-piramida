@@ -55,7 +55,7 @@ export function TournamentSpotlight({
       className={`anim-enter-right rounded-[22px] border-[1.5px] border-golden/70 bg-club-green-dark p-5.5 lg:rounded-3xl lg:bg-club-green-deepest/85 lg:p-7 lg:shadow-[0_24px_60px_rgb(0_0_0/0.35)] lg:backdrop-blur-sm ${className ?? ''}`}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[11px] font-bold tracking-[0.16em] text-golden-light uppercase lg:text-xs lg:tracking-[0.18em]">
+        <span className="text-[13px] font-bold text-golden-light lg:text-sm">
           {m.home_spotlight()}
         </span>
         {days !== null && days >= 0 ? (
