@@ -240,6 +240,106 @@ export function AdminEditBooking({ booking }: { booking: BookingDto }) {
 }
 
 /**
+ * The first thing the form still needs, said under the disabled button
+ * rather than leaving staff to work out why it does nothing; null when
+ * the booking can be saved.
+ */
+function firstMissing({ startMinute, tableId, name, phone }: FormState): string | null {
+  if (startMinute === null) return m.missing_start();
+  if (tableId === null) return m.missing_table();
+  if (name.trim().length === 0) return m.missing_name();
+  if (!isValidPhone(phone)) return m.missing_phone();
+  return null;
+}
+
+/**
+ * The spots for the picked window. Until a start is picked none can be
+ * judged free, and a row of greyed-out buttons gave no reason why, so the
+ * picker says what it is waiting for instead.
+ */
+function SpotPicker({
+  tables,
+  slotWindow,
+  booking,
+  venueHours,
+  tableId,
+  onPick
+}: {
+  tables: TableAvailabilityDto[] | undefined;
+  slotWindow: SlotWindow | null;
+  booking: BookingDto | undefined;
+  venueHours: WeeklyHours;
+  tableId: number | null;
+  onPick: (tableId: number) => void;
+}) {
+  if (!tables) return <Spinner size="sm" aria-label={m.loading()} />;
+  if (slotWindow === null) {
+    return (
+      <p className="rounded-xl border border-dashed border-creme/20 px-3 py-2.5 text-sm text-grey-cool">
+        {m.admin_pick_start_first()}
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {tables.map(table => {
+        const free = isFreeForWindow(table, slotWindow, booking, venueHours);
+        return (
+          <button
+            key={table.tableId}
+            type="button"
+            disabled={!free}
+            aria-pressed={tableId === table.tableId}
+            onClick={() => onPick(table.tableId)}
+            className={chip(tableId === table.tableId, !free)}
+          >
+            {spotName(table.kind, table.label)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const stepper =
+  'flex size-9 items-center justify-center rounded-full border-[1.5px] transition-colors hover:bg-creme/6 disabled:cursor-not-allowed disabled:opacity-40';
+
+/** Sport cards shown at the desk: a counter, not eleven numbered chips. */
+function CardCounter({ value, onChange }: { value: number; onChange: (next: number) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-club-green px-3.5 py-2.5">
+      <span className="text-sm text-creme">{m.admin_sport_cards()}</span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-label={`${m.admin_sport_cards()} −`}
+          disabled={value <= 0}
+          onClick={() => onChange(value - 1)}
+          className={`${stepper} border-creme/35 text-creme`}
+        >
+          <Minus aria-hidden className="size-4" />
+        </button>
+        <output
+          aria-live="polite"
+          className="min-w-5 text-center text-lg font-bold text-golden tabular-nums"
+        >
+          {value}
+        </output>
+        <button
+          type="button"
+          aria-label={`${m.admin_sport_cards()} +`}
+          disabled={value >= MAX_SPORT_CARDS_PER_BOOKING}
+          onClick={() => onChange(value + 1)}
+          className={`${stepper} border-golden text-golden`}
+        >
+          <Plus aria-hidden className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * One modal for both jobs: `booking` present means edit, absent means create.
  * The two differ only in what submit calls and in which slots count as free —
  * everything else (window rules, spot picker, card stepper) is the same form.
@@ -319,19 +419,8 @@ export function AdminBookingModal({
 
   // The first thing still missing, said next to the disabled button rather
   // than leaving staff to work out why it does nothing
-  const missing =
-    startMinute === null
-      ? m.missing_start()
-      : tableId === null
-        ? m.missing_table()
-        : name.trim().length === 0
-          ? m.missing_name()
-          : !isValidPhone(phone)
-            ? m.missing_phone()
-            : null;
+  const missing = firstMissing(form);
   const canSubmit = missing === null;
-  const stepper =
-    'flex size-9 items-center justify-center rounded-full border-[1.5px] transition-colors hover:bg-creme/6 disabled:cursor-not-allowed disabled:opacity-40';
 
   return (
     <Modal isOpen={isOpen} onOpenChange={onOpenChange}>
@@ -395,34 +484,14 @@ export function AdminBookingModal({
 
                   <div>
                     <p className="mb-2 text-sm text-grey-cool">{m.admin_pick_table()}</p>
-                    {!availability ? (
-                      <Spinner size="sm" aria-label={m.loading()} />
-                    ) : slotWindow === null ? (
-                      // Greyed-out spots said nothing about why they could not be picked
-                      <p className="rounded-xl border border-dashed border-creme/20 px-3 py-2.5 text-sm text-grey-cool">
-                        {m.admin_pick_start_first()}
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {availability.tables.map(table => {
-                          const free =
-                            slotWindow !== null &&
-                            isFreeForWindow(table, slotWindow, booking, venueHours);
-                          return (
-                            <button
-                              key={table.tableId}
-                              type="button"
-                              disabled={!free}
-                              aria-pressed={tableId === table.tableId}
-                              onClick={() => dispatch({ type: 'tableId', tableId: table.tableId })}
-                              className={chip(tableId === table.tableId, !free)}
-                            >
-                              {spotName(table.kind, table.label)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <SpotPicker
+                      tables={availability?.tables}
+                      slotWindow={slotWindow}
+                      booking={booking}
+                      venueHours={venueHours}
+                      tableId={tableId}
+                      onPick={next => dispatch({ type: 'tableId', tableId: next })}
+                    />
                   </div>
 
                   {/* Only where the room actually offers a choice — hall 2's 12ft
@@ -467,36 +536,10 @@ export function AdminBookingModal({
                     </p>
                   ) : null}
 
-                  {/* A counter, not eleven numbered chips */}
-                  <div className="flex items-center justify-between gap-3 rounded-xl bg-club-green px-3.5 py-2.5">
-                    <span className="text-sm text-creme">{m.admin_sport_cards()}</span>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        aria-label={`${m.admin_sport_cards()} −`}
-                        disabled={sportCards <= 0}
-                        onClick={() => dispatch({ type: 'sportCards', sportCards: sportCards - 1 })}
-                        className={`${stepper} border-creme/35 text-creme`}
-                      >
-                        <Minus aria-hidden className="size-4" />
-                      </button>
-                      <output
-                        aria-live="polite"
-                        className="min-w-5 text-center text-lg font-bold text-golden tabular-nums"
-                      >
-                        {sportCards}
-                      </output>
-                      <button
-                        type="button"
-                        aria-label={`${m.admin_sport_cards()} +`}
-                        disabled={sportCards >= MAX_SPORT_CARDS_PER_BOOKING}
-                        onClick={() => dispatch({ type: 'sportCards', sportCards: sportCards + 1 })}
-                        className={`${stepper} border-golden text-golden`}
-                      >
-                        <Plus aria-hidden className="size-4" />
-                      </button>
-                    </div>
-                  </div>
+                  <CardCounter
+                    value={sportCards}
+                    onChange={next => dispatch({ type: 'sportCards', sportCards: next })}
+                  />
 
                   {create.error ? (
                     <p className="text-sm text-danger-soft-foreground">

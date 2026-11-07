@@ -51,6 +51,17 @@ function authErrors(error: Error | null): { phone: string | null; form: string |
   return { phone: null, form: unauthorized ? m.auth_err_invalid() : m.err_generic() };
 }
 
+/**
+ * The first thing the submit button is still waiting for, said under it
+ * while it is disabled; null once it can be pressed.
+ */
+function missingField(phone: string, password: string): string | null {
+  if (!isValidPhone(phone)) return m.missing_phone();
+  if (password.length === 0) return m.missing_password();
+  if (password.length < 8) return m.password_too_short();
+  return null;
+}
+
 export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<AuthTab>('login');
@@ -79,14 +90,7 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
   });
 
   const { phone: phoneError, form: errorText } = authErrors(submit.error);
-  // Said under the button while it is disabled, so it never just sits there
-  const missing = !isValidPhone(phone)
-    ? m.missing_phone()
-    : password.length === 0
-      ? m.missing_password()
-      : password.length < 8
-        ? m.password_too_short()
-        : null;
+  const missing = missingField(phone, password);
 
   const idBase = useId();
   const selectTab = (entry: AuthTab) => {

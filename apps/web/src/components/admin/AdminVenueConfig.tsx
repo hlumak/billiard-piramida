@@ -84,6 +84,107 @@ function HourSelect({
   );
 }
 
+type VenueDraft = { rates: RateDraft; hours: WeeklyHours };
+
+/** Edited and not yet saved: the save bar shows, and leaving asks first. */
+function isDirty(draft: VenueDraft | null, config: VenueConfigDto | undefined): boolean {
+  if (draft === null || config === undefined) return false;
+  return (
+    JSON.stringify(draft) !== JSON.stringify({ rates: ratesToDraft(config), hours: config.hours })
+  );
+}
+
+/**
+ * Prices and hours save together. The bar shows up once something changed
+ * and stays in reach while staff scroll the week; before, one Save sat at the
+ * very bottom and nothing said an edit was pending. After a save it says
+ * "Saved" (or the error) until the parent clears the mutation.
+ */
+function SaveBar({
+  dirty,
+  canSave,
+  status,
+  onDiscard,
+  onSave
+}: {
+  dirty: boolean;
+  canSave: boolean;
+  status: 'idle' | 'pending' | 'success' | 'error';
+  onDiscard: () => void;
+  onSave: () => void;
+}) {
+  if (!dirty && status === 'idle') return null;
+  let text = <span className="text-golden-light">{m.saved_ok()}</span>;
+  if (status === 'error')
+    text = <span className="text-danger-soft-foreground">{m.err_generic()}</span>;
+  else if (dirty) text = <>{m.admin_unsaved()}</>;
+  return (
+    <div
+      role="status"
+      className="anim-reveal sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-golden/45 bg-club-green-dark px-4 py-3 shadow-[0_12px_32px_rgb(0_0_0/0.35)] lg:bottom-4"
+    >
+      <span className="mr-auto text-sm font-semibold text-creme">{text}</span>
+      {dirty ? (
+        <>
+          <Button variant="ghost" size="sm" onPress={onDiscard}>
+            {m.admin_discard_changes()}
+          </Button>
+          <Button
+            size="sm"
+            className="btn-gold"
+            isDisabled={!canSave}
+            isPending={status === 'pending'}
+            onPress={onSave}
+          >
+            {m.btn_save()}
+          </Button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/** Asked when staff leave the section (or the page) with edits unsaved. */
+function LeaveDialog({
+  blocker
+}: {
+  blocker: {
+    status: 'blocked' | 'idle';
+    reset: (() => void) | undefined;
+    proceed: (() => void) | undefined;
+  };
+}) {
+  return (
+    <Modal
+      isOpen={blocker.status === 'blocked'}
+      onOpenChange={open => {
+        if (!open) blocker.reset?.();
+      }}
+    >
+      <Modal.Backdrop>
+        <Modal.Container>
+          <Modal.Dialog className="sm:max-w-100">
+            <Modal.Header>
+              <Modal.Heading>{m.admin_leave_title()}</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body>
+              <p className="text-cream-soft">{m.admin_leave_text()}</p>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="ghost" onPress={() => blocker.reset?.()}>
+                {m.admin_stay()}
+              </Button>
+              <Button variant="danger" onPress={() => blocker.proceed?.()}>
+                {m.admin_leave_action()}
+              </Button>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
 /**
  * Rates and opening hours. Saved as one document rather than field by field:
  * the seven days and three tiers are a single consistent picture, and the API
@@ -95,15 +196,11 @@ function HourSelect({
 export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: string) => void }) {
   const queryClient = useQueryClient();
   const { data: config, isPending, isError, error, refetch } = useQuery(adminVenueConfigQuery());
-  const [draft, setDraft] = useState<{ rates: RateDraft; hours: WeeklyHours } | null>(null);
+  const [draft, setDraft] = useState<VenueDraft | null>(null);
 
   // Seeded from the server copy on first load, then owned by the form
   const current = draft ?? (config ? { rates: ratesToDraft(config), hours: config.hours } : null);
-  // Edited and not yet saved: the save bar shows, and leaving asks first
-  const dirty =
-    draft !== null &&
-    config !== undefined &&
-    JSON.stringify(draft) !== JSON.stringify({ rates: ratesToDraft(config), hours: config.hours });
+  const dirty = isDirty(draft, config);
   const leaving = useBlocker({
     shouldBlockFn: () => dirty,
     enableBeforeUnload: dirty,
@@ -250,69 +347,14 @@ export function AdminVenueConfig({ onShowBooking }: { onShowBooking: (phone: str
         ) : null}
       </section>
 
-      {/* Prices and hours save together. The bar shows up once something
-          changed and stays in reach while staff scroll the week; before, one
-          Save sat at the very bottom and nothing said an edit was pending. */}
-      {dirty || save.isPending || save.isSuccess || save.isError ? (
-        <div
-          role="status"
-          className="anim-reveal sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 flex flex-wrap items-center gap-3 rounded-2xl border border-golden/45 bg-club-green-dark px-4 py-3 shadow-[0_12px_32px_rgb(0_0_0/0.35)] lg:bottom-4"
-        >
-          <span className="mr-auto text-sm font-semibold text-creme">
-            {save.isError ? (
-              <span className="text-danger-soft-foreground">{m.err_generic()}</span>
-            ) : dirty ? (
-              m.admin_unsaved()
-            ) : (
-              <span className="text-golden-light">{m.saved_ok()}</span>
-            )}
-          </span>
-          {dirty ? (
-            <>
-              <Button variant="ghost" size="sm" onPress={() => setDraft(null)}>
-                {m.admin_discard_changes()}
-              </Button>
-              <Button
-                size="sm"
-                className="btn-gold"
-                isDisabled={!ratesValid || !hoursValid}
-                isPending={save.isPending}
-                onPress={() => save.mutate()}
-              >
-                {m.btn_save()}
-              </Button>
-            </>
-          ) : null}
-        </div>
-      ) : null}
-
-      <Modal
-        isOpen={leaving.status === 'blocked'}
-        onOpenChange={open => {
-          if (!open) leaving.reset?.();
-        }}
-      >
-        <Modal.Backdrop>
-          <Modal.Container>
-            <Modal.Dialog className="sm:max-w-100">
-              <Modal.Header>
-                <Modal.Heading>{m.admin_leave_title()}</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                <p className="text-cream-soft">{m.admin_leave_text()}</p>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button variant="ghost" onPress={() => leaving.reset?.()}>
-                  {m.admin_stay()}
-                </Button>
-                <Button variant="danger" onPress={() => leaving.proceed?.()}>
-                  {m.admin_leave_action()}
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      <SaveBar
+        dirty={dirty}
+        canSave={ratesValid && hoursValid}
+        status={save.status}
+        onDiscard={() => setDraft(null)}
+        onSave={() => save.mutate()}
+      />
+      <LeaveDialog blocker={leaving} />
     </div>
   );
 }
