@@ -116,7 +116,7 @@ function PhoneSearch({ onSearch }: { onSearch: (phone: string) => void }) {
         event.preventDefault();
         if (value.trim()) onSearch(value.trim());
       }}
-      className="flex h-11 w-70 items-center gap-2.5 rounded-xl bg-club-green-light px-3.5 focus-within:ring-2 focus-within:ring-golden"
+      className="flex h-11 w-80 items-center gap-2.5 rounded-xl bg-club-green-light px-3.5 focus-within:ring-2 focus-within:ring-golden"
     >
       <Search aria-hidden className="size-4.5 flex-none text-grey-cool" />
       <label htmlFor={id} className="sr-only">
@@ -213,8 +213,8 @@ export function AdminShell({
         </header>
 
         {/* Above the schedule's sticky name column (z-20) as it scrolls under */}
+        {/* No logo here: on a phone it left the section's name a few letters wide */}
         <header className="sticky top-0 z-30 flex h-17 items-center gap-3 border-b border-line bg-club-green-dark px-4 lg:hidden">
-          <BrandLogo className="h-8 w-auto" />
           <div className="min-w-0 flex-1">
             {/* The page's heading on a phone; the wide header's h1 is not rendered there */}
             <h1 className="truncate text-lg leading-tight font-bold">{current.label()}</h1>
