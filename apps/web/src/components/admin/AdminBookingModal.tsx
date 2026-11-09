@@ -1,4 +1,4 @@
-import { useReducer, useState, type Dispatch } from 'react';
+import { memo, useReducer, useState, type Dispatch } from 'react';
 import { Minus, Pencil, Plus } from 'lucide-react';
 import { Button, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -349,6 +349,39 @@ function CardCounter({ value, onChange }: { value: number; onChange: (next: numb
 }
 
 /**
+ * The name and phone inputs. Memoised: the switch beside them re-renders the
+ * form, and these need not follow — re-rendering the phone field walks its
+ * 245-country list again.
+ */
+const ContactInputs = memo(function ContactInputs({
+  name,
+  phone,
+  dispatch
+}: {
+  name: string;
+  phone: string;
+  dispatch: Dispatch<FormAction>;
+}) {
+  return (
+    <>
+      <TextField
+        name="customerName"
+        value={name}
+        onChange={value => dispatch({ type: 'name', name: value })}
+      >
+        <Label>{m.name_label()}</Label>
+        <Input placeholder={m.admin_guest_name_placeholder()} />
+      </TextField>
+      <PhoneField
+        name="customerPhone"
+        value={phone}
+        onChange={value => dispatch({ type: 'phone', phone: value })}
+      />
+    </>
+  );
+});
+
+/**
  * Who the booking is for: a name and number, or an offline client with
  * neither. Mounted only while the dialog is open, like the rest of its body.
  */
@@ -384,25 +417,12 @@ function ClientFields({
           ) : null}
         </div>
       ) : null}
-      {/* Typed details stay in the form while the switch is on, so flicking
-          it by mistake loses nothing */}
-      {offline ? null : (
-        <>
-          <TextField
-            name="customerName"
-            value={name}
-            onChange={value => dispatch({ type: 'name', name: value })}
-          >
-            <Label>{m.name_label()}</Label>
-            <Input placeholder={m.admin_guest_name_placeholder()} />
-          </TextField>
-          <PhoneField
-            name="customerPhone"
-            value={phone}
-            onChange={value => dispatch({ type: 'phone', phone: value })}
-          />
-        </>
-      )}
+      {/* Hidden, not unmounted: creating the phone field builds its whole
+          country list, which held the switch's animation up by 50–300 ms.
+          Typed details also survive a switch flicked by mistake. */}
+      <div hidden={offline} className="flex flex-col gap-4">
+        <ContactInputs name={name} phone={phone} dispatch={dispatch} />
+      </div>
       {phoneBlacklisted ? (
         <p role="status" className="text-sm text-danger-soft-foreground">
           {m.admin_blacklisted_warning()}
@@ -495,7 +515,11 @@ export function AdminBookingModal({
   return (
     <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
       <Modal.Container scroll="inside">
-        <Modal.Dialog className="sm:max-w-lg lg:max-w-4xl">
+        {/* Hung from the top below the two-column width. Pinned to the bottom
+            (phones) or centred, the dialog moved its top edge whenever the
+            form changed height, and the offline switch slid 58 px away under
+            the finger that had just tapped it. */}
+        <Modal.Dialog className="max-lg:mt-0 sm:max-w-lg lg:max-w-4xl">
           <Modal.CloseTrigger />
           <Modal.Header>
             <Modal.Heading>
