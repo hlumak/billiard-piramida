@@ -35,7 +35,7 @@ function NewsIndexPage() {
         <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
           {news.map(item => (
             <li key={item.id} className="anim-stagger-item">
-              <NewsListItem item={item} />
+              <NewsListItem item={item} headingLevel="h2" />
             </li>
           ))}
         </ul>

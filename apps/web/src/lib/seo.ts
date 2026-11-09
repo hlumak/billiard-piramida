@@ -4,6 +4,7 @@ import {
   VENUE_TIMEZONE,
   type IsoDate,
   type Locale,
+  type NewsArticleDto,
   type TournamentDto,
   type VenueConfigDto
 } from '@repo/shared';
@@ -198,6 +199,31 @@ function venuePlace() {
   };
 }
 
+/** An image as an absolute URL: app-relative covers (uploads) are same-origin with the site. */
+function absoluteImage(image: string | null): string {
+  if (image === null) return `${SITE_URL}/og-image.jpg`;
+  return image.startsWith('/') ? `${SITE_URL}${image}` : image;
+}
+
+/**
+ * Article structured data for a news post: headline, date and cover, with the
+ * club as author and publisher (staff write the posts, not named people).
+ */
+export function newsArticleJsonLd(article: NewsArticleDto, pageUrl: string): string {
+  const club = { '@type': 'Organization', name: VENUE.name, url: `${SITE_URL}/` };
+  return JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.title,
+    ...(article.body === null ? {} : { description: clampDescription(article.body) }),
+    image: [absoluteImage(article.imageUrl)],
+    datePublished: article.publishedAt,
+    mainEntityOfPage: pageUrl,
+    author: club,
+    publisher: club
+  });
+}
+
 /** Warsaw's UTC offset on a date, as "+01:00" / "+02:00". */
 function warsawOffset(isoDate: IsoDate): string {
   const name = new Intl.DateTimeFormat('en-US', {
@@ -252,12 +278,6 @@ const OFFER_AVAILABILITY: Partial<Record<TournamentDto['registrationState'], str
 export function tournamentJsonLd(t: TournamentDto, pageUrl: string): string | null {
   const startDate = tournamentStart(t);
   if (startDate === null) return null;
-  const image =
-    t.imageUrl === null
-      ? `${SITE_URL}/og-image.jpg`
-      : t.imageUrl.startsWith('/')
-        ? `${SITE_URL}${t.imageUrl}`
-        : t.imageUrl;
   const availability = OFFER_AVAILABILITY[t.registrationState];
   return JSON.stringify({
     '@context': 'https://schema.org',
@@ -268,7 +288,7 @@ export function tournamentJsonLd(t: TournamentDto, pageUrl: string): string | nu
     eventStatus: EVENT_STATUS[t.status] ?? 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     location: venuePlace(),
-    image: [image],
+    image: [absoluteImage(t.imageUrl)],
     url: pageUrl,
     organizer: { '@type': 'Organization', name: VENUE.name, url: `${SITE_URL}/` },
     ...(t.maxPlayers === null ? {} : { maximumAttendeeCapacity: t.maxPlayers }),

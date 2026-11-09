@@ -5,7 +5,7 @@ import { ArticleBody } from '../components/ArticleBody';
 import { notFoundOn404, resolveAssetUrl } from '../lib/api';
 import { formatPublished } from '../lib/news';
 import { newsArticleQuery } from '../lib/queries';
-import { pageHead } from '../lib/seo';
+import { localizedPageUrl, newsArticleJsonLd, pageHead } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
@@ -16,13 +16,17 @@ export const Route = createFileRoute('/news/$slug')({
       .ensureQueryData(newsArticleQuery(params.slug, getLocale()))
       .catch(notFoundOn404),
   // Named after the story, with its cover as the preview: this URL gets shared
-  head: ({ match, loaderData }) =>
-    pageHead(
+  head: ({ match, loaderData }) => {
+    const head = pageHead(
       loaderData ? `${loaderData.title} — Piramida` : m.seo_title_news(),
       loaderData?.body ?? m.seo_desc_news(),
       match.pathname,
       loaderData?.imageUrl ?? undefined
-    ),
+    );
+    if (!loaderData) return head;
+    const article = newsArticleJsonLd(loaderData, localizedPageUrl(match.pathname, getLocale()));
+    return { ...head, scripts: [{ type: 'application/ld+json', children: article }] };
+  },
   component: NewsArticlePage,
   notFoundComponent: () => (
     <ArticleShell>
