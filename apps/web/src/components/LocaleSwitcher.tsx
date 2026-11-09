@@ -1,5 +1,8 @@
+import { useRouterState } from '@tanstack/react-router';
+import type { MouseEvent } from 'react';
 import { getLocale, locales, setLocale, type Locale } from '../paraglide/runtime.js';
 import { m } from '../paraglide/messages.js';
+import { localizedPath } from '../lib/seo';
 
 const LABELS = { uk: 'УКР', pl: 'PL', en: 'EN' } as const;
 
@@ -29,6 +32,12 @@ const NAMES = { uk: 'Українська', pl: 'Polski', en: 'English' } as con
 /**
  * The three languages as one segmented control. `stretch` fills its container
  * (the menu sheet); otherwise it sizes to its labels (header, footer).
+ *
+ * Each language is a real link to this page in that language: search engines
+ * only follow `<a href>`, and with buttons the other languages were reachable
+ * only through hreflang and the sitemap (the Ukrainian home page sat
+ * "discovered, not indexed" for weeks). A plain click still goes through
+ * setLocale, which also remembers the choice in the locale cookie.
  */
 export function LocaleSwitcher({
   stretch = false,
@@ -38,6 +47,18 @@ export function LocaleSwitcher({
   className?: string;
 }) {
   const current = getLocale();
+  const pathname = useRouterState({ select: state => state.location.pathname });
+  const searchStr = useRouterState({ select: state => state.location.searchStr });
+
+  const onClick = (event: MouseEvent, locale: Locale) => {
+    // A modified or middle click still means "open that language in a new tab"
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    switchTo(locale);
+  };
+
   return (
     <div
       role="group"
@@ -45,15 +66,16 @@ export function LocaleSwitcher({
       className={`${stretch ? 'grid grid-cols-3' : 'inline-flex'} gap-1 rounded-xl bg-club-green-dark p-1 ${className ?? ''}`}
     >
       {locales.map(locale => (
-        <button
+        <a
           key={locale}
-          type="button"
+          href={`${localizedPath(pathname, locale)}${searchStr}`}
+          hrefLang={locale}
           lang={locale}
           // Starts with the visible text, so voice control ("click PL") still works
           aria-label={`${LABELS[locale]}, ${NAMES[locale]}`}
-          onClick={() => switchTo(locale)}
-          aria-pressed={locale === current}
-          className={`rounded-[9px] px-3.5 transition-colors ${
+          aria-current={locale === current ? 'true' : undefined}
+          onClick={event => onClick(event, locale)}
+          className={`flex items-center justify-center rounded-[9px] px-3.5 transition-colors ${
             stretch ? 'h-11 text-sm' : 'h-9 text-[13px]'
           } ${
             locale === current
@@ -62,7 +84,7 @@ export function LocaleSwitcher({
           }`}
         >
           {LABELS[locale]}
-        </button>
+        </a>
       ))}
     </div>
   );

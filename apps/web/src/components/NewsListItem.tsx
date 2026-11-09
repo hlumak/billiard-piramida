@@ -10,8 +10,18 @@ const CARD = 'card flex h-full flex-col overflow-hidden';
  * One news card: cover, date, headline, teaser, and "read more" when there is
  * somewhere to go — its own page, an app route or an off-site link. A card with
  * nowhere to go is read in place and does not pretend to be a link.
+ *
+ * The headline is a heading one level below the list's own: h2 under the news
+ * page's h1, h3 under the home page's "News" section title.
  */
-export function NewsListItem({ item }: { item: NewsItemDto }) {
+export function NewsListItem({
+  item,
+  headingLevel = 'h3'
+}: {
+  item: NewsItemDto;
+  headingLevel?: 'h2' | 'h3';
+}) {
+  const Heading = headingLevel;
   const href = newsHref(item);
   const body = (
     <>
@@ -31,7 +41,7 @@ export function NewsListItem({ item }: { item: NewsItemDto }) {
         >
           {formatPublished(item.publishedAt)}
         </time>
-        <p className="text-[19px] leading-snug font-bold md:text-2xl">{item.title}</p>
+        <Heading className="text-[19px] leading-snug font-bold md:text-2xl">{item.title}</Heading>
         {item.body ? (
           <p className="line-clamp-3 text-sm leading-relaxed text-cream-soft md:text-base">
             {item.body}
