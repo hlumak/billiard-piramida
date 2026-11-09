@@ -53,13 +53,25 @@ export const NEW_BOOKING_FIELDS = {
   game: Type.Optional(BILLIARD_GAME)
 };
 
+/**
+ * The desk's body: the same fields, but the name and phone may both be left
+ * out for an offline client — someone who walked in to play and whose
+ * details nobody needs. One without the other is still refused.
+ */
+export const STAFF_BOOKING_FIELDS = {
+  ...NEW_BOOKING_FIELDS,
+  customerName: Type.Optional(NEW_BOOKING_FIELDS.customerName),
+  customerPhone: Type.Optional(NEW_BOOKING_FIELDS.customerPhone)
+};
+
 export interface NewBooking {
   tableId: number;
   date: string;
   startMinute: number;
   durationMinutes: number;
-  customerName: string;
-  customerPhone: string;
+  /** Both left out: an offline client (staff only) */
+  customerName?: string | undefined;
+  customerPhone?: string | undefined;
   sportCardCount?: number | undefined;
   game?: BilliardGame | undefined;
   items?: { foodItemId: number; quantity: number }[] | undefined;
@@ -72,7 +84,8 @@ export interface NewBooking {
  *   cap on upcoming bookings per phone — and the booking gets a manage secret
  *   (returned once). A signed-in guest's account is recorded on it.
  * - staff: the reception desk logging a walk-in or a phone call; any hour of
- *   today may be entered (a game that already started), no cap, no secret.
+ *   today may be entered (a game that already started), no cap, no secret,
+ *   and a walk-in may stay an offline client with no name or number.
  */
 export type BookingPolicy = { kind: 'guest'; userId: string | null } | { kind: 'staff' };
 
@@ -98,6 +111,32 @@ const refuse = (status: 400 | 403 | 409 | 422, error: string): CreateBookingResu
   error
 });
 
+type Contact =
+  | { ok: true; customerName: string; customerPhone: string }
+  | { ok: true; customerName: null; customerPhone: null };
+
+/**
+ * Who to reach: a trimmed name and a normalized number, or — for the desk
+ * only — neither, for an offline client. Half a contact is refused.
+ */
+function readContact(
+  input: NewBooking,
+  policy: BookingPolicy
+): Contact | Extract<CreateBookingResult, { ok: false }> {
+  if (
+    policy.kind === 'staff' &&
+    input.customerName === undefined &&
+    input.customerPhone === undefined
+  ) {
+    return { ok: true, customerName: null, customerPhone: null };
+  }
+  const customerName = input.customerName?.trim() ?? '';
+  if (customerName === '') return { ok: false, status: 422, error: 'invalid_name' };
+  const customerPhone = normalizePhone(input.customerPhone ?? '');
+  if (customerPhone === null) return { ok: false, status: 422, error: 'invalid_phone' };
+  return { ok: true, customerName, customerPhone };
+}
+
 /**
  * One path for every new booking: validation, the locked-in price, the
  * insert (the database's overlap constraint is the final word on the slot)
@@ -109,14 +148,13 @@ export async function createBooking(
   policy: BookingPolicy
 ): Promise<CreateBookingResult> {
   const { tableId, date, startMinute, durationMinutes } = input;
-  const customerName = input.customerName.trim();
-  if (customerName === '') return refuse(422, 'invalid_name');
   if (!isIsoDate(date)) return refuse(400, 'invalid_date');
-  const customerPhone = normalizePhone(input.customerPhone);
-  if (customerPhone === null) return refuse(422, 'invalid_phone');
+  const contact = readContact(input, policy);
+  if (!contact.ok) return contact;
+  const { customerName, customerPhone } = contact;
   // Clients who booked and did not come book by phone now; the desk can
   // still book for them
-  if (policy.kind === 'guest') {
+  if (policy.kind === 'guest' && customerPhone !== null) {
     const [blocked] = await app.db
       .select({ phone: blacklist.phone })
       .from(blacklist)
@@ -167,7 +205,7 @@ export async function createBooking(
 
   try {
     const bookingId = await app.db.transaction(async tx => {
-      if (policy.kind === 'guest') {
+      if (policy.kind === 'guest' && customerPhone !== null) {
         // Serialize creations per phone so two parallel requests can't both
         // pass the count below; released at commit/rollback
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${customerPhone}))`);

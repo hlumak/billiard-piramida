@@ -307,15 +307,19 @@ function ClosureConflicts({
                 {warsawTime(conflict.startsAt)}–{warsawTime(conflict.endsAt)}
               </span>
               <span className="min-w-0 flex-1 text-sm">
-                <span className="font-semibold">{conflict.customerName}</span>
-                {spot ? ` · ${spotName(spot.kind, spot.label)}` : ''}
-                <span className="block text-xs text-golden-light">
-                  {formatPhone(conflict.customerPhone)}
+                <span className="font-semibold">
+                  {conflict.customerName ?? m.admin_offline_client()}
                 </span>
+                {spot ? ` · ${spotName(spot.kind, spot.label)}` : ''}
+                {conflict.customerPhone === null ? null : (
+                  <span className="block text-xs text-golden-light">
+                    {formatPhone(conflict.customerPhone)}
+                  </span>
+                )}
               </span>
               <button
                 type="button"
-                onClick={() => onShowBooking(conflict.customerPhone)}
+                onClick={() => onShowBooking(conflict.customerPhone ?? '')}
                 className="h-9 rounded-[10px] px-3 text-sm font-semibold text-golden-light hover:bg-creme/8"
               >
                 {m.admin_closure_show_booking()} →

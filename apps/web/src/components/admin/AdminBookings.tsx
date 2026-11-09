@@ -278,20 +278,28 @@ function BookingsTable({ bookings }: { bookings: BookingDto[] }) {
                       ) : null}
                     </td>
                     <td className="col-span-2 lg:px-3 lg:py-3.5">
-                      <span className="block font-semibold">
-                        {booking.customerName}
-                        {blacklisted.has(booking.customerPhone) ? (
-                          <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-soft-foreground">
-                            {m.admin_blacklisted()}
+                      {booking.customerPhone === null ? (
+                        <span className="block font-semibold text-grey-cool">
+                          {m.admin_offline_client()}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="block font-semibold">
+                            {booking.customerName}
+                            {blacklisted.has(booking.customerPhone) ? (
+                              <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-soft-foreground">
+                                {m.admin_blacklisted()}
+                              </span>
+                            ) : null}
                           </span>
-                        ) : null}
-                      </span>
-                      <a
-                        href={`tel:${booking.customerPhone}`}
-                        className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
-                      >
-                        {formatPhone(booking.customerPhone)}
-                      </a>
+                          <a
+                            href={`tel:${booking.customerPhone}`}
+                            className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
+                          >
+                            {formatPhone(booking.customerPhone)}
+                          </a>
+                        </>
+                      )}
                       {booking.items.length > 0 ? (
                         <span className="mt-0.5 block text-xs text-grey-cool">
                           {booking.items

@@ -1,0 +1,91 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "0ad9c55f-8226-4bb1-82ea-a9b40eb6e77a",
+  "prevIds": ["26e49ac6-2c27-458c-af63-4e413d9e6e2d"],
+  "footprints": [
+    {
+      "statementType": "alter_column",
+      "statementTarget": ["column", "public", "bookings", "customer_name"],
+      "writes": ["s|colprop|public.bookings.customer_name.notNull"],
+      "reads": ["n|tbl|public.bookings", "n|sch|public", "n|col|public.bookings.customer_name"],
+      "sqlHash": "5eee95b63ddadae3"
+    },
+    {
+      "statementType": "alter_column",
+      "statementTarget": ["column", "public", "bookings", "customer_phone"],
+      "writes": ["s|colprop|public.bookings.customer_phone.notNull"],
+      "reads": ["n|tbl|public.bookings", "n|sch|public", "n|col|public.bookings.customer_phone"],
+      "sqlHash": "f4331395c6468dd2"
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "bookings"],
+      "writes": [
+        "s|ck|public.bookings.bookings_customer_both_or_neither",
+        "n|ck|public.bookings.bookings_customer_both_or_neither",
+        "e|ck|public.bookings.bookings_customer_both_or_neither",
+        "n|con|public.bookings.bookings_customer_both_or_neither"
+      ],
+      "reads": [
+        "n|tbl|public.bookings",
+        "n|sch|public",
+        "n|col|public.bookings.customer_name",
+        "n|col|public.bookings.customer_phone"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "bookings"],
+      "writes": [
+        "s|ck|public.bookings.bookings_online_has_customer",
+        "n|ck|public.bookings.bookings_online_has_customer",
+        "e|ck|public.bookings.bookings_online_has_customer",
+        "n|con|public.bookings.bookings_online_has_customer"
+      ],
+      "reads": [
+        "n|tbl|public.bookings",
+        "n|sch|public",
+        "n|col|public.bookings.manage_token_hash",
+        "n|col|public.bookings.customer_phone"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "bookings",
+        "name": "bookings_customer_both_or_neither",
+        "value": "(\"customer_name\" is null) = (\"customer_phone\" is null)",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "bookings",
+        "name": "bookings_online_has_customer",
+        "value": "\"manage_token_hash\" is null or \"customer_phone\" is not null",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"bookings\",\"customer_name\"]",
+      "set": {
+        "notNull": false
+      }
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"bookings\",\"customer_phone\"]",
+      "set": {
+        "notNull": false
+      }
+    }
+  ]
+}

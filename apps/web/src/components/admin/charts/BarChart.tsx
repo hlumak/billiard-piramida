@@ -10,6 +10,18 @@ export interface BarDatum {
 }
 
 /**
+ * Where the tooltip sits: centred over a bar in the middle of the chart, but
+ * hanging inward from the outer bars. Centred there, it spilled past the
+ * card and widened the whole page.
+ */
+function tooltipPlacement(index: number, count: number) {
+  const centre = (index + 0.5) / count;
+  if (centre < 0.25) return { left: `${(index / count) * 100}%` };
+  if (centre > 0.75) return { right: `${((count - index - 1) / count) * 100}%` };
+  return { left: `${centre * 100}%`, transform: 'translateX(-50%)' };
+}
+
+/**
  * Single-series vertical bar chart (dataviz mark specs: thin marks, 4px rounded
  * data ends on the baseline, 2px surface gaps, recessive axes, per-mark hover
  * tooltip, selective direct label on the max only). The picture is hover-only
@@ -104,8 +116,8 @@ export function BarChart({
       </svg>
       {hovered !== null && data[hovered] ? (
         <div
-          className="pointer-events-none absolute -top-1 z-10 -translate-x-1/2 whitespace-nowrap rounded-[8px] bg-club-green px-2.5 py-1.5 text-xs text-creme shadow-lg ring-1 ring-deep-cream/30"
-          style={{ left: `${((hovered + 0.5) / data.length) * 100}%` }}
+          className="pointer-events-none absolute -top-1 z-10 whitespace-nowrap rounded-[8px] bg-club-green px-2.5 py-1.5 text-xs text-creme shadow-lg ring-1 ring-deep-cream/30"
+          style={tooltipPlacement(hovered, data.length)}
         >
           {data[hovered].tooltip}
         </div>

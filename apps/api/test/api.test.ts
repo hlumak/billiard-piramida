@@ -19,7 +19,7 @@ import { buildApp } from '../src/app.ts';
 import { LOCAL_DATABASE_URL } from '../src/lib/config.ts';
 import { issueAdminSession } from '../src/lib/admin-session.ts';
 import { createDb } from '../src/db/client.ts';
-import { bookings, tournamentRegistrations, users } from '../src/db/schema.ts';
+import { bookings, orderItems, tournamentRegistrations, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
 
 /** Derived from the shared constants — a rate change must not silently rot these. */
@@ -3949,4 +3949,231 @@ test('a night past midnight: book into the small hours, listed under the evening
     assert.equal(cancelled.statusCode, 200);
   }
   assert.equal((await save(week)).statusCode, 200);
+});
+
+test('offline client: the desk books with no name or phone, guests cannot', async () => {
+  const headers = staff('198.51.100.120');
+  const friday = nextDate(5);
+  const window = { tableId: 4, date: friday, durationMinutes: 60 };
+
+  // Walked in to play: nothing to write down
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: { ...window, startMinute: 18 * 60 }
+  });
+  assert.equal(created.statusCode, 201);
+  const offline = created.json();
+  assert.equal(offline.customerName, null);
+  assert.equal(offline.customerPhone, null);
+  assert.equal(offline.tableTotalGrosz, BILLIARD_HOUR);
+
+  // Half a contact is refused either way round
+  const nameOnly = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: { ...window, startMinute: 20 * 60, customerName: 'Just A Name' }
+  });
+  assert.equal(nameOnly.statusCode, 422);
+  assert.equal(nameOnly.json().error, 'invalid_phone');
+  const phoneOnly = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: { ...window, startMinute: 20 * 60, customerPhone: '+48 600 700 811' }
+  });
+  assert.equal(phoneOnly.statusCode, 422);
+  assert.equal(phoneOnly.json().error, 'invalid_name');
+
+  // A guest on the site always leaves both
+  const guest = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: { 'x-forwarded-for': '198.51.100.121' },
+    payload: { ...window, startMinute: 20 * 60 }
+  });
+  assert.equal(guest.statusCode, 400);
+
+  // Listed with the day's bookings, but nobody's customer record
+  const day = await app.inject({
+    method: 'GET',
+    url: `/api/admin/bookings?date=${friday}`,
+    headers
+  });
+  assert.ok(day.json().some((b: { id: string }) => b.id === offline.id));
+  const customers = await app.inject({ method: 'GET', url: '/api/admin/customers', headers });
+  assert.equal(customers.statusCode, 200);
+  assert.ok(customers.json().every((c: { phone: unknown }) => typeof c.phone === 'string'));
+
+  // Edits that leave the details alone keep it offline
+  const moved = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${offline.id}`,
+    headers,
+    payload: { durationMinutes: 90 }
+  });
+  assert.equal(moved.statusCode, 200);
+  assert.equal(moved.json().customerPhone, null);
+
+  // Details that turn up later come as a pair
+  const halfLater = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${offline.id}`,
+    headers,
+    payload: { customerName: 'Found Later' }
+  });
+  assert.equal(halfLater.statusCode, 422);
+  assert.equal(halfLater.json().error, 'invalid_phone');
+  const known = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${offline.id}`,
+    headers,
+    payload: { customerName: 'Found Later', customerPhone: '+48 600 700 812' }
+  });
+  assert.equal(known.statusCode, 200);
+  assert.equal(known.json().customerName, 'Found Later');
+  assert.equal(known.json().customerPhone, '+48600700812');
+
+  // An offline no-show leaves no number for the black list
+  const HOUR = 3_600_000;
+  const hourStart = Math.floor(Date.now() / HOUR) * HOUR - 2 * HOUR;
+  const { db, pool } = createDb(TEST_URL);
+  try {
+    const [played] = await db
+      .insert(bookings)
+      .values({
+        tableId: 3,
+        startsAt: new Date(hourStart),
+        endsAt: new Date(hourStart + HOUR),
+        hourlyRateGrosz: BILLIARD_HOUR
+      })
+      .returning({ id: bookings.id });
+    assert.ok(played);
+    const listedBefore = (
+      await app.inject({ method: 'GET', url: '/api/admin/blacklist', headers })
+    ).json().length;
+    const noShow = await app.inject({
+      method: 'POST',
+      url: `/api/admin/bookings/${played.id}/no-show`,
+      headers
+    });
+    assert.equal(noShow.statusCode, 200);
+    assert.equal(noShow.json().status, 'no_show');
+    const listedAfter = (
+      await app.inject({ method: 'GET', url: '/api/admin/blacklist', headers })
+    ).json();
+    assert.equal(listedAfter.length, listedBefore);
+
+    // The table holds the pair rule, and a site booking always has someone to reach
+    await assert.rejects(
+      db.insert(bookings).values({
+        tableId: 3,
+        customerName: 'Half',
+        startsAt: new Date(hourStart + 30 * 24 * HOUR),
+        endsAt: new Date(hourStart + 30 * 24 * HOUR + HOUR),
+        hourlyRateGrosz: BILLIARD_HOUR
+      })
+    );
+    await assert.rejects(
+      db.insert(bookings).values({
+        tableId: 3,
+        startsAt: new Date(hourStart + 31 * 24 * HOUR),
+        endsAt: new Date(hourStart + 31 * 24 * HOUR + HOUR),
+        hourlyRateGrosz: BILLIARD_HOUR,
+        manageTokenHash: 'x'
+      })
+    );
+  } finally {
+    await pool.end();
+  }
+});
+
+test('monthly revenue: every month listed, rental net of cards plus the bar', async () => {
+  const headers = staff('198.51.100.130');
+  type Month = {
+    month: string;
+    bookings: number;
+    rentalGrosz: number;
+    foodGrosz: number;
+    revenueGrosz: number;
+  };
+  const fetchMonths = async (query = '') => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/admin/analytics/monthly${query}`,
+      headers
+    });
+    assert.equal(res.statusCode, 200);
+    return res.json() as Month[];
+  };
+
+  const HOUR = 3_600_000;
+  const monthsBefore = await fetchMonths();
+  assert.equal(monthsBefore.length, 12);
+  // Oldest first, ending with the month in progress. Read from the answer, not
+  // the test's clock: in UTC a Warsaw month starts an hour or two late.
+  const [year, month] = (monthsBefore.at(-2)?.month ?? '').split('-').map(Number) as [
+    number,
+    number
+  ];
+  const lastMonthStart = new Date(Date.UTC(year, month - 1, 15, 17));
+  const nextIndex = year * 12 + month;
+  assert.equal(
+    monthsBefore.at(-1)?.month,
+    `${Math.floor(nextIndex / 12)}-${String((nextIndex % 12) + 1).padStart(2, '0')}`
+  );
+  assert.ok(Math.abs(Date.now() - lastMonthStart.getTime()) < 62 * 24 * HOUR);
+  assert.deepEqual(
+    monthsBefore.map(m => m.month),
+    monthsBefore.map(m => m.month).toSorted()
+  );
+
+  const { db, pool } = createDb(TEST_URL);
+  try {
+    // Last month: two hours on a 9ft table with one sport card, and a drink
+    const [played] = await db
+      .insert(bookings)
+      .values({
+        tableId: 2,
+        startsAt: lastMonthStart,
+        endsAt: new Date(lastMonthStart.getTime() + 2 * HOUR),
+        hourlyRateGrosz: BILLIARD_HOUR,
+        sportCardCount: 1,
+        discountGrosz: SPORT_CARD_DISCOUNT_GROSZ
+      })
+      .returning({ id: bookings.id });
+    assert.ok(played);
+    await db
+      .insert(orderItems)
+      .values({ bookingId: played.id, foodItemId: 1, quantity: 2, unitPriceGrosz: 1_000 });
+    // Cancelled takings are no takings
+    await db.insert(bookings).values({
+      tableId: 2,
+      startsAt: new Date(lastMonthStart.getTime() + 3 * HOUR),
+      endsAt: new Date(lastMonthStart.getTime() + 4 * HOUR),
+      hourlyRateGrosz: BILLIARD_HOUR,
+      status: 'cancelled'
+    });
+  } finally {
+    await pool.end();
+  }
+
+  const monthsAfter = await fetchMonths();
+  const delta = (key: keyof Omit<Month, 'month'>) =>
+    (monthsAfter.at(-2)?.[key] ?? 0) - (monthsBefore.at(-2)?.[key] ?? 0);
+  assert.equal(delta('bookings'), 1);
+  assert.equal(delta('rentalGrosz'), 2 * BILLIARD_HOUR - SPORT_CARD_DISCOUNT_GROSZ);
+  assert.equal(delta('foodGrosz'), 2_000);
+  assert.equal(delta('revenueGrosz'), 2 * BILLIARD_HOUR - SPORT_CARD_DISCOUNT_GROSZ + 2_000);
+  assert.deepEqual(monthsAfter.at(-1), monthsBefore.at(-1));
+
+  assert.equal((await fetchMonths('?months=3')).length, 3);
+  const tooMany = await app.inject({
+    method: 'GET',
+    url: '/api/admin/analytics/monthly?months=37',
+    headers
+  });
+  assert.equal(tooMany.statusCode, 400);
 });

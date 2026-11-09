@@ -1,4 +1,4 @@
-import { useReducer, useState } from 'react';
+import { useReducer, useState, type Dispatch } from 'react';
 import { Minus, Pencil, Plus } from 'lucide-react';
 import { Button, Input, Label, Modal, Spinner, TextField } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,6 +26,7 @@ import { gameName, spotName } from '../../lib/spots';
 import { m } from '../../paraglide/messages.js';
 import { AdminDatePicker } from './AdminDatePicker';
 import { PhoneField } from '../PhoneField';
+import { AdminSwitch } from './AdminSwitch';
 import { bookingClubDate, clubMoment, useVenueConfig } from '../../lib/venue-config';
 
 const chip = (selected: boolean, disabled = false) =>
@@ -52,6 +53,8 @@ interface FormState {
   /** In minutes: an hour at least, in half-hour steps */
   duration: number;
   tableId: number | null;
+  /** Walked in to play: no name or phone is taken */
+  offline: boolean;
   name: string;
   phone: string;
   sportCards: number;
@@ -65,6 +68,7 @@ type FormAction =
   | { type: 'duration'; duration: number }
   | { type: 'tableId'; tableId: number }
   | { type: 'game'; game: BilliardGame }
+  | { type: 'offline'; offline: boolean }
   | { type: 'name'; name: string }
   | { type: 'phone'; phone: string }
   | { type: 'sportCards'; sportCards: number }
@@ -85,8 +89,9 @@ function initialForm({ prefill, booking, hours }: FormSeed): FormState {
       startMinute: bookingMinutes(booking, hours).start,
       duration: Math.round((Date.parse(booking.endsAt) - Date.parse(booking.startsAt)) / 60_000),
       tableId: booking.tableId,
-      name: booking.customerName,
-      phone: booking.customerPhone,
+      offline: booking.customerPhone === null,
+      name: booking.customerName ?? '',
+      phone: booking.customerPhone ?? '',
       sportCards: booking.sportCardCount,
       game: booking.game
     };
@@ -96,6 +101,7 @@ function initialForm({ prefill, booking, hours }: FormSeed): FormState {
     startMinute: prefill?.startMinute ?? null,
     duration: MIN_BOOKING_MINUTES,
     tableId: prefill?.tableId ?? null,
+    offline: false,
     name: '',
     phone: '',
     sportCards: 0,
@@ -121,6 +127,8 @@ function formReducer(state: FormState, action: FormAction): FormState {
       return { ...state, tableId: action.tableId, game: defaultGameFor(action.tableId) };
     case 'game':
       return { ...state, game: action.game };
+    case 'offline':
+      return { ...state, offline: action.offline };
     case 'name':
       return { ...state, name: action.name };
     case 'phone':
@@ -244,9 +252,10 @@ export function AdminEditBooking({ booking }: { booking: BookingDto }) {
  * rather than leaving staff to work out why it does nothing; null when
  * the booking can be saved.
  */
-function firstMissing({ startMinute, tableId, name, phone }: FormState): string | null {
+function firstMissing({ startMinute, tableId, offline, name, phone }: FormState): string | null {
   if (startMinute === null) return m.missing_start();
   if (tableId === null) return m.missing_table();
+  if (offline) return null;
   if (name.trim().length === 0) return m.missing_name();
   if (!isValidPhone(phone)) return m.missing_phone();
   return null;
@@ -340,6 +349,70 @@ function CardCounter({ value, onChange }: { value: number; onChange: (next: numb
 }
 
 /**
+ * Who the booking is for: a name and number, or an offline client with
+ * neither. Mounted only while the dialog is open, like the rest of its body.
+ */
+function ClientFields({
+  offline,
+  canBeOffline,
+  name,
+  phone,
+  dispatch
+}: {
+  offline: boolean;
+  canBeOffline: boolean;
+  name: string;
+  phone: string;
+  dispatch: Dispatch<FormAction>;
+}) {
+  // The desk may book a black-listed number; it should know it is doing so
+  const { data: blacklist } = useQuery(adminBlacklistQuery());
+  const phoneBlacklisted = !offline && (blacklist?.some(entry => entry.phone === phone) ?? false);
+  return (
+    <>
+      {canBeOffline ? (
+        <div className="flex flex-col gap-1">
+          <AdminSwitch
+            isSelected={offline}
+            onChange={next => dispatch({ type: 'offline', offline: next })}
+            className="self-start"
+          >
+            {m.admin_offline_client()}
+          </AdminSwitch>
+          {offline ? (
+            <p className="text-sm text-grey-cool">{m.admin_offline_client_hint()}</p>
+          ) : null}
+        </div>
+      ) : null}
+      {/* Typed details stay in the form while the switch is on, so flicking
+          it by mistake loses nothing */}
+      {offline ? null : (
+        <>
+          <TextField
+            name="customerName"
+            value={name}
+            onChange={value => dispatch({ type: 'name', name: value })}
+          >
+            <Label>{m.name_label()}</Label>
+            <Input placeholder={m.admin_guest_name_placeholder()} />
+          </TextField>
+          <PhoneField
+            name="customerPhone"
+            value={phone}
+            onChange={value => dispatch({ type: 'phone', phone: value })}
+          />
+        </>
+      )}
+      {phoneBlacklisted ? (
+        <p role="status" className="text-sm text-danger-soft-foreground">
+          {m.admin_blacklisted_warning()}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/**
  * One modal for both jobs: `booking` present means edit, absent means create.
  * The two differ only in what submit calls and in which slots count as free —
  * everything else (window rules, spot picker, card stepper) is the same form.
@@ -364,12 +437,9 @@ export function AdminBookingModal({
     { prefill, booking, hours: venueHours },
     initialForm
   );
-  const { date, startMinute, duration, tableId, name, phone, sportCards, game } = form;
+  const { date, startMinute, duration, tableId, offline, name, phone, sportCards, game } = form;
 
   const { data: availability } = useQuery({ ...availabilityQuery(date), enabled: isOpen });
-  // The desk may book a black-listed number; it should know it is doing so
-  const { data: blacklist } = useQuery({ ...adminBlacklistQuery(), enabled: isOpen });
-  const phoneBlacklisted = blacklist?.some(entry => entry.phone === phone) ?? false;
 
   // Bounded by closing time rather than a fixed list: a 15:00 start on a day
   // that runs to 23:00 can legitimately be booked for eight hours, and the API
@@ -390,8 +460,8 @@ export function AdminBookingModal({
         date,
         startMinute: startMinute!,
         durationMinutes: effectiveDuration,
-        customerName: name.trim(),
-        customerPhone: phone.trim(),
+        // Left out for an offline client, which the API takes as "nobody to reach"
+        ...(offline ? {} : { customerName: name.trim(), customerPhone: phone.trim() }),
         sportCardCount: sportCards,
         // Left out on a dartboard, which the API refuses a game for
         ...(game === null ? {} : { game })
@@ -516,24 +586,16 @@ export function AdminBookingModal({
               </div>
 
               <div className="flex flex-col gap-4">
-                <TextField
-                  name="customerName"
-                  value={name}
-                  onChange={value => dispatch({ type: 'name', name: value })}
-                >
-                  <Label>{m.name_label()}</Label>
-                  <Input placeholder={m.admin_guest_name_placeholder()} />
-                </TextField>
-                <PhoneField
-                  name="customerPhone"
-                  value={phone}
-                  onChange={value => dispatch({ type: 'phone', phone: value })}
+                <ClientFields
+                  offline={offline}
+                  // Offering "offline" on a booking that has a name and number
+                  // would mean wiping them; the switch is for new walk-ins and
+                  // for an offline client whose details turn up later
+                  canBeOffline={booking === undefined || booking.customerPhone === null}
+                  name={name}
+                  phone={phone}
+                  dispatch={dispatch}
                 />
-                {phoneBlacklisted ? (
-                  <p role="status" className="text-sm text-danger-soft-foreground">
-                    {m.admin_blacklisted_warning()}
-                  </p>
-                ) : null}
 
                 <CardCounter
                   value={sportCards}

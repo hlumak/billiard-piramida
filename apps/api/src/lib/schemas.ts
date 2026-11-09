@@ -4,6 +4,7 @@ import type {
   AdminAnalyticsDto,
   AdminCustomerDto,
   AdminMenuItemDto,
+  AdminMonthlyRevenueDto,
   AdminNewsItemDto,
   AdminStatsDto,
   AdminTournamentDto,
@@ -118,8 +119,8 @@ export const CLOSURE_RESPONSE = Type.Object({
 export const CLOSURE_CONFLICT_RESPONSE = Type.Object({
   bookingId: Type.String(),
   tableId: Type.Integer(),
-  customerName: Type.String(),
-  customerPhone: Type.String(),
+  customerName: Type.Union([Type.String(), Type.Null()]),
+  customerPhone: Type.Union([Type.String(), Type.Null()]),
   startsAt: Type.String(),
   endsAt: Type.String()
 });
@@ -151,8 +152,8 @@ export const BOOKING_RESPONSE = Type.Object({
   kind: ACTIVITY_KIND,
   game: Type.Union([BILLIARD_GAME, Type.Null()]),
   tableLabel: Type.String(),
-  customerName: Type.String(),
-  customerPhone: Type.String(),
+  customerName: Type.Union([Type.String(), Type.Null()]),
+  customerPhone: Type.Union([Type.String(), Type.Null()]),
   startsAt: Type.String(),
   endsAt: Type.String(),
   status: BOOKING_STATUS,
@@ -349,6 +350,14 @@ export const ADMIN_ANALYTICS_RESPONSE = Type.Object({
   )
 });
 
+export const ADMIN_MONTHLY_REVENUE_RESPONSE = Type.Object({
+  month: Type.String({ pattern: '^\\d{4}-\\d{2}$' }),
+  bookings: Type.Integer(),
+  rentalGrosz: Type.Integer(),
+  foodGrosz: Type.Integer(),
+  revenueGrosz: Type.Integer()
+});
+
 export const SPORT_CARD_TYPE = Type.Union([
   Type.Literal('multisport'),
   Type.Literal('medicover'),
@@ -423,6 +432,7 @@ export type SchemaDriftChecks = [
   Expect<Equals<Static<typeof PROFILE_RESPONSE>, UserProfileDto>>,
   Expect<Equals<Static<typeof AUTH_RESPONSE>, AuthResponseDto>>,
   Expect<Equals<Static<typeof ADMIN_ANALYTICS_RESPONSE>, AdminAnalyticsDto>>,
+  Expect<Equals<Static<typeof ADMIN_MONTHLY_REVENUE_RESPONSE>, AdminMonthlyRevenueDto>>,
   Expect<Equals<Static<typeof ADMIN_MENU_ITEM_RESPONSE>, AdminMenuItemDto>>,
   Expect<Equals<Static<typeof NEWS_ITEM_RESPONSE>, NewsItemDto>>,
   Expect<Equals<Static<typeof NEWS_ARTICLE_RESPONSE>, NewsArticleDto>>,

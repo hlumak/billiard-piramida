@@ -28,7 +28,7 @@ import {
   UUID
 } from '../lib/schemas.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
-import { createBooking, NEW_BOOKING_FIELDS } from '../services/create-booking.ts';
+import { createBooking, STAFF_BOOKING_FIELDS } from '../services/create-booking.ts';
 import {
   clubDayOf,
   clubDayRange,
@@ -162,6 +162,10 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         .limit(ONLINE_LIMIT);
       return rows.map(row =>
         Object.assign(row, {
+          // Never null here: a booking made on the site always has both
+          // (bookings_online_has_customer)
+          customerName: row.customerName ?? '',
+          customerPhone: row.customerPhone ?? '',
           startsAt: row.startsAt.toISOString(),
           endsAt: row.endsAt.toISOString(),
           createdAt: row.createdAt.toISOString()
@@ -172,12 +176,13 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
 
   // Reception desk: create a booking on behalf of a walk-in/phone client.
   // Same operating-hours rules as the public flow, but the start may be any
-  // hour of the current day (logging a game that already started is fine).
+  // hour of the current day (logging a game that already started is fine),
+  // and a walk-in may be an offline client: no name, no phone.
   admin.post(
     '/api/admin/bookings',
     {
       schema: {
-        body: Type.Object(NEW_BOOKING_FIELDS, { additionalProperties: false }),
+        body: Type.Object(STAFF_BOOKING_FIELDS, { additionalProperties: false }),
         response: { 201: BOOKING_RESPONSE, '4xx': ERROR_RESPONSE }
       }
     },
@@ -247,10 +252,13 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
       }
       await admin.db.transaction(async tx => {
         await tx.update(bookings).set({ status: 'no_show' }).where(eq(bookings.id, booking.id));
-        await tx
-          .insert(blacklist)
-          .values({ phone: booking.customerPhone, reason: 'no_show', bookingId: booking.id })
-          .onConflictDoNothing();
+        // An offline client left no number to put on the list
+        if (booking.customerPhone !== null) {
+          await tx
+            .insert(blacklist)
+            .values({ phone: booking.customerPhone, reason: 'no_show', bookingId: booking.id })
+            .onConflictDoNothing();
+        }
       });
       admin.availabilityHub.notify(
         clubDayOf(booking.startsAt, (await admin.venueConfig.get()).hours).date
@@ -344,6 +352,16 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
       const customerPhone =
         patch.customerPhone === undefined ? undefined : normalizePhone(patch.customerPhone);
       if (customerPhone === null) return reply.code(422).send({ error: 'invalid_phone' });
+      // An offline client given details later gets both at once: a name with
+      // no number (or the reverse) is the half contact the table refuses
+      if (
+        booking.customerPhone === null &&
+        (patch.customerName === undefined) !== (customerPhone === undefined)
+      ) {
+        return reply
+          .code(422)
+          .send({ error: patch.customerName === undefined ? 'invalid_name' : 'invalid_phone' });
+      }
 
       const tableId = patch.tableId ?? booking.tableId;
       const [spot] = await admin.db.select().from(tables).where(eq(tables.id, tableId));

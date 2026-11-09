@@ -70,26 +70,29 @@ function BookingCell({
   const { start, end } = bookingMinutes(booking);
   const time = formatClockRange(start, end - start);
   const game = booking.game ? gameName(booking.game).toLocaleLowerCase(getLocale()) : null;
+  const who = booking.customerName ?? m.admin_offline_client();
+  const phone = booking.customerPhone === null ? null : formatPhone(booking.customerPhone);
   return (
     <button
       type="button"
       style={span > 1 ? { gridColumn: `span ${span}` } : undefined}
-      onClick={() => onShowBooking(booking.customerPhone)}
-      title={`${booking.customerName} · ${formatPhone(booking.customerPhone)} · ${time}`}
+      // An offline client has no history to filter by: the list opens whole
+      onClick={() => onShowBooking(booking.customerPhone ?? '')}
+      title={[who, phone, time].filter(Boolean).join(' · ')}
       // Above the "now" line, so the line never runs through a name
       className={`relative z-10 flex h-12.5 min-w-0 flex-col items-start justify-center rounded-[10px] px-3 text-left transition-colors ${BLOCK_TONES[tone]}`}
     >
       <span className="w-full truncate text-[13px] font-bold">
-        {booking.customerName}
+        {who}
         {tone === 'playing' && game ? ` · ${game}` : ''}
         {/* The colour alone says "playing now" only to those who see it */}
         {tone === 'playing' ? <span className="sr-only">, {PHASE_LABELS.active()}</span> : null}
       </span>
-      {tone === 'done' ? null : (
+      {tone === 'done' || phone === null ? null : (
         <span
           className={`w-full truncate text-xs font-semibold ${tone === 'planned' ? 'text-golden-light' : ''}`}
         >
-          {formatPhone(booking.customerPhone)}
+          {phone}
         </span>
       )}
     </button>

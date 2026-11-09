@@ -127,9 +127,12 @@ export function BookingDetails({
                 </span>
               </div>
               <p className="mt-1.5 text-cream-soft">{spot}</p>
-              <p className="mt-1 text-sm text-grey-cool">
-                {m.booking_for({ name: booking.customerName })}
-              </p>
+              {/* Never null on a guest's own booking; only the desk logs offline clients */}
+              {booking.customerName === null ? null : (
+                <p className="mt-1 text-sm text-grey-cool">
+                  {m.booking_for({ name: booking.customerName })}
+                </p>
+              )}
             </div>
           </div>
 

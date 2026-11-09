@@ -106,8 +106,10 @@ export interface BookingDto {
   game: BilliardGame | null;
   /** Number within the kind ("Table 3", "Dartboard 1") — not the global id */
   tableLabel: TableDto['label'];
-  customerName: string;
-  customerPhone: string;
+  /** Both null for an offline client the desk logged without a name or
+   *  number; a booking made on the site always has both. */
+  customerName: string | null;
+  customerPhone: string | null;
   startsAt: string;
   endsAt: string;
   status: BookingStatus;
@@ -171,24 +173,19 @@ export interface NewOrderItem extends Pick<OrderItemDto, 'foodItemId' | 'quantit
  */
 export interface AdminOnlineBookingDto extends Pick<
   BookingDto,
-  | 'id'
-  | 'kind'
-  | 'game'
-  | 'tableLabel'
-  | 'customerName'
-  | 'customerPhone'
-  | 'startsAt'
-  | 'endsAt'
-  | 'status'
+  'id' | 'kind' | 'game' | 'tableLabel' | 'startsAt' | 'endsAt' | 'status'
 > {
+  /** A guest always leaves both */
+  customerName: string;
+  customerPhone: string;
   createdAt: string;
 }
 
 /** A customer aggregated from their bookings — there are no accounts, phone is the key. */
 export interface AdminCustomerDto {
-  phone: BookingDto['customerPhone'];
+  phone: string;
   /** Name from the most recent booking */
-  name: BookingDto['customerName'];
+  name: string;
   bookingsCount: number;
   cancelledCount: number;
   /** Bookings staff marked as "didn't come" */
@@ -203,14 +200,14 @@ export interface AdminCustomerDto {
 
 /** A number on the black list. Name and counts come from its bookings. */
 export interface AdminBlacklistEntryDto {
-  phone: BookingDto['customerPhone'];
+  phone: string;
   reason: 'no_show' | 'manual';
   note: string | null;
   createdAt: string;
   /** The no-show booking that put it here; null for a manual entry */
   bookingId: BookingDto['id'] | null;
   /** Name from the most recent booking with this number, if any */
-  name: BookingDto['customerName'] | null;
+  name: string | null;
   noShowCount: number;
   lastNoShowAt: string | null;
 }
@@ -381,6 +378,19 @@ export interface AdminAnalyticsDto {
   startHours: AdminStartHourDto[];
 }
 
+/** One calendar month of takings: confirmed bookings, by the club's day. */
+export interface AdminMonthlyRevenueDto {
+  /** 'YYYY-MM'. A late night's small hours count on the evening, so 00:30
+   *  on 1 December is November's. */
+  month: string;
+  bookings: number;
+  /** Table rental net of sport-card discounts */
+  rentalGrosz: number;
+  foodGrosz: number;
+  /** rentalGrosz + foodGrosz: the same net figure the daily chart sums */
+  revenueGrosz: number;
+}
+
 export interface AdminStatsDto {
   date: IsoDate;
   todayBookings: number;
@@ -400,8 +410,8 @@ export interface CreateBookingInput {
   startMinute: number;
   /** At least an hour, in half-hour steps (90 = 1:30) */
   durationMinutes: number;
-  customerName: BookingDto['customerName'];
-  customerPhone: BookingDto['customerPhone'];
+  customerName: string;
+  customerPhone: string;
   /** Self-declared, guests included — staff verify the physical cards on site */
   sportCardCount?: number;
   items?: NewOrderItem[];
