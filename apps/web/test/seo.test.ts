@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { clampDescription, DESCRIPTION_MAX_CHARS } from '../src/lib/seo';
+import { clampDescription, DESCRIPTION_MAX_CHARS, localizedPath } from '../src/lib/seo';
 
 test('a short description is kept, with its spacing tidied', () => {
   expect(clampDescription('Cztery nowe stoły 12ft — rezerwuj online już dziś.')).toBe(
@@ -29,4 +29,12 @@ test('trailing punctuation before the ellipsis goes', () => {
 test('one endless word is still cut to length', () => {
   const clamped = clampDescription('x'.repeat(300));
   expect(clamped).toHaveLength(DESCRIPTION_MAX_CHARS);
+});
+
+test('a page in each language: the home keeps its slash, index routes lose theirs', () => {
+  expect(localizedPath('/', 'pl')).toBe('/');
+  expect(localizedPath('/', 'uk')).toBe('/uk/');
+  expect(localizedPath('/tournaments/', 'en')).toBe('/en/tournaments');
+  expect(localizedPath('/prices', 'pl')).toBe('/prices');
+  expect(localizedPath('/news/second-hall-open', 'uk')).toBe('/uk/news/second-hall-open');
 });

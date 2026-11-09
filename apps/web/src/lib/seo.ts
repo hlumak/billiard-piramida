@@ -10,14 +10,19 @@ export const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'http://localho
 const OG_LOCALES = { uk: 'uk_UA', pl: 'pl_PL', en: 'en_GB' } as const;
 
 /**
- * Absolute address of a page in one language. `pathname` is the route's,
+ * Site-relative address of a page in one language. `pathname` is the route's,
  * without a language prefix (the router strips it); index routes match with a
  * trailing slash ("/tournaments/") while links and the sitemap use the bare
  * form, and a canonical must pick one.
  */
-export function localizedPageUrl(pathname: string, locale: Locale): string {
+export function localizedPath(pathname: string, locale: Locale): string {
   const bare = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
-  return `${SITE_URL}${localizeHref(bare, { locale })}`;
+  return localizeHref(bare, { locale });
+}
+
+/** Absolute address of a page in one language (canonical, hreflang, og:url). */
+export function localizedPageUrl(pathname: string, locale: Locale): string {
+  return `${SITE_URL}${localizedPath(pathname, locale)}`;
 }
 
 /** What a phone's search result shows of a description before it cuts it (three lines). */
