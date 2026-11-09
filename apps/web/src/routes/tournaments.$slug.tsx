@@ -4,7 +4,7 @@ import { PageLayout } from '../components/site/PageLayout';
 import { TournamentView } from '../components/tournament/TournamentView';
 import { notFoundOn404 } from '../lib/api';
 import { tournamentQuery } from '../lib/queries';
-import { pageHead } from '../lib/seo';
+import { localizedPageUrl, pageHead, tournamentDescription, tournamentJsonLd } from '../lib/seo';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
@@ -15,12 +15,19 @@ export const Route = createFileRoute('/tournaments/$slug')({
       .ensureQueryData(tournamentQuery(params.slug, getLocale()))
       .catch(notFoundOn404),
   // Named after the tournament: this is the URL that gets shared around
-  head: ({ match, loaderData }) =>
-    pageHead(
+  head: ({ match, loaderData }) => {
+    const head = pageHead(
       loaderData ? `${loaderData.title} — Piramida` : m.seo_title_tournaments(),
-      loaderData?.summary ?? m.seo_desc_tournaments(),
+      loaderData ? tournamentDescription(loaderData) : m.seo_desc_tournaments(),
       match.pathname
-    ),
+    );
+    const event = loaderData
+      ? tournamentJsonLd(loaderData, localizedPageUrl(match.pathname, getLocale()))
+      : null;
+    return event === null
+      ? head
+      : { ...head, scripts: [{ type: 'application/ld+json', children: event }] };
+  },
   component: TournamentPage,
   notFoundComponent: () => (
     <TournamentShell>
