@@ -17,7 +17,8 @@
     "fmt:check": "oxfmt --check .",
     "db:generate": "pnpm --filter @repo/api db:generate",
     "db:migrate": "pnpm --filter @repo/api db:migrate",
-    "db:seed": "pnpm --filter @repo/api db:seed"
+    "db:seed": "pnpm --filter @repo/api db:seed",
+    "gsc": "node scripts/gsc.mjs"
   },
   "devDependencies": {
     "oxfmt": "0.76.0",

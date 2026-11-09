@@ -92,3 +92,11 @@ deploy can set `ROBOTS_DISALLOW_ALL=1`.
 
 `pnpm lint` · `pnpm fmt:check` · `pnpm typecheck` · `pnpm test` (the API tests need
 the Postgres container) · `pnpm build` — all run in CI (`.github/workflows/ci.yaml`).
+
+## Search Console report
+
+`pnpm gsc` prints clicks, queries, pages, near-page-one queries and the index status of
+every sitemap URL for `sc-domain:billiard-piramida.pl` (read-only). It signs in as a
+service account that was added to the property as a Restricted user; point
+`GSC_KEY_FILE` at its JSON key, which stays outside the repo. Options: `--days 90`,
+`--out <dir>` (saves the raw answers), `--no-inspect`.
