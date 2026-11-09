@@ -147,6 +147,8 @@
   "admin_tab_stats": "Статистика",
   "admin_tab_menu": "Меню",
   "admin_chart_revenue": "Виручка по днях",
+  "admin_chart_revenue_monthly": "Виручка по місяцях, за {months} міс.",
+  "admin_month_so_far": "поки що",
   "admin_chart_utilization": "Завантаженість столів за {days} днів",
   "admin_chart_hours": "Популярні години початку гри",
   "admin_total_revenue": "Виручка за останні {days} днів",

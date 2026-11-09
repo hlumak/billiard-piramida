@@ -378,6 +378,19 @@ export interface AdminAnalyticsDto {
   startHours: AdminStartHourDto[];
 }
 
+/** One calendar month of takings: confirmed bookings, by the club's day. */
+export interface AdminMonthlyRevenueDto {
+  /** 'YYYY-MM'. A late night's small hours count on the evening, so 00:30
+   *  on 1 December is November's. */
+  month: string;
+  bookings: number;
+  /** Table rental net of sport-card discounts */
+  rentalGrosz: number;
+  foodGrosz: number;
+  /** rentalGrosz + foodGrosz: the same net figure the daily chart sums */
+  revenueGrosz: number;
+}
+
 export interface AdminStatsDto {
   date: IsoDate;
   todayBookings: number;

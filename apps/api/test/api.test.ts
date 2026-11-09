@@ -19,7 +19,7 @@ import { buildApp } from '../src/app.ts';
 import { LOCAL_DATABASE_URL } from '../src/lib/config.ts';
 import { issueAdminSession } from '../src/lib/admin-session.ts';
 import { createDb } from '../src/db/client.ts';
-import { bookings, tournamentRegistrations, users } from '../src/db/schema.ts';
+import { bookings, orderItems, tournamentRegistrations, users } from '../src/db/schema.ts';
 import { seed } from '../src/db/seed.ts';
 
 /** Derived from the shared constants — a rate change must not silently rot these. */
@@ -4088,4 +4088,92 @@ test('offline client: the desk books with no name or phone, guests cannot', asyn
   } finally {
     await pool.end();
   }
+});
+
+test('monthly revenue: every month listed, rental net of cards plus the bar', async () => {
+  const headers = staff('198.51.100.130');
+  type Month = {
+    month: string;
+    bookings: number;
+    rentalGrosz: number;
+    foodGrosz: number;
+    revenueGrosz: number;
+  };
+  const fetchMonths = async (query = '') => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/admin/analytics/monthly${query}`,
+      headers
+    });
+    assert.equal(res.statusCode, 200);
+    return res.json() as Month[];
+  };
+
+  const HOUR = 3_600_000;
+  const monthsBefore = await fetchMonths();
+  assert.equal(monthsBefore.length, 12);
+  // Oldest first, ending with the month in progress. Read from the answer, not
+  // the test's clock: in UTC a Warsaw month starts an hour or two late.
+  const [year, month] = (monthsBefore.at(-2)?.month ?? '').split('-').map(Number) as [
+    number,
+    number
+  ];
+  const lastMonthStart = new Date(Date.UTC(year, month - 1, 15, 17));
+  const nextIndex = year * 12 + month;
+  assert.equal(
+    monthsBefore.at(-1)?.month,
+    `${Math.floor(nextIndex / 12)}-${String((nextIndex % 12) + 1).padStart(2, '0')}`
+  );
+  assert.ok(Math.abs(Date.now() - lastMonthStart.getTime()) < 62 * 24 * HOUR);
+  assert.deepEqual(
+    monthsBefore.map(m => m.month),
+    monthsBefore.map(m => m.month).toSorted()
+  );
+
+  const { db, pool } = createDb(TEST_URL);
+  try {
+    // Last month: two hours on a 9ft table with one sport card, and a drink
+    const [played] = await db
+      .insert(bookings)
+      .values({
+        tableId: 2,
+        startsAt: lastMonthStart,
+        endsAt: new Date(lastMonthStart.getTime() + 2 * HOUR),
+        hourlyRateGrosz: BILLIARD_HOUR,
+        sportCardCount: 1,
+        discountGrosz: SPORT_CARD_DISCOUNT_GROSZ
+      })
+      .returning({ id: bookings.id });
+    assert.ok(played);
+    await db
+      .insert(orderItems)
+      .values({ bookingId: played.id, foodItemId: 1, quantity: 2, unitPriceGrosz: 1_000 });
+    // Cancelled takings are no takings
+    await db.insert(bookings).values({
+      tableId: 2,
+      startsAt: new Date(lastMonthStart.getTime() + 3 * HOUR),
+      endsAt: new Date(lastMonthStart.getTime() + 4 * HOUR),
+      hourlyRateGrosz: BILLIARD_HOUR,
+      status: 'cancelled'
+    });
+  } finally {
+    await pool.end();
+  }
+
+  const monthsAfter = await fetchMonths();
+  const delta = (key: keyof Omit<Month, 'month'>) =>
+    (monthsAfter.at(-2)?.[key] ?? 0) - (monthsBefore.at(-2)?.[key] ?? 0);
+  assert.equal(delta('bookings'), 1);
+  assert.equal(delta('rentalGrosz'), 2 * BILLIARD_HOUR - SPORT_CARD_DISCOUNT_GROSZ);
+  assert.equal(delta('foodGrosz'), 2_000);
+  assert.equal(delta('revenueGrosz'), 2 * BILLIARD_HOUR - SPORT_CARD_DISCOUNT_GROSZ + 2_000);
+  assert.deepEqual(monthsAfter.at(-1), monthsBefore.at(-1));
+
+  assert.equal((await fetchMonths('?months=3')).length, 3);
+  const tooMany = await app.inject({
+    method: 'GET',
+    url: '/api/admin/analytics/monthly?months=37',
+    headers
+  });
+  assert.equal(tooMany.statusCode, 400);
 });

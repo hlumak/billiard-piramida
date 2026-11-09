@@ -1,8 +1,8 @@
 import { Spinner } from '@heroui/react';
 import { useQuery } from '@tanstack/react-query';
-import { formatPln } from '@repo/shared';
-import { adminAnalyticsQuery } from '../../lib/admin-api';
-import { formatDay, intlTag } from '../../lib/format';
+import { formatPln, type IsoDate } from '@repo/shared';
+import { adminAnalyticsQuery, adminMonthlyRevenueQuery } from '../../lib/admin-api';
+import { formatDay, formatMonthShort, formatMonthYear, intlTag } from '../../lib/format';
 import { m } from '../../paraglide/messages.js';
 import { QueryError } from '../QueryError';
 import { StaggerGroup, StaggerItem } from '../motion';
@@ -10,6 +10,41 @@ import { BarChart } from './charts/BarChart';
 import { UtilizationBars } from './charts/UtilizationBars';
 
 const DAYS = 30;
+const MONTHS = 12;
+
+/**
+ * A year of takings, a bar per month. Fetched apart from the 30-day figures
+ * so either card can load or fail without holding up the other.
+ */
+function MonthlyRevenue() {
+  const { data, isError, error, refetch } = useQuery(adminMonthlyRevenueQuery(MONTHS));
+  if (isError && !data) return <QueryError error={error} onRetry={() => refetch()} />;
+  if (!data) {
+    return (
+      <div className="flex justify-center py-6">
+        <Spinner size="sm" aria-label={m.loading()} />
+      </div>
+    );
+  }
+  if (data.every(month => month.revenueGrosz === 0)) {
+    return <p className="py-6 text-sm text-grey-cool">{m.admin_no_data()}</p>;
+  }
+  const bars = data.map((month, i) => {
+    const firstDay = `${month.month}-01` as IsoDate;
+    // The last bar is the month in progress, which is no month's total yet
+    const name =
+      i === data.length - 1
+        ? `${formatMonthYear(firstDay)} (${m.admin_month_so_far()})`
+        : formatMonthYear(firstDay);
+    return {
+      key: month.month,
+      label: formatMonthShort(firstDay),
+      value: month.revenueGrosz,
+      tooltip: `${name} · ${formatPln(month.revenueGrosz, intlTag())} · ${month.bookings}×`
+    };
+  });
+  return <BarChart data={bars} formatValue={v => formatPln(v, intlTag())} />;
+}
 
 export function AdminStats() {
   const { data, isPending, isError, error, refetch } = useQuery(adminAnalyticsQuery(DAYS));
@@ -65,6 +100,13 @@ export function AdminStats() {
         ) : (
           <p className="py-6 text-sm text-grey-cool">{m.admin_no_data()}</p>
         )}
+      </StaggerItem>
+
+      <StaggerItem className="card p-5">
+        <h3 className="mb-3 font-semibold text-golden-light">
+          {m.admin_chart_revenue_monthly({ months: MONTHS })}
+        </h3>
+        <MonthlyRevenue />
       </StaggerItem>
 
       <StaggerItem className="card p-5">

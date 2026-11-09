@@ -1,5 +1,6 @@
 import type {
   AdminAnalyticsDto,
+  AdminMonthlyRevenueDto,
   AdminBlacklistEntryDto,
   AdminCustomerDto,
   AdminMenuItemDto,
@@ -174,6 +175,10 @@ export const adminApi = {
     request<BookingDto>(`/api/admin/bookings/${id}/items/${itemId}`, { method: 'DELETE' }),
   analytics: (days: number, signal?: AbortSignal) =>
     request<AdminAnalyticsDto>(`/api/admin/analytics?days=${days}`, { signal }),
+  monthlyRevenue: (months: number, signal?: AbortSignal) =>
+    request<AdminMonthlyRevenueDto[]>(`/api/admin/analytics/monthly?months=${months}`, {
+      signal
+    }),
   menu: (signal?: AbortSignal) => request<AdminMenuItemDto[]>('/api/admin/menu', { signal }),
   createMenuItem: (input: {
     category: string;
@@ -277,6 +282,13 @@ export const adminAnalyticsQuery = (days: number) =>
   queryOptions({
     queryKey: ['admin', 'analytics', days],
     queryFn: ({ signal }) => adminApi.analytics(days, signal),
+    staleTime: 60_000
+  });
+
+export const adminMonthlyRevenueQuery = (months: number) =>
+  queryOptions({
+    queryKey: ['admin', 'analytics', 'monthly', months],
+    queryFn: ({ signal }) => adminApi.monthlyRevenue(months, signal),
     staleTime: 60_000
   });
 

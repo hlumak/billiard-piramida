@@ -147,6 +147,8 @@
   "admin_tab_stats": "Statistics",
   "admin_tab_menu": "Menu",
   "admin_chart_revenue": "Revenue by day",
+  "admin_chart_revenue_monthly": "Revenue by month, last {months} months",
+  "admin_month_so_far": "so far",
   "admin_chart_utilization": "Table use, last {days} days",
   "admin_chart_hours": "Popular game start hours",
   "admin_total_revenue": "Revenue, last {days} days",

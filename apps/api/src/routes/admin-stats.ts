@@ -4,12 +4,18 @@ import {
   hoursForDate,
   nightTailMinutes,
   type AdminAnalyticsDto,
+  type AdminMonthlyRevenueDto,
   type AdminStatsDto,
+  type IsoDate,
   type WeeklyHours
 } from '@repo/shared';
 import { and, count, desc, eq, gte, lt, lte, sql } from 'drizzle-orm';
 import { bookings, foodItems, orderItems, tables } from '../db/schema.ts';
-import { ADMIN_ANALYTICS_RESPONSE, ADMIN_STATS_RESPONSE } from '../lib/schemas.ts';
+import {
+  ADMIN_ANALYTICS_RESPONSE,
+  ADMIN_MONTHLY_REVENUE_RESPONSE,
+  ADMIN_STATS_RESPONSE
+} from '../lib/schemas.ts';
 import { clubDayOf, clubDayRange } from '../lib/time.ts';
 import type { Db } from '../db/client.ts';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
@@ -32,6 +38,18 @@ function inPreviousNight(hours: WeeklyHours) {
   // Indexed by Postgres dow (0 = Sunday), each the minutes the evening before ran past midnight
   const tails = [0, 1, 2, 3, 4, 5, 6].map(dow => nightTailMinutes(hours[(dow + 6) % 7]!));
   return sql`(extract(hour from ${local}) * 60 + extract(minute from ${local})) < (array[${sql.raw(tails.join(','))}])[extract(dow from ${local})::int + 1]`;
+}
+
+/** The club's day of each booking's start, as 'YYYY-MM-DD' in Warsaw. */
+function clubDayOfStart(hours: WeeklyHours) {
+  return sql<string>`to_char((${bookings.startsAt} at time zone 'Europe/Warsaw') - case when ${inPreviousNight(hours)} then interval '1 day' else interval '0' end, 'YYYY-MM-DD')`;
+}
+
+/** 'YYYY-MM' of the month `back` months before the one `date` is in. */
+function monthBefore(date: string, back: number): string {
+  const [year, month] = date.split('-').map(Number) as [number, number];
+  const index = year * 12 + (month - 1) - back;
+  return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
 }
 
 /** Spot rental + food revenue of confirmed bookings starting in [from, to). */
@@ -167,7 +185,7 @@ export const adminStatsRoutes: FastifyPluginAsyncTypebox = async admin => {
       );
       // The club day of each start: the small hours of a late night go to its evening
       const previousNight = inPreviousNight(hours);
-      const warsawDay = sql<string>`to_char((${bookings.startsAt} at time zone 'Europe/Warsaw') - case when ${previousNight} then interval '1 day' else interval '0' end, 'YYYY-MM-DD')`;
+      const warsawDay = clubDayOfStart(hours);
       // Hours of the club's day, so 00:30 on a late night sorts after 23:00 (as 24)
       const startHour = sql<number>`(extract(hour from ${bookings.startsAt} at time zone 'Europe/Warsaw') + case when ${previousNight} then 24 else 0 end)::int`;
 
@@ -246,6 +264,75 @@ export const adminStatsRoutes: FastifyPluginAsyncTypebox = async admin => {
           .map(h => ({ hour: h.hour, bookings: h.bookings }))
           .sort((a, b) => a.hour - b.hour)
       };
+    }
+  );
+
+  /**
+   * Takings per calendar month, oldest first, ending with the month in
+   * progress (so far). Every month in the window is listed, quiet ones at 0,
+   * so the chart's bars stay evenly spaced in time.
+   */
+  admin.get(
+    '/api/admin/analytics/monthly',
+    {
+      schema: {
+        querystring: Type.Object({
+          months: Type.Optional(Type.Integer({ minimum: 1, maximum: 36 }))
+        }),
+        response: { 200: Type.Array(ADMIN_MONTHLY_REVENUE_RESPONSE) }
+      }
+    },
+    async (request): Promise<AdminMonthlyRevenueDto[]> => {
+      const db = admin.db;
+      const months = request.query.months ?? 12;
+      const { hours } = await admin.venueConfig.get();
+      const today = clubDayOf(new Date(), hours).date;
+      const firstMonth = monthBefore(today, months - 1);
+      const inWindow = and(
+        eq(bookings.status, 'confirmed'),
+        gte(bookings.startsAt, clubDayRange(`${firstMonth}-01` as IsoDate, hours)[0]),
+        lt(bookings.startsAt, clubDayRange(today, hours)[1])
+      );
+      const clubMonth = sql<string>`left(${clubDayOfStart(hours)}, 7)`;
+
+      const [rentalByMonth, foodByMonth] = await Promise.all([
+        db
+          .select({
+            month: clubMonth,
+            bookings: count(),
+            rentalGrosz: sql<number>`${RENTAL_GROSZ} - coalesce(sum(${bookings.discountGrosz}), 0)::int`
+          })
+          .from(bookings)
+          .where(inWindow)
+          .groupBy(clubMonth),
+        db
+          .select({
+            month: clubMonth,
+            foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPriceGrosz}), 0)::int`
+          })
+          .from(orderItems)
+          .innerJoin(bookings, eq(orderItems.bookingId, bookings.id))
+          .where(inWindow)
+          .groupBy(clubMonth)
+      ]);
+
+      const rentalMap = new Map(rentalByMonth.map(r => [r.month, r]));
+      const foodMap = new Map(foodByMonth.map(f => [f.month, f.foodGrosz]));
+      const series: AdminMonthlyRevenueDto[] = [];
+      for (let back = months - 1; back >= 0; back--) {
+        const month = monthBefore(today, back);
+        const rental = rentalMap.get(month);
+        const rentalGrosz = rental?.rentalGrosz ?? 0;
+        const foodGrosz = foodMap.get(month) ?? 0;
+        series.push({
+          month,
+          bookings: rental?.bookings ?? 0,
+          rentalGrosz,
+          foodGrosz,
+          revenueGrosz: rentalGrosz + foodGrosz
+        });
+      }
+      return series;
     }
   );
 };

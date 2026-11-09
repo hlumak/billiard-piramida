@@ -147,6 +147,8 @@
   "admin_tab_stats": "Statystyki",
   "admin_tab_menu": "Menu",
   "admin_chart_revenue": "Przychód dzień po dniu",
+  "admin_chart_revenue_monthly": "Przychód miesiąc po miesiącu, ostatnie {months} mies.",
+  "admin_month_so_far": "jak dotąd",
   "admin_chart_utilization": "Obłożenie stołów, ostatnie {days} dni",
   "admin_chart_hours": "Popularne godziny rozpoczęcia gry",
   "admin_total_revenue": "Przychód, ostatnie {days} dni",

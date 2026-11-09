@@ -113,6 +113,11 @@ export function formatMonthYear(isoDate: IsoDate): string {
   return `${month.charAt(0).toLocaleUpperCase(intlTag())}${month.slice(1)} ${dateParts(isoDate)[0]}`;
 }
 
+/** "лист.": the short month name a chart axis is labelled with. */
+export function formatMonthShort(isoDate: IsoDate): string {
+  return formatter(intlTag(), { month: 'short', timeZone: 'UTC' }).format(utcDate(isoDate));
+}
+
 /** Localized weekday name for a JS weekday index (0 = Sunday). */
 export function weekdayName(weekday: number, style: 'long' | 'short' = 'long'): string {
   // 2026-03-01 was a Sunday, so adding the index lands on the wanted weekday
