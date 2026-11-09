@@ -60,7 +60,7 @@ export function SiteFooter({ variant = 'compact' }: { variant?: 'full' | 'compac
   if (variant === 'compact') {
     return (
       <footer className="mt-24 flex-1 border-t border-line">
-        <div className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 px-5 py-6 text-[13px] text-grey-cool md:px-10">
+        <div className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 px-5 pt-6 pb-28 text-[13px] text-grey-cool md:px-10">
           <span>
             © {year} Piramida · {VENUE.street}, {VENUE.city} ·{' '}
             <a
@@ -105,7 +105,9 @@ function FullFooter({ year }: { year: string }) {
           <span className="first-letter:uppercase">{hoursLine}</span>
         </div>
       </div>
-      <div className="mx-auto mt-12 flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-line px-5 pt-6 pb-8 md:px-10">
+      {/* The bottom padding keeps the language switcher clear of the fixed
+          back-to-top button (24–32 px up, 52–56 px tall) at the end of a page */}
+      <div className="mx-auto mt-12 flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-line px-5 pt-6 pb-28 md:px-10">
         <span className="text-[13px] text-grey-cool">© {year} Piramida</span>
         <LocaleSwitcher />
       </div>
