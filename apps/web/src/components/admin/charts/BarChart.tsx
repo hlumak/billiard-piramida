@@ -47,6 +47,20 @@ export function BarChart({
   const barWidth = Math.max(step - 2, 1.5); // 2px surface gap between bars
   const maxIndex = data.findIndex(d => d.value === max);
 
+  /**
+   * Centred under its bar, unless a centred label would run off the chart
+   * (", 9 paź" was cut off). Then it starts (or ends) at its bar's outer edge.
+   * Nudging a centred label inward instead slid it under the next bar:
+   * "Sun 11 Oct" read as the label of 12 October.
+   */
+  const axisLabelAt = (i: number) => {
+    const halfLabel = (data[i]?.label.length ?? 0) * 3.5;
+    const centre = i * step + step / 2;
+    if (centre < halfLabel) return { x: i * step, textAnchor: 'start' as const };
+    if (centre > width - halfLabel) return { x: (i + 1) * step, textAnchor: 'end' as const };
+    return { x: centre, textAnchor: 'middle' as const };
+  };
+
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" aria-hidden>
@@ -85,19 +99,20 @@ export function BarChart({
                 onMouseLeave={() => setHovered(null)}
               />
               {d.label !== '' ? (
-                // Centred under its bar, but kept inside the chart: at the edges a
-                // centred label was cut off (", 9 paź")
-                <text
-                  x={Math.min(
-                    Math.max(i * step + step / 2, d.label.length * 3.5),
-                    width - d.label.length * 3.5
-                  )}
-                  y={height - 7}
-                  textAnchor="middle"
-                  className="fill-grey-cool text-[11px]"
-                >
-                  {d.label}
-                </text>
+                <>
+                  {/* A tick ties the label to its bar, even on a day with no bar */}
+                  <line
+                    x1={i * step + step / 2}
+                    x2={i * step + step / 2}
+                    y1={height - paddingBottom}
+                    y2={height - paddingBottom + 4}
+                    className="stroke-deep-cream/40"
+                    strokeWidth={1}
+                  />
+                  <text y={height - 7} className="fill-grey-cool text-[11px]" {...axisLabelAt(i)}>
+                    {d.label}
+                  </text>
+                </>
               ) : null}
               {/* Selective direct label: the max only (hover covers the rest) */}
               {i === maxIndex && d.value > 0 ? (
