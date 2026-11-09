@@ -614,6 +614,8 @@
   "missing_name": "Enter a name",
   "missing_phone": "Enter a phone number",
   "admin_guest_name_placeholder": "Guest's name",
+  "admin_offline_client": "Offline client",
+  "admin_offline_client_hint": "Came to the club in person: no name or phone needed.",
   "missing_password": "Enter your password",
   "password_too_short": "A password has at least 8 characters",
   "phone_country_search": "Country or code",

@@ -1,6 +1,6 @@
 import { Type } from 'typebox';
 import { type AdminCustomerDto } from '@repo/shared';
-import { and, count, desc, eq, ilike, inArray, max, min, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, inArray, isNotNull, max, min, sql } from 'drizzle-orm';
 import { blacklist, bookings, orderItems } from '../db/schema.ts';
 import { ADMIN_CUSTOMER_RESPONSE, PG_INT_MAX } from '../lib/schemas.ts';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
@@ -29,15 +29,16 @@ export const adminCustomerRoutes: FastifyPluginAsyncTypebox = async admin => {
       const db = admin.db;
       const limit = request.query.limit ?? 100;
       const offset = request.query.offset ?? 0;
+      // Offline clients left no number, so they are nobody's history
       const phoneFilter =
         request.query.phone && request.query.phone.trim() !== ''
           ? ilike(bookings.customerPhone, `%${request.query.phone.trim()}%`)
-          : undefined;
+          : isNotNull(bookings.customerPhone);
 
       // Page the customer set first (newest visit first), then compute food
       // totals and latest names only for the returned phones — so all three
       // queries stay bounded instead of scanning the whole bookings table.
-      const aggregates = await db
+      const groups = await db
         .select({
           phone: bookings.customerPhone,
           bookingsCount: count(),
@@ -54,6 +55,10 @@ export const adminCustomerRoutes: FastifyPluginAsyncTypebox = async admin => {
         .orderBy(desc(max(bookings.startsAt)))
         .limit(limit)
         .offset(offset);
+      // The filter already left offline clients out; this tells the types
+      const aggregates = groups.flatMap(({ phone, ...rest }) =>
+        phone === null ? [] : [{ ...rest, phone }]
+      );
 
       const phones = aggregates.map(a => a.phone);
       const [foodByPhone, latestNames, blocked] =

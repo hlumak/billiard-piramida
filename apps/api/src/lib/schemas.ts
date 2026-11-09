@@ -118,8 +118,8 @@ export const CLOSURE_RESPONSE = Type.Object({
 export const CLOSURE_CONFLICT_RESPONSE = Type.Object({
   bookingId: Type.String(),
   tableId: Type.Integer(),
-  customerName: Type.String(),
-  customerPhone: Type.String(),
+  customerName: Type.Union([Type.String(), Type.Null()]),
+  customerPhone: Type.Union([Type.String(), Type.Null()]),
   startsAt: Type.String(),
   endsAt: Type.String()
 });
@@ -151,8 +151,8 @@ export const BOOKING_RESPONSE = Type.Object({
   kind: ACTIVITY_KIND,
   game: Type.Union([BILLIARD_GAME, Type.Null()]),
   tableLabel: Type.String(),
-  customerName: Type.String(),
-  customerPhone: Type.String(),
+  customerName: Type.Union([Type.String(), Type.Null()]),
+  customerPhone: Type.Union([Type.String(), Type.Null()]),
   startsAt: Type.String(),
   endsAt: Type.String(),
   status: BOOKING_STATUS,

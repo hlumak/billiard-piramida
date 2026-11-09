@@ -137,16 +137,24 @@ function TodayRow({ booking, now }: { booking: BookingDto; now: number }) {
         <p
           className={`mt-0.5 min-w-0 truncate text-[13px] text-grey-cool lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:text-base ${dim}`}
         >
-          <span className="font-semibold lg:block lg:text-[15px] lg:text-creme">
-            {booking.customerName}
-          </span>
-          <span className="lg:hidden"> · </span>
-          <a
-            href={`tel:${booking.customerPhone}`}
-            className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light lg:text-[13px]"
-          >
-            {formatPhone(booking.customerPhone)}
-          </a>
+          {booking.customerPhone === null ? (
+            <span className="font-semibold lg:block lg:text-[15px]">
+              {m.admin_offline_client()}
+            </span>
+          ) : (
+            <>
+              <span className="font-semibold lg:block lg:text-[15px] lg:text-creme">
+                {booking.customerName}
+              </span>
+              <span className="lg:hidden"> · </span>
+              <a
+                href={`tel:${booking.customerPhone}`}
+                className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light lg:text-[13px]"
+              >
+                {formatPhone(booking.customerPhone)}
+              </a>
+            </>
+          )}
         </p>
       </div>
       <span

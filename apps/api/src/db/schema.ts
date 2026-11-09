@@ -78,8 +78,10 @@ export const bookings = pgTable(
      *  started asking — deliberately not backfilled to 'piramida', which would
      *  invent a fact about games nobody recorded. */
     game: billiardGameEnum('game'),
-    customerName: text('customer_name').notNull(),
-    customerPhone: text('customer_phone').notNull(),
+    /** Both null for an offline client: someone who walked in and played,
+     *  logged by the desk without a name or number. Guests always give both. */
+    customerName: text('customer_name'),
+    customerPhone: text('customer_phone'),
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
     endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
     status: bookingStatusEnum('status').notNull().default('confirmed'),
@@ -120,7 +122,19 @@ export const bookings = pgTable(
     ),
     check('bookings_sport_card_count_non_negative', sql`${t.sportCardCount} >= 0`),
     check('bookings_hourly_rate_non_negative', sql`${t.hourlyRateGrosz} >= 0`),
-    check('bookings_discount_non_negative', sql`${t.discountGrosz} >= 0`)
+    check('bookings_discount_non_negative', sql`${t.discountGrosz} >= 0`),
+    // A client is either known (name and number) or offline (neither): half a
+    // contact would slip out of the customer list and the black list alike
+    check(
+      'bookings_customer_both_or_neither',
+      sql`(${t.customerName} is null) = (${t.customerPhone} is null)`
+    ),
+    // Only the desk logs offline clients; a booking made on the site carries
+    // a manage secret and always has someone to reach
+    check(
+      'bookings_online_has_customer',
+      sql`${t.manageTokenHash} is null or ${t.customerPhone} is not null`
+    )
   ]
 );
 

@@ -39,8 +39,9 @@ export interface ClosureDto {
 export interface ClosureConflictDto {
   bookingId: string;
   tableId: number;
-  customerName: string;
-  customerPhone: string;
+  /** Both null for an offline client */
+  customerName: string | null;
+  customerPhone: string | null;
   /** ISO instants */
   startsAt: string;
   endsAt: string;

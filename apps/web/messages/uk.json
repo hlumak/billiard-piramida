@@ -639,6 +639,8 @@
   "missing_name": "Вкажіть ім'я",
   "missing_phone": "Вкажіть номер телефону",
   "admin_guest_name_placeholder": "Ім'я гостя",
+  "admin_offline_client": "Офлайн-клієнт",
+  "admin_offline_client_hint": "Прийшов у клуб особисто: ім'я й телефон не потрібні.",
   "missing_password": "Введіть пароль",
   "password_too_short": "Пароль — щонайменше 8 символів",
   "phone_country_search": "Країна або код",

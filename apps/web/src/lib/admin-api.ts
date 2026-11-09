@@ -34,8 +34,9 @@ export interface AdminCreateBookingInput {
   startMinute: number;
   /** An hour at least, in half-hour steps */
   durationMinutes: number;
-  customerName: string;
-  customerPhone: string;
+  /** Both left out for an offline client */
+  customerName?: string;
+  customerPhone?: string;
   sportCardCount?: number;
   /** Billiard only; the spot's default is stored when it is left out */
   game?: BilliardGame;

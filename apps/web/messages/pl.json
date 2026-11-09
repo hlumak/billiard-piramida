@@ -617,6 +617,8 @@
   "missing_name": "Wpisz imię",
   "missing_phone": "Wpisz numer telefonu",
   "admin_guest_name_placeholder": "Imię gościa",
+  "admin_offline_client": "Klient offline",
+  "admin_offline_client_hint": "Przyszedł do klubu osobiście: imię i telefon nie są potrzebne.",
   "missing_password": "Wpisz hasło",
   "password_too_short": "Hasło ma co najmniej 8 znaków",
   "phone_country_search": "Kraj lub kod",
