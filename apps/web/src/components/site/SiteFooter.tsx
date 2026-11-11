@@ -40,7 +40,9 @@ function FooterCredit() {
       >
         Vladyslav Hlumakov
       </a>
-      . {m.footer_credit_bugs()}{' '}
+      .
+      <br />
+      {m.footer_credit_bugs()}{' '}
       <a
         href={`mailto:${CREDIT_EMAIL}`}
         className="whitespace-nowrap transition-colors hover:text-golden"
