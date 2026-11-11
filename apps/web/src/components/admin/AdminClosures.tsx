@@ -6,11 +6,14 @@ import {
   MAX_CLOSURE_REASON_LENGTH,
   addDays,
   hoursForDate,
-  isWholeDays,
+  isClosedAllDay,
+  wholeDaysOf,
+  wholeDaysRange,
   type ClosureConflictDto,
   type ClosureDto,
   type IsoDate,
-  type TableDto
+  type TableDto,
+  type WeeklyHours
 } from '@repo/shared';
 import { formatPhone } from '@repo/shared/phone';
 import {
@@ -55,41 +58,71 @@ interface Draft {
   reason: string;
 }
 
-function draftFrom(closure: ClosureDto | null, date: IsoDate, close: number): Draft {
-  if (closure === null) {
-    return {
-      scope: 'club',
-      tableIds: [],
-      wholeDays: false,
-      startDate: date,
-      startHour: Math.min(18, close - 1),
-      endDate: date,
-      endHour: close,
-      reason: ''
-    };
-  }
-  const wholeDays = isWholeDays(closure);
-  // An end at midnight is the day before's 24:00 (or, in whole days, its last day)
-  const atMidnight = closure.endHour === 0;
+/**
+ * A new closure starts as "this evening, until closing". The day's closing
+ * hour is on the club day's scale — past 24 on a late night, 0 on a day the
+ * club is shut — while the form and the API speak calendar hours, so a night
+ * ending at 02:00 is the next day's 2, and a shut day gets a plain evening.
+ */
+function newDraft(date: IsoDate, hours: WeeklyHours): Draft {
+  const day = hoursForDate(date, hours);
+  const close = isClosedAllDay(day) ? 24 : day.close;
+  const pastMidnight = close > 24;
   return {
-    scope: closure.tableIds === null ? 'club' : 'spots',
-    tableIds: closure.tableIds ?? [],
-    wholeDays,
-    startDate: closure.startDate,
-    startHour: closure.startHour,
-    endDate: atMidnight ? addDays(closure.endDate, -1) : closure.endDate,
-    endHour: atMidnight ? 24 : closure.endHour,
-    reason: closure.reason ?? ''
+    scope: 'club',
+    tableIds: [],
+    wholeDays: false,
+    startDate: date,
+    startHour: Math.max(0, Math.min(18, close - 1)),
+    endDate: pastMidnight ? addDays(date, 1) : date,
+    endHour: pastMidnight ? close - 24 : close,
+    reason: ''
   };
 }
 
-function inputFrom(draft: Draft): ClosureInput {
-  const lastDay = draft.wholeDays || draft.endHour === 24;
+function draftFrom(closure: ClosureDto | null, date: IsoDate, hours: WeeklyHours): Draft {
+  if (closure === null) return newDraft(date, hours);
+  const scope = {
+    scope: closure.tableIds === null ? ('club' as const) : ('spots' as const),
+    tableIds: closure.tableIds ?? [],
+    reason: closure.reason ?? ''
+  };
+  const days = wholeDaysOf(closure, hours);
+  if (days !== null) {
+    return {
+      ...scope,
+      wholeDays: true,
+      startDate: days.first,
+      startHour: 0,
+      endDate: days.last,
+      endHour: 24
+    };
+  }
+  // An end at midnight is the day before's 24:00
+  const atMidnight = closure.endHour === 0;
   return {
-    startDate: draft.startDate,
-    startHour: draft.wholeDays ? 0 : draft.startHour,
-    endDate: lastDay ? addDays(draft.endDate, 1) : draft.endDate,
-    endHour: lastDay ? 0 : draft.endHour,
+    ...scope,
+    wholeDays: false,
+    startDate: closure.startDate,
+    startHour: closure.startHour,
+    endDate: atMidnight ? addDays(closure.endDate, -1) : closure.endDate,
+    endHour: atMidnight ? 24 : closure.endHour
+  };
+}
+
+function inputFrom(draft: Draft, hours: WeeklyHours): ClosureInput {
+  const atMidnight = draft.endHour === 24;
+  return {
+    // Whole days are club days: up to the end of the last one's night, which
+    // on a late night is past midnight (see wholeDaysRange)
+    ...(draft.wholeDays
+      ? wholeDaysRange(draft.startDate, draft.endDate, hours)
+      : {
+          startDate: draft.startDate,
+          startHour: draft.startHour,
+          endDate: atMidnight ? addDays(draft.endDate, 1) : draft.endDate,
+          endHour: atMidnight ? 0 : draft.endHour
+        }),
     tableIds: draft.scope === 'club' ? null : [...draft.tableIds].sort((a, b) => a - b),
     reason: draft.reason.trim() || null
   };
@@ -118,14 +151,15 @@ function closureErrorText(error: unknown): string {
 }
 
 /** "18:00–23:00", "All day", "24 Dec – 26 Dec", "24 Dec 15:00 – 26 Dec 23:00" */
-function whenText(closure: ClosureDto): string {
+function whenText(closure: ClosureDto, hours: WeeklyHours): string {
+  const days = wholeDaysOf(closure, hours);
+  if (days !== null) {
+    return days.last === days.first
+      ? m.admin_closure_all_day()
+      : `${formatDay(days.first)} – ${formatDay(days.last)}`;
+  }
   const lastDay = closure.endHour === 0 ? addDays(closure.endDate, -1) : closure.endDate;
   const endHour = closure.endHour === 0 ? 24 : closure.endHour;
-  if (isWholeDays(closure)) {
-    return lastDay === closure.startDate
-      ? m.admin_closure_all_day()
-      : `${formatDay(closure.startDate)} – ${formatDay(lastDay)}`;
-  }
   if (lastDay === closure.startDate) {
     return `${formatHour(closure.startHour)}–${formatHour(endHour)}`;
   }
@@ -354,13 +388,11 @@ export function AdminClosureModal({
   const queryClient = useQueryClient();
   const { hours } = useVenueConfig();
   const { data: spots = [] } = useQuery(tablesQuery());
-  const [draft, setDraft] = useState<Draft>(() =>
-    draftFrom(closure, date, hoursForDate(date, hours).close)
-  );
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(closure, date, hours));
   const update = (patch: Partial<Draft>) => setDraft(current => ({ ...current, ...patch }));
 
   const complete = isComplete(draft);
-  const input = inputFrom(draft);
+  const input = inputFrom(draft, hours);
   const conflicts = useQuery({
     ...adminClosureConflictsQuery(input),
     enabled: isOpen && complete
@@ -523,6 +555,7 @@ export function AdminClosures({ onShowBooking }: { onShowBooking: (phone: string
   const queryClient = useQueryClient();
   const { data: closures, isPending, isError, error, refetch } = useQuery(adminClosuresQuery());
   const { data: spots = [] } = useQuery(tablesQuery());
+  const { hours } = useVenueConfig();
   const now = useNowMinute();
   const today = warsawToday(now);
   // A new modal per opening, so its draft starts from what was clicked
@@ -596,7 +629,7 @@ export function AdminClosures({ onShowBooking }: { onShowBooking: (phone: string
                 <div className="min-w-48 flex-1">
                   <p className="flex flex-wrap items-center gap-2">
                     <span className="sr-only">{formatDay(closure.startDate)}, </span>
-                    <span className="font-bold tabular-nums">{whenText(closure)}</span>
+                    <span className="font-bold tabular-nums">{whenText(closure, hours)}</span>
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-[13px] font-semibold ${
                         closure.tableIds === null

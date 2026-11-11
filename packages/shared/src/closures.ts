@@ -2,6 +2,7 @@ import {
   addDays,
   hoursForDate,
   isClosedAllDay,
+  nightTailMinutes,
   type IsoDate,
   type WeeklyHours
 } from './schedule.ts';
@@ -137,7 +138,45 @@ export function clubClosureOn(
   return { spans, allDay: openHours === 0 };
 }
 
-/** A closure from midnight to midnight: shown as days rather than hours. */
-export function isWholeDays(closure: ClosureDto): boolean {
-  return closure.startHour === 0 && closure.endHour === 0;
+/**
+ * The stretch that closes the club days `first` to `last` whole: from where
+ * the night before `first` ends to where `last`'s own night would have ended.
+ * Midnight to midnight when neither runs late. On a week with late nights a
+ * closure from midnight to midnight is the wrong one twice over: it leaves
+ * the last day's small hours (00:00–02:00) open to book, and takes the night
+ * before's instead.
+ */
+export function wholeDaysRange(
+  first: IsoDate,
+  last: IsoDate,
+  hours: WeeklyHours
+): Pick<ClosureDto, 'startDate' | 'startHour' | 'endDate' | 'endHour'> {
+  return {
+    startDate: first,
+    startHour: nightTailMinutes(hoursForDate(addDays(first, -1), hours)) / 60,
+    endDate: addDays(last, 1),
+    endHour: nightTailMinutes(hoursForDate(last, hours)) / 60
+  };
+}
+
+/**
+ * The days a closure covers when it is one of whole days — shown as days
+ * rather than hours — or null when it is not: midnight to midnight, or, given
+ * the week's `hours`, the club days' own bounds (see wholeDaysRange).
+ */
+export function wholeDaysOf(
+  closure: ClosureDto,
+  hours?: WeeklyHours
+): { first: IsoDate; last: IsoDate } | null {
+  if (closure.endDate <= closure.startDate) return null;
+  const days = { first: closure.startDate, last: addDays(closure.endDate, -1) };
+  if (closure.startHour === 0 && closure.endHour === 0) return days;
+  if (hours === undefined) return null;
+  const range = wholeDaysRange(days.first, days.last, hours);
+  return closure.startHour === range.startHour && closure.endHour === range.endHour ? days : null;
+}
+
+/** A closure of whole days: shown as days rather than hours. */
+export function isWholeDays(closure: ClosureDto, hours?: WeeklyHours): boolean {
+  return wholeDaysOf(closure, hours) !== null;
 }
