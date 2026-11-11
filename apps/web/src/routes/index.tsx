@@ -93,16 +93,17 @@ function Home() {
       <div aria-hidden className="absolute inset-x-0 top-0 h-[660px] overflow-hidden lg:h-[920px]">
         <picture>
           {/* By viewport width (device class), not resolution: high-DPR phones
-              would otherwise pull the wide desktop crop. Within each class the
-              2x file serves sharp screens. The server caches hero images for
-              30 days, so a new picture needs a new file name */}
+              would otherwise pull the wide desktop crop. Phones get one file
+              at 2x, since practically every phone screen is 2x or 3x; desktop
+              monitors are often 1x, so they get their own lighter file.
+              Browsers and Cloudflare keep hero images for 30 days: when a
+              picture changes under the same name, bump its ?v= */}
           <source
             media="(min-width: 768px)"
             srcSet="/hero-desktop.webp 1x, /hero-desktop-2x.webp 2x"
           />
           <img
-            src="/hero-mobile.webp"
-            srcSet="/hero-mobile.webp 1x, /hero-mobile-2x.webp 2x"
+            src="/hero-mobile.webp?v=2"
             alt=""
             width={511}
             height={768}
