@@ -25,6 +25,32 @@ function useHoursLine(): string {
     .join(' · ');
 }
 
+const CREDIT_EMAIL = 'vglumakov@gmail.com';
+const CREDIT_LINKEDIN = 'https://www.linkedin.com/in/hlumak/';
+
+function FooterCredit() {
+  return (
+    <p className="text-[13px] text-grey-cool">
+      {m.footer_credit_made()}{' '}
+      <a
+        href={CREDIT_LINKEDIN}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="transition-colors hover:text-golden"
+      >
+        Vladyslav Hlumakov
+      </a>
+      . {m.footer_credit_bugs()}{' '}
+      <a
+        href={`mailto:${CREDIT_EMAIL}`}
+        className="whitespace-nowrap transition-colors hover:text-golden"
+      >
+        {CREDIT_EMAIL}
+      </a>
+    </p>
+  );
+}
+
 function FooterColumn({
   title,
   links
@@ -61,15 +87,18 @@ export function SiteFooter({ variant = 'compact' }: { variant?: 'full' | 'compac
     return (
       <footer className="mt-24 flex-1 border-t border-line">
         <div className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 px-5 pt-6 pb-28 text-[13px] text-grey-cool md:px-10">
-          <span>
-            © {year} Piramida · {VENUE.street}, {VENUE.city} ·{' '}
-            <a
-              href={VENUE_PHONE_HREF}
-              className="whitespace-nowrap transition-colors hover:text-golden"
-            >
-              {VENUE.phone}
-            </a>
-          </span>
+          <div className="flex flex-col gap-1.5">
+            <span>
+              © {year} Piramida · {VENUE.street}, {VENUE.city} ·{' '}
+              <a
+                href={VENUE_PHONE_HREF}
+                className="whitespace-nowrap transition-colors hover:text-golden"
+              >
+                {VENUE.phone}
+              </a>
+            </span>
+            <FooterCredit />
+          </div>
           <LocaleSwitcher />
         </div>
       </footer>
@@ -108,7 +137,10 @@ function FullFooter({ year }: { year: string }) {
       {/* The bottom padding keeps the language switcher clear of the fixed
           back-to-top button (24–32 px up, 52–56 px tall) at the end of a page */}
       <div className="mx-auto mt-12 flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-line px-5 pt-6 pb-28 md:px-10">
-        <span className="text-[13px] text-grey-cool">© {year} Piramida</span>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[13px] text-grey-cool">© {year} Piramida</span>
+          <FooterCredit />
+        </div>
         <LocaleSwitcher />
       </div>
     </footer>
