@@ -20,14 +20,7 @@ import {
   type AdminBookingFilters
 } from '../../lib/admin-api';
 import { formatPhone } from '@repo/shared/phone';
-import {
-  bookingMinutes,
-  formatDay,
-  intlTag,
-  warsawDate,
-  warsawTime,
-  warsawToday
-} from '../../lib/format';
+import { bookingMinutes, formatDay, intlTag, warsawTime, warsawToday } from '../../lib/format';
 import { menuQuery } from '../../lib/queries';
 import { getLocale } from '../../paraglide/runtime.js';
 import { m } from '../../paraglide/messages.js';
@@ -103,12 +96,9 @@ function RowActions({ booking }: { booking: BookingDto }) {
 
   const extend = useMutation({
     // Through the staff edit, not the guest endpoint (that needs the guest's secret)
-    mutationFn: () => {
-      const { start, end } = bookingMinutes(booking, venueHours);
-      return adminApi.updateBooking(booking.id, {
-        durationMinutes: end - start + EXTEND_STEP_MINUTES
-      });
-    },
+    // Added to the length it has now, by the server: worked out here from the
+    // row on screen, it took back any extension made since the list loaded
+    mutationFn: () => adminApi.updateBooking(booking.id, { extendMinutes: EXTEND_STEP_MINUTES }),
     onSuccess: invalidate
   });
   const cancel = useMutation({
@@ -194,6 +184,7 @@ function RowActions({ booking }: { booking: BookingDto }) {
  * the list pane above only decides what to show (error, loading, empty, rows).
  */
 function BookingsTable({ bookings }: { bookings: BookingDto[] }) {
+  const { hours: venueHours } = useVenueConfig();
   const thisYear = warsawToday().slice(0, 4);
   // Localized dish names for the order summary (items carry only a slug)
   const { data: menu } = useQuery(menuQuery(getLocale()));
@@ -237,10 +228,11 @@ function BookingsTable({ bookings }: { bookings: BookingDto[] }) {
           <tbody>
             {bookings.map((booking, index) => {
               const voided = booking.phase === 'cancelled' || booking.phase === 'no_show';
-              const day = warsawDate(booking.startsAt);
+              // The club day, which is what the list's date filter goes by
+              const day = bookingClubDate(booking, venueHours);
               const previous = bookings[index - 1];
               // One heading per day, so the rows below only need their hours
-              const newDay = !previous || warsawDate(previous.startsAt) !== day;
+              const newDay = !previous || bookingClubDate(previous, venueHours) !== day;
               return (
                 <Fragment key={booking.id}>
                   {newDay ? (

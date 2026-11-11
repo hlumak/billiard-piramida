@@ -18,7 +18,7 @@ import {
   type WeeklyHours
 } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
-import { adminApi, adminBlacklistQuery } from '../../lib/admin-api';
+import { adminApi, adminBlacklistQuery, type AdminBookingPatch } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
 import { bookingMinutes, formatClock, formatDuration } from '../../lib/format';
 import { availabilityQuery } from '../../lib/queries';
@@ -155,7 +155,8 @@ function submitErrorMessage(err: unknown): string {
     if (err.code === 'slot_taken') return m.err_slot_taken();
     if (err.code === 'slot_closed') return m.err_slot_closed();
     if (err.code === 'invalid_phone') return m.err_phone_invalid();
-    if (err.code === 'outside_operating_hours') return m.err_past_closing();
+    if (err.code === 'outside_operating_hours') return m.err_outside_hours();
+    if (err.code === 'booking_too_long') return m.err_booking_too_long();
   }
   return m.err_generic();
 }
@@ -475,18 +476,41 @@ export function AdminBookingModal({
 
   const create = useMutation({
     mutationFn: () => {
-      const values = {
-        tableId: tableId!,
-        date,
-        startMinute: startMinute!,
-        durationMinutes: effectiveDuration,
-        // Left out for an offline client, which the API takes as "nobody to reach"
-        ...(offline ? {} : { customerName: name.trim(), customerPhone: phone.trim() }),
-        sportCardCount: sportCards,
-        // Left out on a dartboard, which the API refuses a game for
-        ...(game === null ? {} : { game })
+      // Left out for an offline client, which the API takes as "nobody to reach"
+      const contact = offline ? {} : { customerName: name.trim(), customerPhone: phone.trim() };
+      if (!booking) {
+        return adminApi.createBooking({
+          tableId: tableId!,
+          date,
+          startMinute: startMinute!,
+          durationMinutes: effectiveDuration,
+          ...contact,
+          sportCardCount: sportCards,
+          // Left out on a dartboard, which the API refuses a game for
+          ...(game === null ? {} : { game })
+        });
+      }
+      // An edit sends only what staff changed. The API judges a booking
+      // against today's hours and closures whenever its date, start or length
+      // is in the request — so with all three sent every time, correcting a
+      // name was refused on a booking that no longer fitted, silently
+      // shortened one to the length this form had clamped it to, and undid
+      // an extension made while the dialog was open.
+      const was = initialForm({ booking, hours: venueHours });
+      const moved =
+        date !== was.date || startMinute !== was.startMinute || duration !== was.duration;
+      const patch: AdminBookingPatch = {
+        ...(tableId !== null && tableId !== was.tableId ? { tableId } : {}),
+        ...(moved && startMinute !== null
+          ? { date, startMinute, durationMinutes: effectiveDuration }
+          : {}),
+        ...(!offline && (name.trim() !== was.name || phone.trim() !== was.phone) ? contact : {}),
+        ...(sportCards !== was.sportCards ? { sportCardCount: sportCards } : {}),
+        ...(game !== null && game !== was.game ? { game } : {})
       };
-      return booking ? adminApi.updateBooking(booking.id, values) : adminApi.createBooking(values);
+      // Saved with nothing changed: there is nothing to ask the API for
+      if (Object.keys(patch).length === 0) return Promise.resolve(booking);
+      return adminApi.updateBooking(booking.id, patch);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin'] });

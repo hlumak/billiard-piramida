@@ -52,6 +52,8 @@ export interface AdminBookingPatch {
   date?: IsoDate;
   startMinute?: number;
   durationMinutes?: number;
+  /** "+30": added by the server to the length the booking has now */
+  extendMinutes?: number;
   customerName?: string;
   customerPhone?: string;
   sportCardCount?: number;
