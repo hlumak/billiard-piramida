@@ -93,12 +93,19 @@ function Home() {
       <div aria-hidden className="absolute inset-x-0 top-0 h-[660px] overflow-hidden lg:h-[920px]">
         <picture>
           {/* By viewport width (device class), not resolution: high-DPR phones
-              would otherwise pull the wide desktop crop */}
-          <source media="(min-width: 768px)" srcSet="/hero-bg-desktop.webp" />
+              would otherwise pull the wide desktop crop. Within each class the
+              2x file serves sharp screens. File names carry the width: the
+              server caches hero images for 30 days, so a new picture needs a
+              new name */}
+          <source
+            media="(min-width: 768px)"
+            srcSet="/hero-desktop-1920.webp 1x, /hero-desktop-3106.webp 2x"
+          />
           <img
-            src="/hero-bg-mobile.webp"
+            src="/hero-mobile-511.webp"
+            srcSet="/hero-mobile-511.webp 1x, /hero-mobile-1022.webp 2x"
             alt=""
-            width={376}
+            width={511}
             height={768}
             fetchPriority="high"
             className="anim-hero-photo size-full object-cover"
