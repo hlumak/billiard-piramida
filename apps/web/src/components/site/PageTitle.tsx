@@ -22,7 +22,7 @@ export function PageTitle({
 }) {
   const Heading = decorative ? 'p' : 'h1';
   return (
-    <div className={`anim-reveal ${align === 'center' ? 'text-center' : ''} ${className ?? ''}`}>
+    <div className={`anim-rise ${align === 'center' ? 'text-center' : ''} ${className ?? ''}`}>
       <Heading className="font-script text-[52px] leading-[1.15] text-balance text-golden md:text-[76px]">
         {title}
       </Heading>

@@ -63,7 +63,7 @@ function NewsArticlePage() {
   return (
     <ArticleShell showTitle={false}>
       <article className="mx-auto max-w-[760px]">
-        <header className="anim-reveal">
+        <header className="anim-rise">
           <Link
             to="/news"
             className="text-sm font-semibold text-golden-light transition-colors hover:text-golden"

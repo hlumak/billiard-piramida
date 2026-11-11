@@ -172,7 +172,7 @@ export function TournamentRegisterForm({
         </p>
       ) : null}
 
-      <BotCheckWidget check={botCheck} />
+      <BotCheckWidget check={botCheck} lazy />
       <button
         type="submit"
         // Not disabled while sending: that would drop keyboard focus

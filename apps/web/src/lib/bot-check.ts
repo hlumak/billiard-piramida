@@ -86,6 +86,11 @@ class BotCheckController {
   /** The widget gave up (error, blocked script): stop waiting for it */
   private failed = false;
   private readonly waiters = new Set<(token: string | undefined) => void>();
+  /** Where the widget goes, while a form shows it */
+  private element: HTMLElement | null = null;
+  /** start() was called: the widget is drawn whenever there is an element */
+  private started = false;
+  private undraw: (() => void) | null = null;
 
   private readonly action: BotCheckAction;
 
@@ -93,9 +98,33 @@ class BotCheckController {
     this.action = action;
   }
 
-  /** Draws the widget into `element`; the returned cleanup removes it. */
+  /**
+   * Gives the widget its place; the returned cleanup takes it away. The
+   * widget itself waits for start().
+   */
   mount(element: HTMLElement): () => void {
     if (SITE_KEY === '') return () => undefined;
+    this.element = element;
+    if (this.started) this.draw(element);
+    return () => {
+      this.element = null;
+      this.undraw?.();
+      this.undraw = null;
+    };
+  }
+
+  /**
+   * Loads Turnstile (about 2 MB from Cloudflare, once per page) and lets it
+   * solve. A form calls this when the guest starts on it, so pages that only
+   * show the form don't pay for it; token() calls it too, as a fallback.
+   */
+  start(): void {
+    if (SITE_KEY === '' || this.started) return;
+    this.started = true;
+    if (this.element) this.draw(this.element);
+  }
+
+  private draw(element: HTMLElement): void {
     let cancelled = false;
     loadTurnstile()
       .then(api => {
@@ -123,7 +152,7 @@ class BotCheckController {
         this.failed = true;
         this.flush(undefined);
       });
-    return () => {
+    this.undraw = () => {
       cancelled = true;
       if (this.api && this.widgetId !== null) this.api.remove(this.widgetId);
       this.widgetId = null;
@@ -139,6 +168,8 @@ class BotCheckController {
   token(): Promise<string | undefined> {
     if (SITE_KEY === '' || this.failed) return Promise.resolve(undefined);
     if (this.current !== null) return Promise.resolve(this.current);
+    // Sent before the guest touched the form (autofill + Enter): solve now
+    this.start();
     return new Promise(resolve => {
       const timer = setTimeout(() => {
         this.waiters.delete(done);
@@ -171,7 +202,7 @@ class BotCheckController {
   }
 }
 
-export type BotCheck = Pick<BotCheckController, 'mount' | 'token' | 'reset'>;
+export type BotCheck = Pick<BotCheckController, 'mount' | 'start' | 'token' | 'reset'>;
 
 /** A form's bot check; render its widget with <BotCheckWidget check={…} />. */
 export function useBotCheck(action: BotCheckAction): BotCheck {

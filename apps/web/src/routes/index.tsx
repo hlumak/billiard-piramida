@@ -124,7 +124,7 @@ function Home() {
               />
             ) : null}
             <div
-              className={`anim-reveal flex flex-col justify-end pb-7 lg:col-start-1 lg:row-start-1 lg:min-h-0 lg:pb-0 ${spotlight ? 'pt-7' : 'min-h-[584px]'}`}
+              className={`anim-rise flex flex-col justify-end pb-7 lg:col-start-1 lg:row-start-1 lg:min-h-0 lg:pb-0 ${spotlight ? 'pt-7' : 'min-h-[584px]'}`}
             >
               <Pills />
               <h1 className="mt-4 max-w-[600px] text-[38px] leading-[1.06] font-bold tracking-[-0.01em] lg:mt-6.5 lg:text-[64px] lg:leading-[1.04] lg:tracking-[-0.015em]">
