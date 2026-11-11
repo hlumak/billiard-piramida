@@ -1,0 +1,1 @@
+CREATE INDEX "bookings_online_created_at_idx" ON "bookings" ("created_at") WHERE "manage_token_hash" is not null;

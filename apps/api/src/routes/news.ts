@@ -1,7 +1,7 @@
 import { Type } from 'typebox';
 import type { Locale, NewsArticleDto, NewsItemDto } from '@repo/shared';
 import { DEFAULT_LOCALE, isLocale, isSafeUrl } from '@repo/shared';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { newsItems, newsItemTranslations } from '../db/schema.ts';
 import { ERROR_RESPONSE, NEWS_ARTICLE_RESPONSE, NEWS_ITEM_RESPONSE } from '../lib/schemas.ts';
 import type { AppInstance } from '../app.ts';
@@ -78,13 +78,30 @@ export function newsRoutes(app: AppInstance) {
 
       if (items.length === 0) return [];
 
+      // Of the published cards only, and without the article text: the list
+      // just says whether a card has one, and this runs for every home page
+      // render — it used to pull every article ever written to answer that
       const translations = await app.db
-        .select()
+        .select({
+          newsItemId: newsItemTranslations.newsItemId,
+          locale: newsItemTranslations.locale,
+          title: newsItemTranslations.title,
+          body: newsItemTranslations.body,
+          content: sql<
+            string | null
+          >`case when ${newsItemTranslations.content} ~ '\\S' then 'article' end`
+        })
         .from(newsItemTranslations)
         .where(
-          inArray(
-            newsItemTranslations.locale,
-            locale === FALLBACK_LOCALE ? [locale] : [locale, FALLBACK_LOCALE]
+          and(
+            inArray(
+              newsItemTranslations.newsItemId,
+              items.map(item => item.id)
+            ),
+            inArray(
+              newsItemTranslations.locale,
+              locale === FALLBACK_LOCALE ? [locale] : [locale, FALLBACK_LOCALE]
+            )
           )
         );
 
