@@ -7,7 +7,7 @@ import {
   type BookingStatus,
   type NewOrderItem
 } from '@repo/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.ts';
 import { bookings, foodItems, orderItems, tables } from '../db/schema.ts';
 import { minutesBetween } from '../lib/time.ts';
@@ -43,7 +43,7 @@ export function phaseOf(
 }
 
 /** For handlers that just verified/created the booking — null is impossible. */
-export async function mustLoadBookingDto(db: Db, id: string): Promise<BookingDto> {
+export async function mustLoadBookingDto(db: Pick<Db, 'select'>, id: string): Promise<BookingDto> {
   const dto = await loadBookingDto(db, id);
   if (!dto) throw new Error(`booking ${id} vanished mid-request`);
   return dto;
@@ -128,7 +128,10 @@ export async function toBookingDtos(
   });
 }
 
-export async function loadBookingDto(db: Db, id: string): Promise<BookingDto | null> {
+export async function loadBookingDto(
+  db: Pick<Db, 'select'>,
+  id: string
+): Promise<BookingDto | null> {
   const [row] = await db
     .select({
       booking: bookings,
@@ -154,13 +157,27 @@ export async function loadBookingDto(db: Db, id: string): Promise<BookingDto | n
   return composeDto(row.booking, row.spot, items, new Date());
 }
 
-/** Validates food ids and inserts order rows; returns an error code or null. */
+/**
+ * Validates food ids and inserts order rows; returns an error code or null.
+ * `maxUnits` caps the booking's whole order (what is on it already plus these
+ * lines) — pass it for a guest, and call inside a transaction that holds the
+ * booking's order lock, or two parallel requests both pass the count.
+ */
 export async function insertOrderItems(
   tx: Pick<Db, 'select' | 'insert'>,
   bookingId: string,
-  items: NewOrderItem[]
-): Promise<'unknown_food_item' | null> {
+  items: NewOrderItem[],
+  { maxUnits }: { maxUnits?: number } = {}
+): Promise<'unknown_food_item' | 'too_many_items' | null> {
   if (items.length === 0) return null;
+  if (maxUnits !== undefined) {
+    const [ordered] = await tx
+      .select({ units: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int` })
+      .from(orderItems)
+      .where(eq(orderItems.bookingId, bookingId));
+    const adding = items.reduce((sum, item) => sum + item.quantity, 0);
+    if ((ordered?.units ?? 0) + adding > maxUnits) return 'too_many_items';
+  }
   const ids = [...new Set(items.map(i => i.foodItemId))];
   // Only available dishes are orderable — a hidden item's id must not slip
   // through, so unavailable ids fall out here and hit the unknown_food_item path.

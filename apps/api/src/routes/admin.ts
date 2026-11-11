@@ -28,7 +28,14 @@ const ADMIN_FAILURE_WINDOW_MS = 15 * 60_000;
 export async function adminRoutes(app: AppInstance, adminToken: string | undefined) {
   // Shared by the login and the guard: guessing through the x-admin-token
   // header on any admin route used to run at the global 100/min instead of the
-  // login's 10/min. Every wrong secret or session now counts against the IP.
+  // login's 10/min. Every wrong secret now counts against the IP.
+  //
+  // Only guesses at the secret itself are counted and blocked. A session
+  // cookie is checked first and is never held back: the desk shares the club
+  // Wi-Fi with guests, and ten junk requests from one phone used to lock every
+  // signed-in member of staff out for the window. Nor is a dead cookie a
+  // guess — it is signed, so there is nothing to find by trying — and counting
+  // those locked the desk out of signing in right after the key was rotated.
   const failures = new FailureLimiter(ADMIN_FAILURES_PER_WINDOW, ADMIN_FAILURE_WINDOW_MS);
 
   // Session endpoints live OUTSIDE the guarded scope so they manage their own auth:
@@ -75,18 +82,19 @@ export async function adminRoutes(app: AppInstance, adminToken: string | undefin
       if (!adminToken) {
         return reply.code(503).send({ error: 'admin_disabled' });
       }
-      if (failures.isBlocked(request.ip)) return reply.code(429).send({ error: 'rate_limited' });
       // Browsers carry a signed, expiring session cookie; API clients (and the
       // tests) may send the secret itself in the x-admin-token header.
       const header = request.headers['x-admin-token'];
       const session = request.cookies[ADMIN_TOKEN_COOKIE];
-      const authorized =
-        typeof header === 'string'
-          ? secretsMatch(header, adminToken)
-          : typeof session === 'string' && verifyAdminSession(adminToken, session);
-      if (!authorized) {
-        // An absent credential is a visitor, not a guess
-        if (typeof header === 'string' || typeof session === 'string') failures.fail(request.ip);
+      if (typeof header === 'string') {
+        if (failures.isBlocked(request.ip)) {
+          return reply.code(429).send({ error: 'rate_limited' });
+        }
+        if (!secretsMatch(header, adminToken)) {
+          failures.fail(request.ip);
+          return reply.code(401).send({ error: 'unauthorized' });
+        }
+      } else if (typeof session !== 'string' || !verifyAdminSession(adminToken, session)) {
         return reply.code(401).send({ error: 'unauthorized' });
       }
       // Sliding expiry: a device in use never reaches the 30-day limit

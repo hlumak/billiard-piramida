@@ -1,6 +1,7 @@
 import { Type } from 'typebox';
 import {
   discountGroszFor,
+  EXTEND_STEP_MINUTES,
   hourlyRateGrosz,
   isIsoDate,
   isValidBookingWindow,
@@ -11,12 +12,13 @@ import {
   MAX_SPOT_ID,
   MIN_BOOKING_MINUTES,
   defaultGameFor,
+  rateTierOf,
   rentalGrosz,
   SLOT_MINUTES,
   resolveBookingGame,
   type BilliardGame
 } from '@repo/shared';
-import { and, desc, eq, gt, gte, ilike, isNotNull, lt } from 'drizzle-orm';
+import { and, desc, eq, gt, gte, ilike, isNotNull, lt, ne } from 'drizzle-orm';
 import { blacklist, bookings, orderItems, tables } from '../db/schema.ts';
 import {
   ACTIVITY_KIND,
@@ -108,7 +110,16 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         filters.push(gte(bookings.startsAt, dayStart), lt(bookings.startsAt, dayEnd));
       }
       if (status !== undefined) filters.push(eq(bookings.status, status));
-      if (upcoming) filters.push(gt(bookings.endsAt, new Date()));
+      if (upcoming) {
+        const now = new Date();
+        // Not over yet. The floor on the start is implied (nothing runs longer
+        // than MAX_BOOKING_MINUTES) and is what the index can use: without it
+        // the scan began at the first booking ever made
+        filters.push(
+          gt(bookings.endsAt, now),
+          gte(bookings.startsAt, new Date(now.getTime() - MAX_BOOKING_MINUTES * MINUTE_MS))
+        );
+      }
       if (phone !== undefined && phone.trim() !== '') {
         filters.push(ilike(bookings.customerPhone, `%${phone.trim()}%`));
       }
@@ -298,6 +309,12 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
                 multipleOf: SLOT_MINUTES
               })
             ),
+            /**
+             * "+30 min" at the desk: added to whatever the booking runs to
+             * now. A length worked out from the list on screen undid any
+             * extension made since that list was loaded.
+             */
+            extendMinutes: Type.Optional(Type.Literal(EXTEND_STEP_MINUTES)),
             customerName: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })),
             customerPhone: Type.Optional(Type.String({ minLength: 5, maxLength: 25 })),
             sportCardCount: Type.Optional(
@@ -337,14 +354,19 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
       if (!isIsoDate(date)) return reply.code(400).send({ error: 'invalid_date' });
       const startMinute = patch.startMinute ?? previous.minute;
       const durationMinutes =
-        patch.durationMinutes ?? minutesBetween(booking.startsAt, booking.endsAt);
+        patch.durationMinutes ??
+        minutesBetween(booking.startsAt, booking.endsAt) + (patch.extendMinutes ?? 0);
+      if (durationMinutes > MAX_BOOKING_MINUTES) {
+        return reply.code(422).send({ error: 'booking_too_long' });
+      }
       // Only a change to when the booking runs is judged against today's
       // hours: correcting a name or phone on a booking that no longer fits
       // since staff moved closing time must still go through
       const timeChanged =
         patch.date !== undefined ||
         patch.startMinute !== undefined ||
-        patch.durationMinutes !== undefined;
+        patch.durationMinutes !== undefined ||
+        patch.extendMinutes !== undefined;
       if (timeChanged && !isValidBookingWindow(date, startMinute, durationMinutes, hours)) {
         return reply.code(422).send({ error: 'outside_operating_hours' });
       }
@@ -382,11 +404,18 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
         game = carried.ok ? carried.game : defaultGameFor(tableId);
       }
 
-      // Moving to a different spot means a different tier, so the rental is
-      // re-quoted at today's rate. Staying put keeps the locked rate: making a
-      // booking longer must not silently reprice it at a newer one.
+      // Moving to a spot of another tier (9ft to 12ft, a table to a dartboard)
+      // re-quotes the rental at today's rate. Staying put, or moving to a spot
+      // of the same tier, keeps the locked rate: neither a longer booking nor
+      // "table 3 instead of table 2" may silently reprice it at a newer one.
+      const [previousSpot] =
+        tableId === booking.tableId
+          ? [spot]
+          : await admin.db.select().from(tables).where(eq(tables.id, booking.tableId));
       const hourlyRate =
-        tableId === booking.tableId ? booking.hourlyRateGrosz : hourlyRateGrosz(spot, rates);
+        previousSpot !== undefined && rateTierOf(previousSpot) === rateTierOf(spot)
+          ? booking.hourlyRateGrosz
+          : hourlyRateGrosz(spot, rates);
 
       // Cards and duration both feed the cap, so the discount is recomputed
       // whenever either could have moved — same rule as extend.
@@ -433,9 +462,34 @@ export const adminBookingRoutes: FastifyPluginAsyncTypebox = async admin => {
             })
             .where(eq(bookings.id, booking.id));
           // "Came after all": a restored no-show takes its black-list entry
-          // with it (only the one it created; an older entry stays)
+          // with it (only the one it created; an older entry stays) — unless
+          // the same number has another no-show standing, which then carries
+          // the entry instead: one of two missed bookings restored is still
+          // one missed booking
           if (booking.status === 'no_show' && patch.status === 'confirmed') {
-            await tx.delete(blacklist).where(eq(blacklist.bookingId, booking.id));
+            const [other] =
+              booking.customerPhone === null
+                ? []
+                : await tx
+                    .select({ id: bookings.id })
+                    .from(bookings)
+                    .where(
+                      and(
+                        eq(bookings.customerPhone, booking.customerPhone),
+                        eq(bookings.status, 'no_show'),
+                        ne(bookings.id, booking.id)
+                      )
+                    )
+                    .orderBy(desc(bookings.startsAt))
+                    .limit(1);
+            if (other) {
+              await tx
+                .update(blacklist)
+                .set({ bookingId: other.id })
+                .where(eq(blacklist.bookingId, booking.id));
+            } else {
+              await tx.delete(blacklist).where(eq(blacklist.bookingId, booking.id));
+            }
           }
           return false;
         });

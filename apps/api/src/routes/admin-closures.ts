@@ -61,7 +61,10 @@ async function parseClosure(db: Pick<Db, 'select'>, body: ClosureBody): Promise<
   const startsAt = warsawInstant(body.startDate, body.startHour);
   const endsAt = warsawInstant(body.endDate, body.endHour);
   if (endsAt <= startsAt) return { ok: false, error: 'invalid_closure' };
-  if (endsAt.getTime() - startsAt.getTime() > MAX_CLOSURE_DAYS * 24 * HOUR_MS) {
+  // Days on the calendar, not 24-hour ones: the night the clocks go back is an
+  // hour longer, and a closure of whole days ends when its last night would
+  // have (up to 02:00), so the limit carries that much slack
+  if (endsAt.getTime() - startsAt.getTime() > (MAX_CLOSURE_DAYS * 24 + 3) * HOUR_MS) {
     return { ok: false, error: 'closure_too_long' };
   }
   if (body.tableIds !== null) {

@@ -9,6 +9,7 @@ import {
   isValidBookingWindow,
   MAX_BOOKING_MINUTES,
   MAX_CLOSE_HOUR,
+  MAX_ORDER_UNITS_PER_BOOKING,
   MAX_SPORT_CARDS_PER_BOOKING,
   MAX_SPOT_ID,
   MAX_UPCOMING_BOOKINGS_PER_PHONE,
@@ -94,7 +95,7 @@ export type CreateBookingResult =
   | { ok: false; status: 400 | 403 | 409 | 422; error: string };
 
 /** Allow bookings that start at most 5 minutes ago ("book the table right now"). */
-const START_GRACE_MS = 5 * 60_000;
+export const START_GRACE_MS = 5 * 60_000;
 
 /** Thrown inside the transaction so a refusal rolls the booking back. */
 class BookingRefused extends Error {
@@ -204,7 +205,7 @@ export async function createBooking(
   const manage = policy.kind === 'guest' ? createManageToken() : null;
 
   try {
-    const bookingId = await app.db.transaction(async tx => {
+    const booking = await app.db.transaction(async tx => {
       if (policy.kind === 'guest' && customerPhone !== null) {
         // Serialize creations per phone so two parallel requests can't both
         // pass the count below; released at commit/rollback
@@ -244,17 +245,26 @@ export async function createBooking(
         })
         .returning({ id: bookings.id });
       assert(created, 'insert returned no row');
-      const itemError = await insertOrderItems(tx, created.id, input.items ?? []);
+      const itemError = await insertOrderItems(
+        tx,
+        created.id,
+        input.items ?? [],
+        policy.kind === 'guest' ? { maxUnits: MAX_ORDER_UNITS_PER_BOOKING } : {}
+      );
       if (itemError) throw new BookingRefused(itemError);
-      return created.id;
+      // Read back before the commit: were this to fail afterwards, the guest
+      // would get a 500 for a booking that exists, and its secret — returned
+      // only here — would be lost with the answer
+      return mustLoadBookingDto(tx, created.id);
     });
-    const booking = await mustLoadBookingDto(app.db, bookingId);
     app.availabilityHub.notify(date);
     return { ok: true, booking, manageToken: manage?.token ?? null };
   } catch (err) {
     if (pgErrorCode(err) === EXCLUSION_VIOLATION) return refuse(409, 'slot_taken');
     if (err instanceof BookingRefused) {
-      return err.code === 'unknown_food_item' ? refuse(422, err.code) : refuse(409, err.code);
+      return err.code === 'unknown_food_item' || err.code === 'too_many_items'
+        ? refuse(422, err.code)
+        : refuse(409, err.code);
     }
     throw err;
   }

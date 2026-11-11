@@ -37,9 +37,16 @@ export function clearUserCookies(reply: FastifyReply, secure: boolean): void {
   reply.clearCookie(USER_FLAG_COOKIE, { ...base(secure), httpOnly: false });
 }
 
-/** Only the admin API ever reads the session, so only it is ever sent it —
- *  not every page request to the web server. */
-const ADMIN_COOKIE_PATH = '/api/admin';
+/**
+ * Sent to the API only, not with every page request to the web server. To
+ * all of it, not just /api/admin: the rate limiter's staff exemption (app.ts)
+ * reads the session on every route, and the panel calls the public ones too
+ * (availability, tables, menu). Scoped to /api/admin, those calls arrived
+ * without it and were limited along with the guests on the club Wi-Fi.
+ */
+const ADMIN_COOKIE_PATH = '/api';
+/** Where the session sat before; cleared whenever a new one is set. */
+const LEGACY_ADMIN_COOKIE_PATH = '/api/admin';
 
 const ADMIN_MAX_AGE_S = ADMIN_SESSION_TTL_MS / 1000;
 
@@ -60,15 +67,20 @@ export function setAdminCookies(reply: FastifyReply, session: string, secure: bo
     httpOnly: false,
     maxAge: ADMIN_MAX_AGE_S
   });
+  // The narrower path wins in the browser: left in place, the old cookie
+  // would keep being sent to /api/admin ahead of this one
+  reply.clearCookie(ADMIN_TOKEN_COOKIE, {
+    ...base(secure),
+    path: LEGACY_ADMIN_COOKIE_PATH,
+    httpOnly: true
+  });
 }
 
 export function clearAdminCookies(reply: FastifyReply, secure: boolean): void {
-  reply.clearCookie(ADMIN_TOKEN_COOKIE, {
-    ...base(secure),
-    path: ADMIN_COOKIE_PATH,
-    httpOnly: true
-  });
-  // Sessions from before the cookie was scoped sat on "/" — clear that one too
-  reply.clearCookie(ADMIN_TOKEN_COOKIE, { ...base(secure), httpOnly: true });
+  // Every path the session has ever sat on: "/api", "/api/admin" before
+  // that, and "/" before it was scoped at all
+  for (const path of [ADMIN_COOKIE_PATH, LEGACY_ADMIN_COOKIE_PATH, '/']) {
+    reply.clearCookie(ADMIN_TOKEN_COOKIE, { ...base(secure), path, httpOnly: true });
+  }
   reply.clearCookie(ADMIN_FLAG_COOKIE, { ...base(secure), httpOnly: false });
 }

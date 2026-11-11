@@ -35,6 +35,8 @@ export class VenueConfigStore {
   #loadedAt = 0;
   /** In-flight load, shared so a cold burst issues one query, not twenty */
   #pending: Promise<Loaded> | null = null;
+  /** Bumped by every invalidate(): tells a load that it began before a write */
+  #generation = 0;
 
   constructor(db: Db) {
     this.#db = db;
@@ -43,9 +45,13 @@ export class VenueConfigStore {
   async get(): Promise<VenueConfigDto> {
     let cached = this.#cached;
     if (cached === null || Date.now() - this.#loadedAt >= TTL_MS) {
-      this.#pending ??= this.#load().finally(() => {
-        this.#pending = null;
-      });
+      if (this.#pending === null) {
+        const load = this.#load().finally(() => {
+          // Unless a write has since started a newer one
+          if (this.#pending === load) this.#pending = null;
+        });
+        this.#pending = load;
+      }
       cached = await this.#pending;
     }
     // A closure that ended since the load drops out now, not at the next one
@@ -60,9 +66,14 @@ export class VenueConfigStore {
   invalidate(): void {
     this.#cached = null;
     this.#loadedAt = 0;
+    // A load already under way may have read the rows before this write: it
+    // must neither be handed to the next get() nor be cached when it lands
+    this.#generation += 1;
+    this.#pending = null;
   }
 
   async #load(): Promise<Loaded> {
+    const generation = this.#generation;
     const [rateRows, hourRows, closureRows] = await Promise.all([
       this.#db.select().from(venueRates),
       this.#db.select().from(venueHours),
@@ -85,8 +96,10 @@ export class VenueConfigStore {
     }
 
     const loaded = { config: { rates, hours }, closures: closureRows };
-    this.#cached = loaded;
-    this.#loadedAt = Date.now();
+    if (generation === this.#generation) {
+      this.#cached = loaded;
+      this.#loadedAt = Date.now();
+    }
     return loaded;
   }
 }

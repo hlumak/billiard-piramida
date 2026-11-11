@@ -36,14 +36,21 @@ const TRANSLATIONS_BODY = Type.Array(
 const OPTIONAL_DATE = Type.Optional(
   Type.Union([Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), Type.Null()])
 );
-const OPTIONAL_HOUR = Type.Optional(
-  Type.Union([Type.Integer({ minimum: 0, maximum: 23 }), Type.Null()])
-);
-const OPTIONAL_FEE = Type.Optional(
-  Type.Union([Type.Integer({ minimum: 0, maximum: 1_000_00 }), Type.Null()])
-);
+/**
+ * An integer or null, as ONE schema with two types. Written as a union of an
+ * integer schema and a null one, Fastify's validator (which coerces types)
+ * tried the integer branch first and turned the null into 0: a start hour or
+ * fee left blank was saved as 00:00 and "free". With null listed first, a real
+ * 0 would have become null instead. One schema naming both types coerces
+ * neither.
+ */
+const nullableInteger = (limits: { minimum: number; maximum: number }) =>
+  Type.Unsafe<number | null>({ type: ['integer', 'null'], ...limits });
+
+const OPTIONAL_HOUR = Type.Optional(nullableInteger({ minimum: 0, maximum: 23 }));
+const OPTIONAL_FEE = Type.Optional(nullableInteger({ minimum: 0, maximum: 1_000_00 }));
 const OPTIONAL_MAX_PLAYERS = Type.Optional(
-  Type.Union([Type.Integer({ minimum: 2, maximum: MAX_TOURNAMENT_PLAYERS }), Type.Null()])
+  nullableInteger({ minimum: 2, maximum: MAX_TOURNAMENT_PLAYERS })
 );
 const OPTIONAL_MIN_PLAYERS = Type.Optional(
   Type.Integer({ minimum: 0, maximum: MAX_TOURNAMENT_PLAYERS })
@@ -474,6 +481,11 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
 
       const patch = {
         ...(request.body.status !== undefined ? { status: request.body.status } : {}),
+        // A seat put back to pending is held from now, as when the player
+        // signs up again themselves: a pending seat only counts for
+        // PENDING_SEAT_HOLD_MS after createdAt, so one restored with its old
+        // date showed on the roster while holding nothing
+        ...(request.body.status === 'pending' ? { createdAt: new Date() } : {}),
         ...(name !== undefined ? { name } : {})
       };
       if (Object.keys(patch).length === 0) return reply.code(400).send({ error: 'empty_patch' });

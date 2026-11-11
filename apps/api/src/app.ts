@@ -231,13 +231,17 @@ export async function buildApp({
 
   app.decorate('authenticatedUser', async (request: FastifyRequest) => {
     if (jwtSecret === undefined) return null;
+    let payload: { sub: string };
     try {
-      const payload = await request.jwtVerify<{ sub: string }>();
-      const [user] = await app.db.select().from(users).where(eq(users.id, payload.sub));
-      return user ?? null;
+      payload = await request.jwtVerify<{ sub: string }>();
     } catch {
+      // No token, or one that is expired or forged: not signed in
       return null;
     }
+    // Outside the catch: a database failure here is a 5xx, not "signed out" —
+    // answered as a 401 it logged the guest out of the web app on a blip
+    const [user] = await app.db.select().from(users).where(eq(users.id, payload.sub));
+    return user ?? null;
   });
 
   // Keep handler-emitted machine-readable codes ({ error: 'slot_taken' }) intact;

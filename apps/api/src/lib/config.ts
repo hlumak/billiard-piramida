@@ -85,6 +85,12 @@ export function loadConfig(warn: (message: string) => void = console.warn): ApiC
 
   const turnstileSecret = process.env.TURNSTILE_SECRET_KEY || undefined;
   const turnstileHostnames = splitList(process.env.TURNSTILE_HOSTNAMES);
+  // Unset is a legitimate setup (a site with no bot check), so it does not
+  // stop the server — but a production .env that merely lost the line used to
+  // switch the check off on booking, sign-up and tournament forms in silence
+  if (production && turnstileSecret === undefined) {
+    warn('TURNSTILE_SECRET_KEY is not set: the bot check on public forms is OFF');
+  }
   if (production && turnstileSecret !== undefined) {
     // A test secret passes every token (or none); without hostnames a token
     // solved on any site that copied our public site key would count

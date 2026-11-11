@@ -8,6 +8,8 @@ import {
   BILLIARD_TABLES_COUNT,
   DARTBOARDS_COUNT,
   DEFAULT_HOURLY_RATE_GROSZ,
+  MAX_ORDER_ITEM_QUANTITY,
+  MAX_ORDER_UNITS_PER_BOOKING,
   PENDING_SEAT_HOLD_MS,
   SPORT_CARD_DISCOUNT_GROSZ,
   SPOTS_COUNT
@@ -1909,10 +1911,14 @@ test('admin session cookie authenticates admin requests; bad token is rejected',
   });
   assert.equal(stats.statusCode, 200);
 
-  // The cookie is a signed, expiring session scoped to the admin API — not
-  // the master secret, and not sent along with every page request
+  // The cookie is a signed, expiring session scoped to the API — not the
+  // master secret, and not sent along with every page request. To all of the
+  // API, so the limiter's staff exemption sees it on the public routes the
+  // panel calls too; the copy on the older, narrower path is cleared.
   assert.notEqual(adminCookie.value, 'test-admin-token');
-  assert.equal(adminCookie.path, '/api/admin');
+  assert.equal(adminCookie.path, '/api');
+  const legacy = session.cookies.find(c => c.name === 'admin_token' && c.path === '/api/admin');
+  assert.ok(legacy && legacy.value === '', 'the session on the old path is cleared');
 
   // A forged or expired session is refused
   const [, signature] = adminCookie.value.split('.');
@@ -2005,6 +2011,39 @@ test('guessing the admin secret is throttled on every admin route', async () => 
     headers: staff('198.51.100.45')
   });
   assert.equal(other.statusCode, 200);
+
+  // …and so is a member of staff already signed in on the blocked address:
+  // the desk shares it with every guest on the club Wi-Fi, whose guesses
+  // must not lock the panel
+  const signedIn = await app.inject({
+    method: 'GET',
+    url: '/api/admin/stats',
+    headers: ip,
+    cookies: { admin_token: issueAdminSession('test-admin-token') }
+  });
+  assert.equal(signedIn.statusCode, 200);
+});
+
+test('a dead session cookie is refused, but is not a guess at the secret', async () => {
+  // After the key is rotated every open panel polls with its old cookie; were
+  // those counted, the desk could not sign in with the new key
+  const ip = { 'x-forwarded-for': '198.51.100.46' };
+  for (let i = 0; i < 12; i++) {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/stats',
+      headers: ip,
+      cookies: { admin_token: issueAdminSession('the-key-before-rotation') }
+    });
+    assert.equal(res.statusCode, 401);
+  }
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/admin/session',
+    headers: ip,
+    payload: { token: 'test-admin-token' }
+  });
+  assert.equal(login.statusCode, 200);
 });
 
 /** The next EU fall-back Sunday (last Sunday of October) at least a day out. */
@@ -4176,4 +4215,275 @@ test('monthly revenue: every month listed, rental net of cards plus the bar', as
     headers
   });
   assert.equal(tooMany.statusCode, 400);
+});
+
+test('a guest order is capped per booking; the desk is not held to the cap', async () => {
+  const ip = { 'x-forwarded-for': '198.51.100.60' };
+  const menu = await app.inject({ method: 'GET', url: '/api/menu?locale=en' });
+  const fries = menu.json().find((i: { slug: string }) => i.slug === 'fries');
+  const order = (quantity: number) => [{ foodItemId: fries.id, quantity }];
+  const base = {
+    tableId: 5,
+    date: nextDate(2),
+    startMinute: 19 * 60 + 30,
+    durationMinutes: 60,
+    customerName: 'Order Cap',
+    customerPhone: '+48 602 555 010'
+  };
+
+  // More than the cap in the booking itself is refused whole
+  const tooMuch = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: {
+      ...base,
+      items: Array.from({ length: 5 }, () => ({
+        foodItemId: fries.id,
+        quantity: MAX_ORDER_ITEM_QUANTITY
+      }))
+    }
+  });
+  assert.equal(tooMuch.statusCode, 422);
+  assert.equal(tooMuch.json().error, 'too_many_items');
+
+  // …leaving no booking behind: the same slot is still there to take
+  const create = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    headers: ip,
+    payload: { ...base, items: order(MAX_ORDER_ITEM_QUANTITY) }
+  });
+  assert.equal(create.statusCode, 201, create.body);
+  const booking = create.json();
+  const add = (quantity: number) =>
+    app.inject({
+      method: 'POST',
+      url: `/api/bookings/${booking.id}/items`,
+      headers: { ...ip, 'x-booking-token': booking.manageToken },
+      payload: { items: order(quantity) }
+    });
+
+  // Up to the cap, in as many requests as it takes…
+  const room = MAX_ORDER_UNITS_PER_BOOKING - MAX_ORDER_ITEM_QUANTITY;
+  for (let added = 0; added < room; added += MAX_ORDER_ITEM_QUANTITY) {
+    assert.equal((await add(MAX_ORDER_ITEM_QUANTITY)).statusCode, 200);
+  }
+  // …and not one dish past it
+  const over = await add(1);
+  assert.equal(over.statusCode, 422);
+  assert.equal(over.json().error, 'too_many_items');
+
+  // A big party's tab is the desk's to run
+  const desk = await app.inject({
+    method: 'POST',
+    url: `/api/admin/bookings/${booking.id}/items`,
+    headers: staff('198.51.100.60'),
+    payload: { items: order(1) }
+  });
+  assert.equal(desk.statusCode, 200);
+  assert.equal(desk.json().foodTotalGrosz, (MAX_ORDER_UNITS_PER_BOOKING + 1) * fries.priceGrosz);
+});
+
+test('a tournament hour or fee left blank stays blank, and a real 0 stays 0', async () => {
+  // The validator coerces types: as a union of an integer and a null schema,
+  // null was turned into 0 — a blank start showed as 00:00, a blank fee as free
+  const blank = await createTournament('198.51.100.61', {
+    slug: 'blank-hour-cup',
+    startsOn: nextDate(6),
+    startHour: null,
+    entryFeeGrosz: null,
+    maxPlayers: null
+  });
+  assert.equal(blank.startHour, null);
+  assert.equal(blank.entryFeeGrosz, null);
+  assert.equal(blank.maxPlayers, null);
+
+  const zero = await createTournament('198.51.100.61', {
+    slug: 'midnight-free-cup',
+    startsOn: nextDate(6),
+    startHour: 0,
+    entryFeeGrosz: 0
+  });
+  assert.equal(zero.startHour, 0);
+  assert.equal(zero.entryFeeGrosz, 0);
+
+  const cleared = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${zero.id}`,
+    headers: staff('198.51.100.61'),
+    payload: { startHour: null, entryFeeGrosz: null }
+  });
+  assert.equal(cleared.statusCode, 200, cleared.body);
+  assert.equal(cleared.json().startHour, null);
+  assert.equal(cleared.json().entryFeeGrosz, null);
+});
+
+test('slugs keep accented words whole, and a title used many times still saves', async () => {
+  const headers = staff('198.51.100.62');
+  const create = (title: string) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/admin/news',
+      headers,
+      payload: { isPublished: false, translations: [{ locale: 'pl', title }] }
+    });
+
+  const accented = await create('Wieczór świąteczny już w sobotę');
+  assert.equal(accented.statusCode, 201, accented.body);
+  assert.equal(accented.json().slug, 'wieczor-swiateczny-juz-w-sobote');
+
+  // base, base-2 … base-20, then a random suffix instead of a 500
+  const slugs = new Set<string>();
+  for (let i = 0; i < 23; i++) {
+    const res = await create('Turniej cotygodniowy');
+    assert.equal(res.statusCode, 201, res.body);
+    slugs.add(res.json().slug);
+  }
+  assert.equal(slugs.size, 23);
+  assert.ok(slugs.has('turniej-cotygodniowy-20'));
+});
+
+test('guessing one account password is throttled whatever address it comes from', async () => {
+  const phone = '+48 600 700 901';
+  const registered = await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    headers: { 'x-forwarded-for': '198.51.100.63' },
+    payload: { phone, name: 'Throttle Test', password: 'secret-pass-9' }
+  });
+  assert.equal(registered.statusCode, 201);
+  const login = (ip: string, password: string, number = phone) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { 'x-forwarded-for': ip },
+      payload: { phone: number, password }
+    });
+
+  // A fresh address for each guess walks around the per-address limit…
+  for (let i = 0; i < 10; i++) {
+    assert.equal((await login(`203.0.113.${10 + i}`, `wrong-pass-${i}`)).statusCode, 401);
+  }
+  // …but not around the account's own
+  const blocked = await login('203.0.113.30', 'wrong-pass-x');
+  assert.equal(blocked.statusCode, 429);
+  assert.equal(blocked.json().error, 'rate_limited');
+  // Even the right password waits out the window
+  assert.equal((await login('203.0.113.31', 'secret-pass-9')).statusCode, 429);
+
+  // Another account is unaffected, and a success clears its count
+  const other = '+48 600 700 902';
+  await app.inject({
+    method: 'POST',
+    url: '/api/auth/register',
+    headers: { 'x-forwarded-for': '198.51.100.64' },
+    payload: { phone: other, name: 'Other Account', password: 'secret-pass-9' }
+  });
+  for (let round = 0; round < 3; round++) {
+    for (let i = 0; i < 4; i++) {
+      const res = await login(`203.0.113.${40 + round * 10 + i}`, 'wrong-pass', other);
+      assert.equal(res.statusCode, 401);
+    }
+    const ok = await login(`203.0.113.${48 + round * 10}`, 'secret-pass-9', other);
+    assert.equal(ok.statusCode, 200);
+  }
+});
+
+test('moving a booking to another table of the same size keeps its locked rate', async () => {
+  const headers = staff('198.51.100.65');
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers,
+    payload: {
+      tableId: 4,
+      date: nextDate(5),
+      startMinute: 21 * 60 + 30,
+      durationMinutes: 60,
+      customerName: 'Rate Lock',
+      customerPhone: '+48 602 555 011'
+    }
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  const booking = created.json();
+  assert.equal(booking.tableTotalGrosz, BILLIARD_HOUR);
+
+  const config = (await app.inject({ method: 'GET', url: '/api/venue-config' })).json();
+  const save = (rates: Record<string, number>) =>
+    app.inject({
+      method: 'PUT',
+      url: '/api/admin/venue-config',
+      headers,
+      payload: { rates, hours: config.hours }
+    });
+  const move = (tableId: number) =>
+    app.inject({
+      method: 'PATCH',
+      url: `/api/admin/bookings/${booking.id}`,
+      headers,
+      payload: { tableId }
+    });
+  try {
+    const raised = await save({
+      ...config.rates,
+      '9ft': BILLIARD_HOUR + 10_00,
+      '12ft': BILLIARD_12FT_HOUR + 10_00
+    });
+    assert.equal(raised.statusCode, 200, raised.body);
+
+    // Table 5 is 9ft like table 4: the guest keeps the price they were quoted
+    const sameSize = await move(5);
+    assert.equal(sameSize.statusCode, 200, sameSize.body);
+    assert.equal(sameSize.json().tableId, 5);
+    assert.equal(sameSize.json().tableTotalGrosz, BILLIARD_HOUR);
+
+    // A 12ft table is another tier: quoted at what it costs today
+    const bigger = await move(TABLE_12FT_ID);
+    assert.equal(bigger.statusCode, 200, bigger.body);
+    assert.equal(bigger.json().tableTotalGrosz, BILLIARD_12FT_HOUR + 10_00);
+  } finally {
+    assert.equal((await save(config.rates)).statusCode, 200);
+  }
+});
+
+test('a seat staff restore to pending is held from the moment it is restored', async () => {
+  const headers = staff('198.51.100.66');
+  const cup = await createTournament('198.51.100.66', {
+    slug: 'restored-seat-cup',
+    minPlayers: 2,
+    maxPlayers: 2
+  });
+  const signUp = await app.inject({
+    method: 'POST',
+    url: '/api/tournaments/restored-seat-cup/register',
+    headers: { 'x-forwarded-for': '198.51.100.66' },
+    payload: { name: 'Olga Late', phone: '512 300 366' }
+  });
+  assert.equal(signUp.statusCode, 201, signUp.body);
+  const { db, pool } = createDb(TEST_URL);
+  try {
+    // Signed up long ago, then cancelled by mistake
+    await db
+      .update(tournamentRegistrations)
+      .set({ status: 'cancelled', createdAt: new Date(Date.now() - PENDING_SEAT_HOLD_MS - 60_000) })
+      .where(eq(tournamentRegistrations.tournamentId, cup.id));
+  } finally {
+    await pool.end();
+  }
+  const roster = await app.inject({
+    method: 'GET',
+    url: `/api/admin/tournaments/${cup.id}/registrations`,
+    headers
+  });
+  const [seat] = roster.json();
+  const restored = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/tournaments/${cup.id}/registrations/${seat.id}`,
+    headers,
+    payload: { status: 'pending' }
+  });
+  assert.equal(restored.statusCode, 200, restored.body);
+  const page = await app.inject({ method: 'GET', url: '/api/tournaments/restored-seat-cup' });
+  assert.equal(page.json().pendingCount, 1);
 });
