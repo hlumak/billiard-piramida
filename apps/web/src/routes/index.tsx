@@ -94,16 +94,15 @@ function Home() {
         <picture>
           {/* By viewport width (device class), not resolution: high-DPR phones
               would otherwise pull the wide desktop crop. Within each class the
-              2x file serves sharp screens. File names carry the width: the
-              server caches hero images for 30 days, so a new picture needs a
-              new name */}
+              2x file serves sharp screens. The server caches hero images for
+              30 days, so a new picture needs a new file name */}
           <source
             media="(min-width: 768px)"
-            srcSet="/hero-desktop-1920.webp 1x, /hero-desktop-3106.webp 2x"
+            srcSet="/hero-desktop.webp 1x, /hero-desktop-2x.webp 2x"
           />
           <img
-            src="/hero-mobile-511.webp"
-            srcSet="/hero-mobile-511.webp 1x, /hero-mobile-1022.webp 2x"
+            src="/hero-mobile.webp"
+            srcSet="/hero-mobile.webp 1x, /hero-mobile-2x.webp 2x"
             alt=""
             width={511}
             height={768}
