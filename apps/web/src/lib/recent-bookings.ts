@@ -84,9 +84,18 @@ export function manageTokenFor(id: string): string | undefined {
  * The booking page's link carries the secret in its fragment (#key=…), which
  * browsers never send to a server: opening that link on another device is
  * how a guest manages a booking from there. Adopt it into this browser.
+ *
+ * Only on that booking's own page, and only when this browser holds no secret
+ * for it yet. The fragment used to be taken for whichever booking was being
+ * fetched: a link to /bookings#key=x replaced the secret of every stored
+ * booking with "x", the API then answered 404 for each, and the list forgot
+ * them all — the guest could no longer manage any of them here.
  */
 export function adoptTokenFromLocation(id: string): void {
   if (typeof window === 'undefined') return;
+  const [page, pageId] = window.location.pathname.split('/').filter(Boolean).slice(-2);
+  if (page !== 'booking' || pageId !== id) return;
+  if (manageTokenFor(id) !== undefined) return;
   const key = new URLSearchParams(window.location.hash.slice(1)).get('key');
   if (key) rememberBooking(id, key);
 }

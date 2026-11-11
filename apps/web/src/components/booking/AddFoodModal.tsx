@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Button, Modal, Spinner } from '@heroui/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatPln, type BookingDto } from '@repo/shared';
-import { api } from '../../lib/api';
+import { ApiError, api } from '../../lib/api';
 import { intlTag } from '../../lib/format';
-import { bookingQuery, menuQuery } from '../../lib/queries';
+import { bookingQuery, menuQuery, storeChangedBooking } from '../../lib/queries';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { MenuPicker } from '../MenuPicker';
@@ -21,16 +21,20 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
     menu?.reduce((sum, item) => sum + (quantities[item.id] ?? 0) * item.priceGrosz, 0) ?? 0;
 
   const addItems = useMutation({
-    mutationFn: () =>
-      api.addItems(
+    mutationFn: () => {
+      // Only what the menu still offers: a dish staff took off after it was
+      // picked is gone from the picker, so it could not be removed by hand,
+      // yet it was still sent — and every attempt was refused for it
+      const offered = new Set(menu?.map(item => item.id));
+      return api.addItems(
         booking.id,
-        Object.entries(quantities).map(([foodItemId, quantity]) => ({
-          foodItemId: Number(foodItemId),
-          quantity
-        }))
-      ),
+        Object.entries(quantities)
+          .map(([foodItemId, quantity]) => ({ foodItemId: Number(foodItemId), quantity }))
+          .filter(line => offered.has(line.foodItemId))
+      );
+    },
     onSuccess: updated => {
-      queryClient.setQueryData(bookingQuery(booking.id).queryKey, updated);
+      storeChangedBooking(queryClient, updated);
       setQuantities({});
       setOpen(false);
     },
@@ -38,6 +42,10 @@ export function AddFoodModal({ booking }: { booking: BookingDto }) {
     onError: error => {
       if (isStaleBookingError(error)) {
         void queryClient.invalidateQueries({ queryKey: bookingQuery(booking.id).queryKey });
+      }
+      // The menu changed under the picker: load what is on it now
+      if (error instanceof ApiError && error.code === 'unknown_food_item') {
+        void queryClient.invalidateQueries({ queryKey: menuQuery(getLocale()).queryKey });
       }
     }
   });

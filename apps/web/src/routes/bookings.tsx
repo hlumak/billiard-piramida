@@ -7,8 +7,8 @@ import { formatPln, sizeOf, type BookingDto, type BookingSummaryDto } from '@rep
 import { PageLayout } from '../components/site/PageLayout';
 import { DateBadge } from '../components/DateBadge';
 import { PHASE_LABELS, PHASE_STYLES, mutationErrorText } from '../components/booking/phase';
-import { formatDayLong, intlTag, warsawDate, warsawTime } from '../lib/format';
-import { bookingQuery } from '../lib/queries';
+import { formatDayLong, intlTag, warsawTime } from '../lib/format';
+import { bookingQuery, MY_BOOKINGS_KEY } from '../lib/queries';
 import { ApiError, api } from '../lib/api';
 import { userAuthFlag } from '../lib/auth';
 import { useFlagCookie } from '../lib/hydration';
@@ -18,6 +18,7 @@ import { forgetBooking, useRecentBookings } from '../lib/recent-bookings';
 import { m } from '../paraglide/messages.js';
 import { noindexMeta } from '../lib/seo';
 import { spotDescription } from '../lib/spots';
+import { bookingClubDate, useVenueConfig } from '../lib/venue-config';
 
 export const Route = createFileRoute('/bookings')({
   head: () => ({ meta: noindexMeta(m.seo_title_bookings()) }),
@@ -40,7 +41,7 @@ function useMyBookings() {
   });
   // A signed-in guest also sees what their account booked on any device
   const mine = useQuery({
-    queryKey: ['bookings', 'mine'],
+    queryKey: MY_BOOKINGS_KEY,
     queryFn: ({ signal }) => api.myBookings(signal),
     enabled: signedIn
   });
@@ -57,7 +58,9 @@ function useMyBookings() {
   }, [goneKey]);
 
   const byId = new Map<string, BookingDto>();
-  for (const booking of [...results.map(result => result.data), ...(mine.data ?? [])]) {
+  // The account's list first, so a booking also held in this browser shows as
+  // its own entry has it: that one is polled and updated by every change
+  for (const booking of [...(mine.data ?? []), ...results.map(result => result.data)]) {
     if (booking) byId.set(booking.id, booking);
   }
   const bookings = [...byId.values()].sort((a, b) => b.startsAt.localeCompare(a.startsAt));
@@ -180,7 +183,10 @@ function BookingGroup({
 
 /** Day, time, phase and spot — shared by managed bookings and lookup summaries. */
 function BookingLine({ booking, muted }: { booking: BookingSummaryDto; muted: boolean }) {
-  const date = warsawDate(booking.startsAt);
+  const { hours } = useVenueConfig();
+  // The club day, as the wizard and the booking's own page date it: a 00:30
+  // on a late night belongs to the evening before
+  const date = bookingClubDate(booking, hours);
   return (
     <>
       <DateBadge date={date} muted={muted} />

@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stripImageMetadata } from './image-metadata.ts';
 
@@ -77,11 +77,17 @@ export class ImageStore {
     // would be too: strip metadata first (the hash then names the clean file)
     const bytes = stripImageMetadata(ext, upload);
     const name = `${createHash('sha256').update(bytes).digest('hex').slice(0, 32)}.${ext}`;
+    // Written beside the target and renamed into place, so the name only ever
+    // points at a whole file. Written straight to it, a write cut short (disk
+    // full, container stopped mid-deploy) left a truncated picture that every
+    // later upload of the same file took for "already there" — and kept.
+    const partial = join(this.dir, `.${name}.${randomBytes(6).toString('hex')}.part`);
     try {
-      // 'wx' fails if the file exists — same hash, same bytes, nothing to redo
-      await writeFile(join(this.dir, name), bytes, { flag: 'wx' });
+      await writeFile(partial, bytes);
+      await rename(partial, join(this.dir, name));
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+      await rm(partial, { force: true });
+      throw err;
     }
     return `${UPLOADS_URL_PREFIX}${name}`;
   }

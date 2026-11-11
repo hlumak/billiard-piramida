@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 /**
  * Letters Unicode does not decompose into a base letter plus accent — Polish
  * "ł" above all, which every other headline here seems to contain.
@@ -17,7 +19,7 @@ const STROKED_LETTERS: Record<string, string> = {
  * Latin letters at all (a fully Cyrillic one) collapses to nothing, which is
  * what `fallback` is for.
  */
-/** Attempts before giving up: base, base-2 … base-20. */
+/** Numbered attempts — base, base-2 … base-20 — before a random suffix takes over. */
 const MAX_SLUG_ATTEMPTS = 20;
 
 /**
@@ -35,7 +37,14 @@ export async function insertWithFreeSlug<T>(
     const row = await insert(attempt === 1 ? base : `${base}-${attempt}`);
     if (row !== undefined) return row;
   }
-  throw new Error(`no free slug for "${base}" after ${MAX_SLUG_ATTEMPTS} attempts`);
+  // A weekly tournament under one title gets here within months, and every
+  // all-Cyrillic title shares one fallback base: past the numbered ones a
+  // random suffix keeps the record creatable instead of failing for good
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const row = await insert(`${base}-${randomBytes(4).toString('hex')}`);
+    if (row !== undefined) return row;
+  }
+  throw new Error(`no free slug for "${base}"`);
 }
 
 export function slugify(name: string, fallback: string): string {
@@ -43,6 +52,9 @@ export function slugify(name: string, fallback: string): string {
     .toLowerCase()
     .replace(/[łđøæœß]/g, letter => STROKED_LETTERS[letter] ?? letter)
     .normalize('NFKD')
+    // The accents NFKD split off, or each would become a hyphen in the next
+    // step and cut the word in two ("wieczór" → "wieczo-r")
+    .replace(/\p{M}+/gu, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
   return base || fallback;

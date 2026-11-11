@@ -68,7 +68,7 @@ export const adminCustomerRoutes: FastifyPluginAsyncTypebox = async admin => {
               db
                 .select({
                   phone: bookings.customerPhone,
-                  foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPriceGrosz}), 0)::int`
+                  foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity}::bigint * ${orderItems.unitPriceGrosz}), 0)::float8`
                 })
                 .from(orderItems)
                 .innerJoin(bookings, eq(orderItems.bookingId, bookings.id))

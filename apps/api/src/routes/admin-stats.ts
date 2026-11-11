@@ -2,6 +2,7 @@ import { Type } from 'typebox';
 import {
   addDays,
   hoursForDate,
+  MAX_BOOKING_MINUTES,
   nightTailMinutes,
   type AdminAnalyticsDto,
   type AdminMonthlyRevenueDto,
@@ -16,7 +17,7 @@ import {
   ADMIN_MONTHLY_REVENUE_RESPONSE,
   ADMIN_STATS_RESPONSE
 } from '../lib/schemas.ts';
-import { clubDayOf, clubDayRange } from '../lib/time.ts';
+import { clubDayOf, clubDayRange, MINUTE_MS } from '../lib/time.ts';
 import type { Db } from '../db/client.ts';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 
@@ -69,7 +70,7 @@ async function revenueBetween(db: Db, from: Date, to: Date): Promise<number> {
       .where(inRange),
     db
       .select({
-        grosz: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPriceGrosz}), 0)::int`
+        grosz: sql<number>`coalesce(sum(${orderItems.quantity}::bigint * ${orderItems.unitPriceGrosz}), 0)::float8`
       })
       .from(orderItems)
       .innerJoin(bookings, eq(orderItems.bookingId, bookings.id))
@@ -119,6 +120,9 @@ export const adminStatsRoutes: FastifyPluginAsyncTypebox = async admin => {
             and(
               eq(bookings.status, 'confirmed'),
               lte(bookings.startsAt, now),
+              // Implied by the next line (no booking outlasts
+              // MAX_BOOKING_MINUTES), and what bounds the index scan
+              gte(bookings.startsAt, new Date(now.getTime() - MAX_BOOKING_MINUTES * MINUTE_MS)),
               sql`${bookings.endsAt} > ${now}`
             )
           ),
@@ -204,7 +208,7 @@ export const adminStatsRoutes: FastifyPluginAsyncTypebox = async admin => {
         db
           .select({
             date: warsawDay,
-            foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPriceGrosz}), 0)::int`
+            foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity}::bigint * ${orderItems.unitPriceGrosz}), 0)::float8`
           })
           .from(orderItems)
           .innerJoin(bookings, eq(orderItems.bookingId, bookings.id))
@@ -308,7 +312,7 @@ export const adminStatsRoutes: FastifyPluginAsyncTypebox = async admin => {
         db
           .select({
             month: clubMonth,
-            foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitPriceGrosz}), 0)::int`
+            foodGrosz: sql<number>`coalesce(sum(${orderItems.quantity}::bigint * ${orderItems.unitPriceGrosz}), 0)::float8`
           })
           .from(orderItems)
           .innerJoin(bookings, eq(orderItems.bookingId, bookings.id))

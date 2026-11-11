@@ -9,10 +9,11 @@ import {
 } from '@repo/shared';
 import { formatPhone } from '@repo/shared/phone';
 import { adminBookingsQuery, adminStatsQuery } from '../../lib/admin-api';
-import { intlTag, warsawTime, warsawToday } from '../../lib/format';
+import { intlTag, warsawTime } from '../../lib/format';
 import { menuQuery, tablesQuery } from '../../lib/queries';
 import { spotDescription, spotName } from '../../lib/spots';
 import { useNowMinute } from '../../lib/use-now';
+import { clubMoment, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
 import { PHASE_LABELS, PHASE_STYLES } from '../booking/phase';
@@ -366,7 +367,12 @@ function TopBarItems({
  */
 export function AdminOverview({ onOpen }: { onOpen: (pane: AdminPaneId) => void }) {
   const now = useNowMinute();
-  const today = warsawToday(now);
+  const { hours } = useVenueConfig();
+  // The club's day, as the API lists bookings and the schedule shows them:
+  // past midnight on a late night it is still the evening before. Asked for
+  // by the calendar date, this screen showed no bookings and every table
+  // free from 00:00 until closing.
+  const today = clubMoment(hours, now).date;
   const { data: stats, isPending, isError, error, refetch } = useQuery(adminStatsQuery());
   // The same query the schedule makes, so the two share one cache entry
   const {

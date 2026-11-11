@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Button, Popover } from '@heroui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
@@ -75,20 +75,39 @@ function markSeen(createdAt: string): void {
 }
 
 let audio: AudioContext | null = null;
+/** A chime that could not sound because audio was still locked */
+let chimeOwed = false;
 
 /** Browsers start audio muted until the page is used; any tap or key unlocks it. */
 function unlockAudio(): void {
   try {
     audio ??= new AudioContext();
-    if (audio.state === 'suspended') void audio.resume();
+    if (audio.state === 'suspended') void audio.resume().then(playOwedChime);
+    else playOwedChime();
   } catch {
     /* no Web Audio: the bell stays silent */
   }
 }
 
+/**
+ * The desk's browser restores the panel in the morning and nobody has touched
+ * it yet: a booking that arrives then is marked as announced, but made no
+ * sound and never would. It sounds at the first tap or key instead.
+ */
+function playOwedChime(): void {
+  const owed = chimeOwed;
+  chimeOwed = false;
+  // Still locked, and chime() owes it again
+  if (owed && readStored(SOUND_OFF_KEY) !== '1') chime();
+}
+
 /** Two soft rising notes, made on the spot: no sound file to load. */
 function chime(): void {
-  if (audio?.state !== 'running') return;
+  if (audio?.state !== 'running') {
+    chimeOwed = true;
+    return;
+  }
+  chimeOwed = false;
   const start = audio.currentTime;
   for (const [index, frequency] of [880, 1318.5].entries()) {
     const at = start + index * 0.18;
@@ -180,6 +199,19 @@ export function BookingAlerts({ onShowBooking }: { onShowBooking: (phone: string
     };
   }, []);
 
+  // Opening the list is looking at it: what it holds is seen. Read from the
+  // stores rather than from this render, because the desktop notification
+  // keeps this function for as long as it is on screen — clicking it used to
+  // open the list without marking anything, so the badge and the count in
+  // the tab's title stayed until the bell was closed and opened by hand.
+  const openList = useCallback(() => {
+    const seenBefore = readStored(SEEN_KEY);
+    setOpen(true);
+    setShownSince(seenBefore);
+    const newest = queryClient.getQueryData(adminOnlineBookingsQuery().queryKey)?.[0]?.createdAt;
+    if (newest !== undefined && (seenBefore === null || newest > seenBefore)) markSeen(newest);
+  }, [queryClient]);
+
   useEffect(() => {
     if (data === undefined) return;
     const newest = data[0]?.createdAt ?? '';
@@ -195,12 +227,12 @@ export function BookingAlerts({ onShowBooking }: { onShowBooking: (phone: string
     if (fresh.length === 0) return;
     store(ALERTED_KEY, newest);
     if (readStored(SOUND_OFF_KEY) !== '1') chime();
-    notifyDesktop(fresh, () => setOpen(true));
+    notifyDesktop(fresh, openList);
     // The day's lists and the schedule should show it now, not at their next poll
     void queryClient.invalidateQueries({
       predicate: query => query.queryKey[0] === 'admin' && query.queryKey[1] !== 'online-bookings'
     });
-  }, [data, queryClient]);
+  }, [data, queryClient, openList]);
 
   const unseen = seen === null ? [] : (data ?? []).filter(b => b.createdAt > seen);
 
@@ -213,13 +245,8 @@ export function BookingAlerts({ onShowBooking }: { onShowBooking: (phone: string
   }, [unseen.length]);
 
   const onOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (next) {
-      setShownSince(seen);
-      // Seen once looked at: up to the newest the list holds
-      const newest = data?.[0]?.createdAt;
-      if (newest !== undefined && (seen === null || newest > seen)) markSeen(newest);
-    }
+    if (next) openList();
+    else setOpen(false);
   };
 
   const enableDesktop = async () => {

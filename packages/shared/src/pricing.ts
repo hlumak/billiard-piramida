@@ -30,6 +30,13 @@ export const MAX_HOURLY_RATE_GROSZ = 1_000_00;
 /** Max quantity per order line (the API rejects more; the UI caps at this). */
 export const MAX_ORDER_ITEM_QUANTITY = 50;
 
+/**
+ * Max dishes and drinks a guest can put on one booking online, all lines
+ * together. Without it one booking could take order lines without end. Staff
+ * are not held to it: a big party's tab is theirs to run.
+ */
+export const MAX_ORDER_UNITS_PER_BOOKING = 200;
+
 export const CURRENCY = 'PLN';
 
 /** Enough of a spot to price it — the id resolves the size, the kind is the fallback. */

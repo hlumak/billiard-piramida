@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { users } from '../db/schema.ts';
 import { normalizePhone } from '@repo/shared/phone';
 import { clearUserCookies, setUserCookies } from '../lib/cookies.ts';
+import { FailureLimiter } from '../lib/failure-limiter.ts';
 import { pgErrorCode, UNIQUE_VIOLATION } from '../lib/errors.ts';
 import { hashPassword, verifyPassword } from '../lib/passwords.ts';
 import {
@@ -64,7 +65,17 @@ function toProfile(user: typeof users.$inferSelect): UserProfileDto {
   };
 }
 
+/**
+ * Wrong passwords per phone number before that account's login answers 429
+ * for a while. The route's own limit is per address, which a guesser with
+ * many addresses walks around; this one follows the account.
+ */
+const LOGIN_FAILURES_PER_WINDOW = 10;
+const LOGIN_FAILURE_WINDOW_MS = 15 * 60_000;
+
 export function authRoutes(app: AppInstance, authEnabled: boolean) {
+  const loginFailures = new FailureLimiter(LOGIN_FAILURES_PER_WINDOW, LOGIN_FAILURE_WINDOW_MS);
+
   const guard = async (_request: FastifyRequest, reply: FastifyReply) => {
     if (!authEnabled) {
       return reply.code(503).send({ error: 'auth_disabled' });
@@ -135,12 +146,21 @@ export function authRoutes(app: AppInstance, authEnabled: boolean) {
     async (request, reply) => {
       // Same normalization as registration, so any input format matches
       const normalized = normalizePhone(request.body.phone) ?? request.body.phone.trim();
+      // Before the password is looked at, and the same for a number nobody
+      // registered, so the answer tells a guesser nothing about either
+      if (loginFailures.isBlocked(normalized)) {
+        return reply.code(429).send({ error: 'rate_limited' });
+      }
       const [user] = await app.db.select().from(users).where(eq(users.phone, normalized));
       // Verify against a dummy hash when the user is missing — uniform timing
       const check = user
         ? await verifyPassword(request.body.password, user.passwordHash)
         : (await hashPassword(request.body.password), { valid: false, needsRehash: false });
-      if (!user || !check.valid) return reply.code(401).send({ error: 'invalid_credentials' });
+      if (!user || !check.valid) {
+        loginFailures.fail(normalized);
+        return reply.code(401).send({ error: 'invalid_credentials' });
+      }
+      loginFailures.reset(normalized);
       // The only moment the plain password is at hand: bring an old hash up to today's cost
       if (check.needsRehash) {
         await app.db

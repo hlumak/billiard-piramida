@@ -5,6 +5,7 @@ import { and, eq, gt, gte, lt } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { AVAILABILITY_RESPONSE, ERROR_RESPONSE } from '../lib/schemas.ts';
 import { loadClosuresBetween } from '../services/closures.ts';
+import { START_GRACE_MS } from '../services/create-booking.ts';
 import { MINUTE_MS, warsawInstantAt } from '../lib/time.ts';
 import type { AppInstance } from '../app.ts';
 
@@ -69,7 +70,7 @@ export function availabilityRoutes(app: AppInstance) {
           const slotEnd = new Date(slotStart.getTime() + SLOT_MINUTES * MINUTE_MS);
           const overlaps = busy.some(b => b.startsAt < slotEnd && b.endsAt > slotStart);
           const closed = shut.some(c => c.startsAt < slotEnd && c.endsAt > slotStart);
-          const inPast = slotStart.getTime() < now.getTime() - 5 * 60_000;
+          const inPast = slotStart.getTime() < now.getTime() - START_GRACE_MS;
           // `booked` = taken (staff can still log past-but-free slots today);
           // `available` also excludes past slots for the public wizard.
           slots.push({

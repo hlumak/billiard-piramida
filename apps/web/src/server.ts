@@ -46,13 +46,20 @@ export default {
         .filter(Boolean)
         .join(', ') || undefined;
 
+    // The two redirects answer before the app does, and are still responses
+    // of this site: without the headers, a first visit that landed on one
+    // (a trailing slash, "/" with a language chosen earlier) got no HSTS
     const canonical = page ? canonicalPath(new URL(request.url)) : null;
     if (canonical !== null) {
-      return new Response(null, { status: 308, headers: { location: canonical } });
+      return withSecurityHeaders(
+        new Response(null, { status: 308, headers: { location: canonical } }),
+        request,
+        null
+      );
     }
 
     const chosen = page ? chosenLocaleRedirect(request) : null;
-    if (chosen !== null) return chosen;
+    if (chosen !== null) return withSecurityHeaders(chosen, request, null);
 
     return requestContext.run({ nonce, forwardedFor }, async () => {
       // The router de-localizes the URL itself (rewrite in router.tsx), so it

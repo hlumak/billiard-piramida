@@ -109,6 +109,12 @@ export const bookings = pgTable(
     index('bookings_status_starts_at_idx').on(t.status, t.startsAt),
     index('bookings_customer_phone_idx').on(t.customerPhone),
     index('bookings_user_id_idx').on(t.userId),
+    // The staff bell: bookings made on the site (they alone carry a secret),
+    // newest first. Polled every half minute by every open panel, and without
+    // this each poll read and sorted the whole table.
+    index('bookings_online_created_at_idx')
+      .on(t.createdAt)
+      .where(sql`${t.manageTokenHash} is not null`),
     // Every writer validates these, but the database is the last word: a
     // zero-length booking would slip past the overlap guard (an empty range
     // overlaps nothing), and negative money would corrupt every total

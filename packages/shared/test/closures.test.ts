@@ -6,6 +6,8 @@ import {
   clubClosureOn,
   isHourClosed,
   isWholeDays,
+  wholeDaysOf,
+  wholeDaysRange,
   type ClosureDto
 } from '../src/closures.ts';
 import { DEFAULT_WEEKLY_HOURS } from '../src/schedule.ts';
@@ -143,4 +145,44 @@ test('closedSpansOn: a closure through midnight reaches the late night as hours 
       [24, 25]
     ]
   );
+});
+
+test('whole days on a week with late nights run from night end to night end', () => {
+  // Friday and Saturday close at 02:00; 2026-10-24 is a Saturday
+  const late = DEFAULT_WEEKLY_HOURS.map((day, weekday) =>
+    weekday === 5 || weekday === 6 ? { open: day.open, close: 26 } : day
+  ) as typeof DEFAULT_WEEKLY_HOURS;
+
+  // Saturday alone: Friday's night keeps its small hours, Saturday's are closed
+  const saturday = wholeDaysRange('2026-10-24', '2026-10-24', late);
+  assert.deepEqual(saturday, {
+    startDate: '2026-10-24',
+    startHour: 2,
+    endDate: '2026-10-25',
+    endHour: 2
+  });
+  const closed = closure(saturday);
+  assert.deepEqual(clubClosureOn('2026-10-24', late, [closed])?.allDay, true);
+  // Friday night's 00:00–02:00 is untouched, and so is Sunday
+  assert.equal(clubClosureOn('2026-10-23', late, [closed]), null);
+  assert.equal(clubClosureOn('2026-10-25', late, [closed]), null);
+  // Midnight to midnight, by contrast, leaves Saturday's small hours open
+  const midnight = closure({ startHour: 0, endDate: '2026-10-25', endHour: 0 });
+  assert.equal(clubClosureOn('2026-10-24', late, [midnight])?.allDay, false);
+
+  // Both forms read back as the days they cover
+  assert.deepEqual(wholeDaysOf(closed, late), { first: '2026-10-24', last: '2026-10-24' });
+  assert.deepEqual(wholeDaysOf(midnight, late), { first: '2026-10-24', last: '2026-10-24' });
+  assert.equal(isWholeDays(closed, late), true);
+  // …but hours are hours: an early-morning closure is not "the day before"
+  assert.equal(wholeDaysOf(closure({ startHour: 0, endHour: 2 }), late), null);
+  assert.equal(wholeDaysOf(closed), null, 'without the hours only midnight counts');
+
+  // No late nights: the same as it ever was
+  assert.deepEqual(wholeDaysRange('2026-10-24', '2026-10-25', DEFAULT_WEEKLY_HOURS), {
+    startDate: '2026-10-24',
+    startHour: 0,
+    endDate: '2026-10-26',
+    endHour: 0
+  });
 });

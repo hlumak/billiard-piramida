@@ -54,11 +54,41 @@ const API_URL: string = resolveApiUrl();
 const forwardedFor = (): string | undefined => currentRequestContext()?.forwardedFor;
 
 /** A render must not wait on a hung API for longer than nginx would. */
-const REQUEST_TIMEOUT_MS = import.meta.env.SSR ? 3_000 : 15_000;
+const READ_TIMEOUT_MS = import.meta.env.SSR ? 3_000 : 15_000;
+/**
+ * A write is given as long as nginx gives the API (30 s) and a little more, so
+ * it is the server that gives up, not the browser. A booking the browser
+ * abandoned at 15 s was still made, and its answer — the only time the
+ * booking's secret is sent — went unread.
+ */
+const WRITE_TIMEOUT_MS = 35_000;
 
-function withTimeout(signal: AbortSignal | undefined): AbortSignal {
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+function timeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(new DOMException('timed out', 'TimeoutError')), ms);
+  return controller.signal;
+}
+
+/**
+ * `signal` (the caller's) or the timeout, whichever fires first. Not every
+ * browser in use has AbortSignal.any — Safari before 17.4, so every iPhone
+ * left on iOS 16, has none — and there each query threw before it was sent:
+ * no availability, no booking page. Those get the two wired up by hand.
+ */
+export function withTimeout(signal: AbortSignal | undefined, ms: number): AbortSignal {
+  const timeout = timeoutSignal(ms);
+  if (!signal) return timeout;
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([signal, timeout]);
+  const controller = new AbortController();
+  for (const source of [signal, timeout]) {
+    if (source.aborted) {
+      controller.abort(source.reason);
+      break;
+    }
+    source.addEventListener('abort', () => controller.abort(source.reason), { once: true });
+  }
+  return controller.signal;
 }
 
 /**
@@ -139,7 +169,10 @@ export async function request<T>(
   const forwarded = forwardedFor();
   const response = await fetch(`${API_URL}${path}`, {
     ...(method !== undefined ? { method } : {}),
-    signal: withTimeout(signal),
+    signal: withTimeout(
+      signal,
+      method === undefined || method === 'GET' ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS
+    ),
     // Send the HttpOnly session cookie (same-origin in prod, same-site in dev)
     credentials: 'include',
     headers: {

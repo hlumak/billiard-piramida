@@ -109,12 +109,23 @@ export function noindexMeta(title: string) {
 }
 
 /**
+ * Structured data as the text of a <script type="application/ld+json">. The
+ * router writes that text into the page as it is, and JSON.stringify leaves
+ * "<" alone — so a headline containing "</script>" closed the element and the
+ * rest of it became markup on a public page. "<" as < is the same string
+ * to a JSON parser and nothing at all to the HTML one.
+ */
+function jsonLd(data: unknown): string {
+  return JSON.stringify(data).replaceAll('<', '\\u003c');
+}
+
+/**
  * WebSite structured data for the home page: the name Google shows above the
  * result instead of the bare domain (its "site name"), with the alternates it
  * may fall back to.
  */
 export function websiteJsonLd(): string {
-  return JSON.stringify({
+  return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: VENUE.name,
@@ -146,7 +157,7 @@ export function venueJsonLd(config: VenueConfigDto | null | undefined): string {
   // A late night's closing reads as the morning clock: 25 is "01:00"
   const pad = (hour: number) => `${String(hour > 24 ? hour - 24 : hour).padStart(2, '0')}:00`;
 
-  return JSON.stringify({
+  return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'EntertainmentBusiness',
     name: VENUE.name,
@@ -211,7 +222,7 @@ function absoluteImage(image: string | null): string {
  */
 export function newsArticleJsonLd(article: NewsArticleDto, pageUrl: string): string {
   const club = { '@type': 'Organization', name: VENUE.name, url: `${SITE_URL}/` };
-  return JSON.stringify({
+  return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: article.title,
@@ -279,7 +290,7 @@ export function tournamentJsonLd(t: TournamentDto, pageUrl: string): string | nu
   const startDate = tournamentStart(t);
   if (startDate === null) return null;
   const availability = OFFER_AVAILABILITY[t.registrationState];
-  return JSON.stringify({
+  return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'Event',
     name: t.title,

@@ -106,3 +106,13 @@ test('an undated tournament has no Event; a cancelled one says so', () => {
   expect(cancelled.eventStatus).toBe('https://schema.org/EventCancelled');
   expect(cancelled.offers.availability).toBeUndefined();
 });
+
+test('staff text cannot close the structured-data script element', () => {
+  const url = 'https://billiard-piramida.pl/tournaments/x';
+  const title = 'Cup</script><meta http-equiv="refresh" content="0;url=https://evil.example">';
+  const text = tournamentJsonLd(tournament({ title }), url) ?? '';
+  // Nothing the HTML parser could read as a tag…
+  expect(text).not.toContain('<');
+  // …and the same title to anything that reads the JSON
+  expect(JSON.parse(text).name).toBe(title);
+});

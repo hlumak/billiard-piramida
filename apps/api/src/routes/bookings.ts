@@ -6,10 +6,11 @@ import {
   hoursForDate,
   MAX_BOOKING_MINUTES,
   MAX_ORDER_ITEM_QUANTITY,
+  MAX_ORDER_UNITS_PER_BOOKING,
   rentalGrosz
 } from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
-import { and, asc, desc, eq, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, sql } from 'drizzle-orm';
 import { bookings, tables } from '../db/schema.ts';
 import { EXCLUSION_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import {
@@ -248,16 +249,29 @@ export function bookingRoutes(
       );
 
       try {
-        const closed = await app.db.transaction(async tx => {
+        const outcome = await app.db.transaction(async tx => {
           // The added half hour may run into time staff have closed
-          if (await isClosedFor(tx, booking.tableId, booking.endsAt, newEndsAt)) return true;
-          await tx
+          if (await isClosedFor(tx, booking.tableId, booking.endsAt, newEndsAt)) return 'closed';
+          // Only the row the checks above were made on: staff may have moved,
+          // extended or cancelled it since it was read, and a blind write
+          // would put this end time on a booking it was never checked against
+          const [extended] = await tx
             .update(bookings)
             .set({ endsAt: newEndsAt, discountGrosz })
-            .where(eq(bookings.id, booking.id));
-          return false;
+            .where(
+              and(
+                eq(bookings.id, booking.id),
+                eq(bookings.status, 'confirmed'),
+                eq(bookings.tableId, booking.tableId),
+                eq(bookings.startsAt, booking.startsAt),
+                eq(bookings.endsAt, booking.endsAt)
+              )
+            )
+            .returning({ id: bookings.id });
+          return extended ? 'done' : 'changed';
         });
-        if (closed) return reply.code(409).send({ error: 'slot_closed' });
+        if (outcome === 'closed') return reply.code(409).send({ error: 'slot_closed' });
+        if (outcome === 'changed') return reply.code(409).send({ error: 'booking_changed' });
       } catch (err) {
         if (pgErrorCode(err) === EXCLUSION_VIOLATION) {
           return reply.code(409).send({ error: 'slot_taken' });
@@ -290,7 +304,14 @@ export function bookingRoutes(
         return reply.code(409).send({ error: `booking_${phase}` });
       }
 
-      const itemError = await insertOrderItems(app.db, booking.id, request.body.items);
+      const itemError = await app.db.transaction(async tx => {
+        // One order at a time per booking, or two parallel requests would
+        // both pass the cap on what a guest may order online
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${booking.id}))`);
+        return insertOrderItems(tx, booking.id, request.body.items, {
+          maxUnits: MAX_ORDER_UNITS_PER_BOOKING
+        });
+      });
       if (itemError) return reply.code(422).send({ error: itemError });
       return mustLoadBookingDto(app.db, booking.id);
     }
@@ -313,7 +334,14 @@ export function bookingRoutes(
         return reply.code(409).send({ error: 'only_upcoming_can_be_cancelled' });
       }
 
-      await app.db.update(bookings).set({ status: 'cancelled' }).where(eq(bookings.id, booking.id));
+      // Still confirmed, or staff got there first (cancelled it, or marked a
+      // no-show whose black-list entry a late "cancelled" would contradict)
+      const [cancelled] = await app.db
+        .update(bookings)
+        .set({ status: 'cancelled' })
+        .where(and(eq(bookings.id, booking.id), eq(bookings.status, 'confirmed')))
+        .returning({ id: bookings.id });
+      if (!cancelled) return reply.code(409).send({ error: 'booking_changed' });
       app.availabilityHub.notify(
         clubDayOf(booking.startsAt, (await app.venueConfig.get()).hours).date
       );

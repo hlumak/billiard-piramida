@@ -313,6 +313,8 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
   const [date, setDate] = useState<IsoDate>(() => clubMoment(weekHours).date);
   const [prefill, setPrefill] = useState<NewBookingPrefill | null>(null);
   const [creating, setCreating] = useState(false);
+  // Counts the cells clicked, to key the dialog: a new form per click
+  const [opening, setOpening] = useState(0);
 
   const {
     data: bookings,
@@ -387,6 +389,7 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
 
   const pickSlot = (tableId: number, startMinute: number) => {
     setPrefill({ date, startMinute, tableId });
+    setOpening(count => count + 1);
     setCreating(true);
   };
 
@@ -556,7 +559,11 @@ export function AdminSchedule({ onShowBooking }: { onShowBooking: (phone: string
 
       {prefill ? (
         <AdminBookingModal
-          key={`${prefill.date}:${prefill.startMinute}:${prefill.tableId}`}
+          // Per click, not per cell: the dialog stays mounted while closed (for
+          // its closing animation), so keyed by the cell alone, clicking the
+          // same free cell for the next caller brought back the form as it
+          // was left — the last caller's name, phone and sport cards
+          key={opening}
           isOpen={creating}
           onOpenChange={setCreating}
           prefill={prefill}

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ArrowRight, Star } from 'lucide-react';
-import { hoursForDate, isClosedAllDay, type TournamentDto } from '@repo/shared';
+import type { TournamentDto } from '@repo/shared';
 import { FreeTables } from '../components/home/FreeTables';
 import { TournamentSpotlight } from '../components/home/TournamentSpotlight';
 import { NewsListItem } from '../components/NewsListItem';
@@ -13,7 +13,8 @@ import { SiteHeader } from '../components/site/SiteHeader';
 import { SportCardsBand } from '../components/SportCardsBand';
 import { VenueMap } from '../components/venue/VenueMap';
 import { VisitCard } from '../components/venue/VisitCard';
-import { formatHour, formatNumber } from '../lib/format';
+import { todayLine } from '../lib/closures';
+import { formatNumber } from '../lib/format';
 import { newsQuery, tournamentsQuery, venueConfigQuery } from '../lib/queries';
 import { pageHead, venueJsonLd, websiteJsonLd } from '../lib/seo';
 import { GOOGLE_LISTING_URL, GOOGLE_RATING } from '../lib/venue';
@@ -54,8 +55,7 @@ function nextOpenTournament(tournaments: TournamentDto[] | undefined): Tournamen
 }
 
 function Pills() {
-  const { hours } = useVenueConfig();
-  const today = hoursForDate(clubMoment(hours).date, hours);
+  const { hours, closures } = useVenueConfig();
   const score = formatNumber(GOOGLE_RATING.score, { minimumFractionDigits: 1 });
   const pill =
     'inline-flex items-center gap-2 rounded-full border border-creme/20 bg-club-green-deepest/65 px-3 py-1.5 text-xs font-medium lg:gap-2.5 lg:px-4 lg:py-2 lg:text-sm';
@@ -63,9 +63,7 @@ function Pills() {
     <div className="flex flex-wrap gap-2 lg:gap-2.5">
       <p className={pill}>
         <span aria-hidden className="size-2 rounded-full bg-golden" />
-        {isClosedAllDay(today)
-          ? m.closed_today()
-          : m.open_today({ open: formatHour(today.open), close: formatHour(today.close) })}
+        {todayLine(clubMoment(hours).date, hours, closures)}
       </p>
       <a
         href={GOOGLE_LISTING_URL}
