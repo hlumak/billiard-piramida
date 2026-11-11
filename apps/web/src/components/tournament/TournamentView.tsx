@@ -95,7 +95,7 @@ export function TournamentView({ tournament }: { tournament: TournamentDto }) {
 
   return (
     <div>
-      <header className="anim-reveal">
+      <header className="anim-rise">
         <Link
           to="/tournaments"
           className="text-sm font-semibold text-golden-light transition-colors hover:text-golden"

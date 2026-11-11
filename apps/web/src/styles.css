@@ -435,6 +435,17 @@ body {
   }
 }
 
+/* The same rise without the fade, for a page's main heading (anim-rise). It
+   is the page's largest text, and text that starts at opacity 0 only counts
+   as painted on the frame after first paint — on a busy phone that frame came
+   up to 0.4 s later (Largest Contentful Paint). Visible from the first frame,
+   it still moves with the rest. */
+@keyframes rise-in {
+  from {
+    transform: translateY(14px);
+  }
+}
+
 /* Wizard/tab step changes are enter-only: the outgoing step unmounts
    instantly and the new one slides in from the travel direction. Exit
    animations (AnimatePresence) doubled the animated trees exactly while the
@@ -480,6 +491,10 @@ body {
 
   .anim-reveal {
     animation: fade-up-in 0.4s ease-out backwards;
+  }
+
+  .anim-rise {
+    animation: rise-in 0.4s ease-out backwards;
   }
 
   .anim-step-forward {
