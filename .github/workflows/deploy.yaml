@@ -1,0 +1,63 @@
+name: Deploy
+
+# Puts each commit on main live once CI has passed and published its images.
+# A commit message with [skip deploy] stays out; "Run workflow" on this page
+# deploys the latest main, or a full commit sha typed in.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Full commit sha on main (empty = latest main)
+        required: false
+
+permissions: {}
+
+# One deploy at a time, never cancelled halfway; a newer one waiting replaces
+# an older one waiting
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    # workflow_run also fires for pull requests (from forks too, whose branch
+    # may be called main): only a successful push to this repository counts
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       !contains(github.event.workflow_run.head_commit.message, '[skip deploy]'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Holds the secrets: the server's address and host key stay out of this
+    # public repository, since Cloudflare hides the origin
+    environment:
+      name: production
+      url: https://billiard-piramida.pl
+    steps:
+      - name: Deploy over SSH
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || inputs.sha || github.sha }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "::error::Set DEPLOY_HOST, DEPLOY_KNOWN_HOSTS and DEPLOY_SSH_KEY in the production environment"
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy
+          # The key can only run scripts/deploy.sh, which takes the sha as its
+          # one argument (README, "Automatic deploys")
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 \
+            "root@$DEPLOY_HOST" "$SHA"

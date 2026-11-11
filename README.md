@@ -69,26 +69,48 @@ API_IMAGE=ghcr.io/hlumak/piramida-api:main
 WEB_IMAGE=ghcr.io/hlumak/piramida-web:main
 ```
 
-and deploy, once CI on `main` is green:
+and deploy a commit of `main` once CI has published its images:
 
 ```sh
-git pull --ff-only
-docker compose --profile app pull migrate web
-docker compose --profile app run --rm migrate
-docker compose --profile app up -d --wait
-docker compose --profile app restart nginx     # see below
-docker image prune -f                          # the images this deploy replaced
+scripts/deploy.sh <full commit sha>
 ```
 
-`up` leaves nginx running, since nothing in its own definition changed — but it
-needs the restart all the same: `nginx/default.conf` is mounted as a single
-file, so a version `git pull` just replaced is not the one the running container
-sees, and nginx resolved the `api` and `web` containers' addresses once, when it
-started, not when they were recreated.
+It checks out that commit, pulls the images tagged with its sha, dumps the
+database to `/root/backups` if migrations changed (keeping the last 10 such
+dumps), migrates, brings the stack up, restarts nginx and checks
+`/health/ready` and the home page. If the new version is not healthy, it puts
+the previous commit back and fails. A commit older than the live one is
+skipped. Logs: `/var/log/piramida-deploy/`.
 
-Each image is also tagged with its commit sha (`…:<sha>` in `.env` rolls back),
-and `docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}'`
+nginx restarts on every deploy: `nginx/default.conf` is mounted as a single
+file, so a version the checkout just replaced is not the one the running
+container sees, and nginx resolved the `api` and `web` containers' addresses
+once, when it started, not when they were recreated.
+
+`docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}'`
 names the commit an image was built from.
+
+### Automatic deploys
+
+`.github/workflows/deploy.yaml` runs the script for every commit on `main` whose
+CI passed. A commit message containing `[skip deploy]` is left out (for a
+migration better run at night, say); deploy it later with "Run workflow" on the
+Deploy page, which takes a full sha or defaults to the latest `main`.
+
+The workflow connects with a key that may run only the script. On the server, in
+`/root/.ssh/authorized_keys`:
+
+```
+restrict,command="/root/billiard-piramida/scripts/deploy.sh" ssh-ed25519 AAAA… github-actions-deploy
+```
+
+`restrict` turns off the shell, port forwarding and the rest; the forced command
+receives what the client asked to run as `SSH_ORIGINAL_COMMAND` and accepts only
+a full sha of a commit on `main`. The GitHub environment `production` holds three
+secrets: `DEPLOY_HOST` (the server's address), `DEPLOY_KNOWN_HOSTS` (its line
+`<address> ssh-ed25519 …`) and `DEPLOY_SSH_KEY` (the private key). The address
+stays out of this repository because Cloudflare hides the origin. To replace
+the key, swap the public half on the server and the secret.
 
 nginx listens on `127.0.0.1:8080`; put the TLS-terminating proxy in front of it.
 The API and web containers run as an unprivileged user on read-only filesystems;
