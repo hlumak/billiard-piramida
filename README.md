@@ -76,8 +76,15 @@ git pull --ff-only
 docker compose --profile app pull migrate web
 docker compose --profile app run --rm migrate
 docker compose --profile app up -d --wait
+docker compose --profile app restart nginx     # see below
 docker image prune -f                          # the images this deploy replaced
 ```
+
+`up` leaves nginx running, since nothing in its own definition changed — but it
+needs the restart all the same: `nginx/default.conf` is mounted as a single
+file, so a version `git pull` just replaced is not the one the running container
+sees, and nginx resolved the `api` and `web` containers' addresses once, when it
+started, not when they were recreated.
 
 Each image is also tagged with its commit sha (`…:<sha>` in `.env` rolls back),
 and `docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}'`
