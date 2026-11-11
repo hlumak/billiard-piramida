@@ -36,7 +36,7 @@ function FooterCredit() {
         href={CREDIT_LINKEDIN}
         target="_blank"
         rel="noopener noreferrer"
-        className="transition-colors hover:text-golden"
+        className="text-cream-soft underline decoration-grey-cool underline-offset-4 transition-colors hover:text-golden hover:decoration-golden"
       >
         Vladyslav Hlumakov
       </a>
@@ -45,7 +45,7 @@ function FooterCredit() {
       {m.footer_credit_bugs()}{' '}
       <a
         href={`mailto:${CREDIT_EMAIL}`}
-        className="whitespace-nowrap transition-colors hover:text-golden"
+        className="whitespace-nowrap text-cream-soft underline decoration-grey-cool underline-offset-4 transition-colors hover:text-golden hover:decoration-golden"
       >
         {CREDIT_EMAIL}
       </a>
