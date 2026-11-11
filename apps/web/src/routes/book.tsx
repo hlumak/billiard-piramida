@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useRef } from 'react';
 import { Spinner } from '@heroui/react';
 import {
   BOOKING_DAYS_AHEAD,
+  MAX_CLOSE_HOUR,
   MIN_BOOKING_MINUTES,
   addDays,
   isIsoDate,
@@ -40,7 +41,8 @@ const DetailsStep = lazy(() => loadDetailsStep().then(module => ({ default: modu
 export const Route = createFileRoute('/book')({
   // ?date=…&start=… arrives from the home page's free-tables strip: the guest
   // picked an hour there (start is that hour, 18 = 18:00), so the wizard
-  // opens on the table step with it set.
+  // opens on the table step with it set. On the club day's scale, like the
+  // strip's own hours: 24 and 25 are 00:00 and 01:00 of a late night.
   validateSearch: (search: Record<string, unknown>): { date?: IsoDate; start?: number } => {
     // A number, or the digits of one: Number('') and Number(null) are 0 and
     // Number(true) is 1, which would hand the wizard a start nobody picked
@@ -51,7 +53,7 @@ export const Route = createFileRoute('/book')({
         : Number.NaN;
     return {
       ...(typeof search.date === 'string' && isIsoDate(search.date) ? { date: search.date } : {}),
-      ...(Number.isInteger(start) && start >= 0 && start <= 23 ? { start } : {})
+      ...(Number.isInteger(start) && start >= 0 && start < MAX_CLOSE_HOUR ? { start } : {})
     };
   },
   head: () => ({ meta: noindexMeta(msg.seo_title_book()) }),

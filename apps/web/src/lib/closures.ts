@@ -1,4 +1,14 @@
-import type { ClosedSpan, DayClosure, DayHours } from '@repo/shared';
+import {
+  clubClosureOn,
+  hoursForDate,
+  isClosedAllDay,
+  type ClosedSpan,
+  type ClosureDto,
+  type DayClosure,
+  type DayHours,
+  type IsoDate,
+  type WeeklyHours
+} from '@repo/shared';
 import { m } from '../paraglide/messages.js';
 import { formatClock, formatHour } from './format';
 
@@ -38,4 +48,23 @@ export function partlyClosedTag(closure: DayClosure, day: DayHours): string {
   return left.open === day.open
     ? m.date_open_until({ time: formatHour(left.close) })
     : m.date_open_from({ time: formatClock(left.open * 60) });
+}
+
+/**
+ * "Open today 16:00–21:00" or "Closed today", for the home page's pill and the
+ * menu — with the closures staff set, not the weekly hours alone: on a day the
+ * club was closed for an event the pill still promised the usual hours. A day
+ * closed in part shows the hours that are left when they can be said as one
+ * range; otherwise the usual ones stand, and the hours list has the detail.
+ */
+export function todayLine(
+  date: IsoDate,
+  hours: WeeklyHours,
+  closures: readonly ClosureDto[]
+): string {
+  const day = hoursForDate(date, hours);
+  const closure = clubClosureOn(date, hours, closures);
+  if (isClosedAllDay(day) || closure?.allDay) return m.closed_today();
+  const open = (closure && hoursLeft(closure, day)) ?? day;
+  return m.open_today({ open: formatHour(open.open), close: formatHour(open.close) });
 }

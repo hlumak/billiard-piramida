@@ -31,6 +31,7 @@ const BOOKING_ERRORS: Record<string, () => string> = {
   start_in_past: m.err_slot_expired,
   outside_operating_hours: m.err_outside_hours,
   unknown_food_item: m.err_food_unavailable,
+  too_many_items: m.err_too_many_items,
   booking_too_long: m.err_booking_too_long,
   booking_finished: m.err_booking_changed,
   booking_cancelled: m.err_booking_changed,
@@ -38,6 +39,8 @@ const BOOKING_ERRORS: Record<string, () => string> = {
   booking_not_started: m.err_booking_not_started,
   phone_blocked: m.err_phone_blocked,
   only_upcoming_can_be_cancelled: m.err_booking_changed,
+  // Staff changed it between this page loading it and the guest's tap
+  booking_changed: m.err_booking_changed,
   invalid_phone: m.err_phone_invalid,
   invalid_name: m.err_name_required,
   rate_limited: m.err_rate_limited,

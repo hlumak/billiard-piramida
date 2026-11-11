@@ -325,6 +325,7 @@
   "admin_tournament_min_above_max": "Minimum graczy nie może przekraczać maksimum",
   "err_outside_hours": "Ta godzina jest poza godzinami otwarcia. Wróć i wybierz inną.",
   "err_food_unavailable": "Jedna z pozycji zamówienia jest już niedostępna. Sprawdź zamówienie i spróbuj ponownie.",
+  "err_too_many_items": "To więcej, niż mieści jedno zamówienie online. Większe zamów telefonicznie lub przy barze.",
   "err_booking_changed": "Ta rezerwacja w międzyczasie się zmieniła. Odśwież stronę.",
   "err_rate_limited": "Zbyt wiele prób. Odczekaj minutę i spróbuj ponownie.",
   "err_bot_check": "Nie udało się potwierdzić, że nie jesteś botem. Spróbuj ponownie lub zadzwoń do nas.",

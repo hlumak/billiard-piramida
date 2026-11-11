@@ -1,5 +1,6 @@
 import { adoptTokenFromLocation } from './recent-bookings';
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, type QueryClient } from '@tanstack/react-query';
+import type { BookingDto } from '@repo/shared';
 import { api } from './api';
 
 export const availabilityQuery = (date: string) =>
@@ -67,6 +68,20 @@ export const tournamentQuery = (slug: string, locale: string) =>
     queryFn: ({ signal }) => api.tournament(slug, locale, signal),
     staleTime: 60_000
   });
+
+/** What the signed-in account booked, on any device. */
+export const MY_BOOKINGS_KEY = ['bookings', 'mine'] as const;
+
+/**
+ * A booking the guest just changed (cancelled, extended, ordered for): into
+ * its own cache entry, and the account's list — which carries a copy of it —
+ * refetched. Left alone, that list went on showing a cancelled booking as
+ * upcoming on the My bookings page.
+ */
+export function storeChangedBooking(queryClient: QueryClient, booking: BookingDto): void {
+  queryClient.setQueryData(bookingQuery(booking.id).queryKey, booking);
+  void queryClient.invalidateQueries({ queryKey: MY_BOOKINGS_KEY });
+}
 
 export const bookingQuery = (id: string) =>
   queryOptions({

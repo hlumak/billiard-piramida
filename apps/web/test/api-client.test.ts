@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { ApiError, api, notFoundOn404, request } from '../src/lib/api';
+import { ApiError, api, notFoundOn404, request, withTimeout } from '../src/lib/api';
 import { rememberBooking } from '../src/lib/recent-bookings';
 
 type Call = { url: string; init: RequestInit };
@@ -75,4 +75,29 @@ test('a 404 becomes the router not-found; anything else is rethrown as is', () =
 
   const broken = new ApiError(500, 'internal_error');
   expect(() => notFoundOn404(broken)).toThrow(broken);
+});
+
+test('a browser without AbortSignal.any still sends its queries, and still aborts them', async () => {
+  // Safari before 17.4 — every iPhone left on iOS 16 — has no AbortSignal.any:
+  // each query used to throw before fetch was called
+  const any = AbortSignal.any;
+  // @ts-expect-error: stand in for the older browser
+  delete AbortSignal.any;
+  try {
+    const caller = new AbortController();
+    await api.tables(caller.signal);
+    expect(calls).toHaveLength(1);
+    const sent = calls[0]?.init.signal;
+    expect(sent?.aborted).toBe(false);
+    // Leaving the page (the query's own signal) still cancels the request
+    caller.abort();
+    expect(sent?.aborted).toBe(true);
+
+    // And so does the timeout, on its own
+    const timed = withTimeout(new AbortController().signal, 10);
+    await new Promise(resolve => setTimeout(resolve, 60));
+    expect(timed.aborted).toBe(true);
+  } finally {
+    AbortSignal.any = any;
+  }
 });

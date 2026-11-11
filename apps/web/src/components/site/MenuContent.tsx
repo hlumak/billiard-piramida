@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { ArrowRight, ChevronRight, Phone } from 'lucide-react';
-import { hoursForDate, isClosedAllDay } from '@repo/shared';
 import { BrandLogo } from '../BrandLogo';
 import { LocaleSwitcher } from '../LocaleSwitcher';
-import { formatHour } from '../../lib/format';
+import { todayLine } from '../../lib/closures';
 import { VENUE, VENUE_PHONE_HREF } from '../../lib/venue';
 import { clubMoment, useVenueConfig } from '../../lib/venue-config';
 import { m } from '../../paraglide/messages.js';
@@ -28,8 +27,7 @@ export function MenuContent({
   /** A tournament is taking sign-ups: worth a badge on its row */
   tournamentsOpen?: boolean;
 }) {
-  const { hours } = useVenueConfig();
-  const today = hoursForDate(clubMoment(hours).date, hours);
+  const { hours, closures } = useVenueConfig();
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col px-5 pb-7">
@@ -79,9 +77,7 @@ export function MenuContent({
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-2 text-sm font-semibold">
               <span aria-hidden className="size-2 shrink-0 rounded-full bg-golden" />
-              {isClosedAllDay(today)
-                ? m.closed_today()
-                : m.open_today({ open: formatHour(today.open), close: formatHour(today.close) })}
+              {todayLine(clubMoment(hours).date, hours, closures)}
             </p>
             <p className="mt-1 truncate text-[13px] text-grey-cool">{VENUE.street}</p>
           </div>
