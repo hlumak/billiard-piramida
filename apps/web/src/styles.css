@@ -50,6 +50,16 @@
   --color-grey-cool: #d9ddc8;
 }
 
+/* Page and section titles in the script face. Until Great Vibes arrives the
+   browser draws the system's cursive (Comic Sans on Windows), far wider, and
+   on a phone a one-line title took two: once the font landed the whole page
+   jumped up 60px (CLS 0.06–0.1 on a slow connection). Scaling any fallback to
+   Great Vibes' x-height (0.328, its own value, so the real font is untouched)
+   keeps the title on as many lines either way. */
+.font-script {
+  font-size-adjust: 0.328;
+}
+
 /* A raised panel: the default container for a block of content */
 @utility card {
   background-color: var(--color-card);
