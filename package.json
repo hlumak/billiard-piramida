@@ -21,8 +21,8 @@
     "gsc": "node scripts/gsc.mjs"
   },
   "devDependencies": {
-    "oxfmt": "0.76.0",
-    "oxlint": "1.91.0",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
     "oxlint-plugin-react-doctor": "0.9.22",
     "typescript": "7.0.2"
   },
