@@ -109,6 +109,16 @@ test('food quantities drop out at zero; sport cards never go negative', () => {
   expect(state().sportCardCount).toBe(0);
 });
 
+test('one sport card per full hour; a shorter booking drops the extras', () => {
+  selectDuration(180);
+  setSportCardCount(5);
+  expect(state().sportCardCount).toBe(3);
+  selectDuration(90);
+  expect(state().sportCardCount).toBe(1);
+  selectDuration(150);
+  expect(state().sportCardCount).toBe(1);
+});
+
 test('an abandoned wizard on a past date starts over; today or later is kept', () => {
   pickUpToTable();
   resetIfDateStale('2026-10-12');

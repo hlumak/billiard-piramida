@@ -1,6 +1,7 @@
 import { createStore } from '@tanstack/react-store';
 import {
   defaultGameFor,
+  maxSportCardsOnline,
   MIN_BOOKING_MINUTES,
   type ActivityKind,
   type BilliardGame,
@@ -36,7 +37,7 @@ export interface WizardState {
   /** Which cue game the table gets racked for. Null on a dartboard and before
    *  a spot is picked; set to the table's default the moment one is. */
   game: BilliardGame | null;
-  /** Sport cards the players will present, 15 zł off each */
+  /** Sport cards the players will present, 15 zł off each; one per full hour */
   sportCardCount: number;
   /** foodItemId → quantity */
   items: Record<number, number>;
@@ -102,12 +103,23 @@ export function furthestStep(state: WizardState): number {
   return state.reached;
 }
 
+/** A shorter booking takes fewer cards: going back to cut 3 h to 1 h drops the extras. */
+const cardsFor = (sportCardCount: number, durationMinutes: number) =>
+  Math.min(sportCardCount, maxSportCardsOnline(durationMinutes));
+
 /** Picking the same date again keeps every later pick; a new one clears them. */
 export function selectDate(date: IsoDate): void {
   wizardStore.setState(state =>
     state.date === date
       ? state
-      : { ...state, date, startMinute: null, durationMinutes: MIN_BOOKING_MINUTES, ...noSpot }
+      : {
+          ...state,
+          date,
+          startMinute: null,
+          durationMinutes: MIN_BOOKING_MINUTES,
+          sportCardCount: cardsFor(state.sportCardCount, MIN_BOOKING_MINUTES),
+          ...noSpot
+        }
   );
 }
 
@@ -120,7 +132,14 @@ export function selectStart(startMinute: number): void {
 
 export function selectDuration(durationMinutes: number): void {
   wizardStore.setState(state =>
-    state.durationMinutes === durationMinutes ? state : { ...state, durationMinutes, ...noSpot }
+    state.durationMinutes === durationMinutes
+      ? state
+      : {
+          ...state,
+          durationMinutes,
+          sportCardCount: cardsFor(state.sportCardCount, durationMinutes),
+          ...noSpot
+        }
   );
 }
 
@@ -130,6 +149,7 @@ export function selectTime(startMinute: number, durationMinutes: number): void {
     ...state,
     startMinute,
     durationMinutes,
+    sportCardCount: cardsFor(state.sportCardCount, durationMinutes),
     ...noSpot,
     step: 'table',
     direction: 1,
@@ -160,7 +180,10 @@ export function selectGame(game: BilliardGame): void {
 }
 
 export function setSportCardCount(sportCardCount: number): void {
-  wizardStore.setState(state => ({ ...state, sportCardCount: Math.max(0, sportCardCount) }));
+  wizardStore.setState(state => ({
+    ...state,
+    sportCardCount: Math.max(0, cardsFor(sportCardCount, state.durationMinutes))
+  }));
 }
 
 export function setItemQuantity(foodItemId: number, quantity: number): void {

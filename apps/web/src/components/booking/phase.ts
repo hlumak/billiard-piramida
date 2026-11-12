@@ -46,6 +46,7 @@ const BOOKING_ERRORS: Record<string, () => string> = {
   rate_limited: m.err_rate_limited,
   booking_too_far: m.err_booking_too_far,
   too_many_bookings: m.err_too_many_bookings,
+  too_many_sport_cards: m.err_too_many_sport_cards,
   bot_check_failed: m.err_bot_check
 };
 

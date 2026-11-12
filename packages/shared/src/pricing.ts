@@ -73,18 +73,27 @@ export function spotPriceGrosz(spot: SpotRef, durationMinutes: number, rates: Ra
 
 /**
  * Partner sport card (FitProfit / Medicover Sport / MultiSport): a flat amount
- * off the spot rental, once per card per day. Cards stack — every partner on
- * the booking may put their own card in.
+ * off one hour at one spot, once per card per day — "one spot, one hour, one
+ * card". Online that means one card per full hour booked
+ * (`maxSportCardsOnline`); the desk may put in more after checking the cards.
  */
 export const SPORT_CARD_DISCOUNT_GROSZ = 15_00;
 
 /**
- * The policy itself sets no ceiling on cards per booking, but an unbounded
- * integer off a public endpoint is not something to hand to the pricing math —
- * this bounds both the API schema and the UI stepper. Well above any real
- * group size around one table.
+ * Hard bound on cards per booking for the desk, which settles disputes at
+ * reception: an unbounded integer is not something to hand to the pricing
+ * math. Guests booking online get the tighter `maxSportCardsOnline`.
  */
 export const MAX_SPORT_CARDS_PER_BOOKING = 10;
+
+/**
+ * Cards a guest may claim online: one per full hour, so 1 h and 1:30 take one
+ * card, 2 h and 2:30 take two. Guests stacked four cards on one hour and
+ * expected to play free; the club's rule is one card per hour at one spot.
+ */
+export function maxSportCardsOnline(durationMinutes: number): number {
+  return Math.min(Math.max(Math.floor(durationMinutes / 60), 0), MAX_SPORT_CARDS_PER_BOOKING);
+}
 
 /**
  * Never exceeds the spot rental itself: two cards on a 30 zł/h dartboard make

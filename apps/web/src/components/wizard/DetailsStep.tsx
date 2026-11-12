@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { CircleUserRound } from 'lucide-react';
-import { MAX_SPORT_CARDS_PER_BOOKING } from '@repo/shared';
+import { maxSportCardsOnline } from '@repo/shared';
 import { isValidPhone } from '@repo/shared/phone';
 import { m } from '../../paraglide/messages.js';
 import { getLocale } from '../../paraglide/runtime.js';
@@ -203,7 +203,7 @@ export function DetailsStep({ draft }: { draft: BookingDraft }) {
       <SportCardPicker
         className="mt-5 md:mt-6"
         count={sportCardCount}
-        max={MAX_SPORT_CARDS_PER_BOOKING}
+        max={maxSportCardsOnline(draft.durationMinutes)}
         onChange={setSportCardCount}
       />
 

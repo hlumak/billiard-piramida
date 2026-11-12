@@ -13,6 +13,7 @@ import {
   MAX_SPORT_CARDS_PER_BOOKING,
   MAX_SPOT_ID,
   MAX_UPCOMING_BOOKINGS_PER_PHONE,
+  maxSportCardsOnline,
   MIN_BOOKING_MINUTES,
   rentalGrosz,
   resolveBookingGame,
@@ -48,7 +49,8 @@ export const NEW_BOOKING_FIELDS = {
   }),
   customerName: Type.String({ minLength: 1, maxLength: 120 }),
   customerPhone: Type.String({ minLength: 5, maxLength: 25 }),
-  /** Self-declared and open to guests — staff check the cards at reception */
+  /** Self-declared and open to guests — staff check the cards at reception.
+   *  Guests get one per full hour on top of this bound (see createBooking). */
   sportCardCount: Type.Optional(Type.Integer({ minimum: 0, maximum: MAX_SPORT_CARDS_PER_BOOKING })),
   /** Billiard only. Omitted, the spot's first offered game is stored. */
   game: Type.Optional(BILLIARD_GAME)
@@ -197,6 +199,11 @@ export async function createBooking(
   // players at the spot, not to an account. The rate is locked onto the row:
   // a later reprice must not rewrite this receipt.
   const sportCardCount = input.sportCardCount ?? 0;
+  // One card per full hour online; the desk is not held to it, since staff
+  // see the cards and settle it at reception
+  if (policy.kind === 'guest' && sportCardCount > maxSportCardsOnline(durationMinutes)) {
+    return refuse(422, 'too_many_sport_cards');
+  }
   const lockedRateGrosz = hourlyRateGrosz(spot, rates);
   const discountGrosz = discountGroszFor(
     sportCardCount,

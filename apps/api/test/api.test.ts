@@ -736,7 +736,7 @@ test('auth: register, login, profile update', async () => {
   assert.equal(anon.statusCode, 401);
 });
 
-test('discounts: 15 zl per sport card, stacking, capped at the rental', async () => {
+test('discounts: 15 zl per sport card, one per hour online, capped at the rental', async () => {
   // One card on a 2h billiard booking — flat 15 zł off, no account needed
   const oneCard = await app.inject({
     method: 'POST',
@@ -798,10 +798,28 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
   assert.equal(bigDto.discountGrosz, 4 * SPORT_CARD_DISCOUNT_GROSZ);
   assert.equal(bigDto.totalGrosz, 4 * BILLIARD_12FT_HOUR - 4 * SPORT_CARD_DISCOUNT_GROSZ);
 
-  // Policy example: one darts hour with two cards is free, never negative
-  const darts = await app.inject({
+  // Online, one card per full hour: two cards on 1:30 are one too many
+  const stacked = await app.inject({
     method: 'POST',
     url: '/api/bookings',
+    payload: {
+      tableId: DARTBOARD_ID,
+      date: MONDAY,
+      startMinute: 16 * 60,
+      durationMinutes: 90,
+      customerName: 'Darts Pair',
+      customerPhone: '+48 444 000 444',
+      sportCardCount: 2
+    }
+  });
+  assert.equal(stacked.statusCode, 422);
+  assert.equal(stacked.json().error, 'too_many_sport_cards');
+
+  // The desk is not held to it: two cards on one darts hour make it free, never negative
+  const darts = await app.inject({
+    method: 'POST',
+    url: '/api/admin/bookings',
+    headers: { 'x-admin-token': 'test-admin-token' },
     payload: {
       tableId: DARTBOARD_ID,
       date: MONDAY,
@@ -819,17 +837,6 @@ test('discounts: 15 zl per sport card, stacking, capped at the rental', async ()
   assert.equal(dartsDto.tableTotalGrosz, DARTS_HOUR);
   assert.equal(dartsDto.discountGrosz, DARTS_HOUR);
   assert.equal(dartsDto.totalGrosz, 0);
-
-  // Extending uncaps a clipped discount: 2 cards = 30 zł, now under a 45 zł 1:30 rental
-  const extended = await app.inject({
-    method: 'POST',
-    url: `/api/bookings/${dartsDto.id}/extend`,
-    headers: { 'x-booking-token': dartsDto.manageToken },
-    payload: { additionalMinutes: 30 }
-  });
-  assert.equal(extended.statusCode, 200);
-  assert.equal(extended.json().tableTotalGrosz, 1.5 * DARTS_HOUR);
-  assert.equal(extended.json().discountGrosz, 2 * SPORT_CARD_DISCOUNT_GROSZ);
 
   // No cards declared — no discount
   const guest = await app.inject({

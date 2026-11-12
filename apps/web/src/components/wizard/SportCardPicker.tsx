@@ -5,9 +5,10 @@ import { m } from '../../paraglide/messages.js';
 import { PartnerCardLogos } from '../PartnerCardLogos';
 
 /**
- * How many partner sport cards the group will present. Guests can claim them
- * too — the discount belongs to the players at the spot, not to an account, and
- * staff check the physical cards at reception.
+ * How many partner sport cards the group will present: one per full hour
+ * booked (`max`). Guests can claim them too — the discount belongs to the
+ * players at the spot, not to an account, and staff check the physical cards
+ * at reception.
  */
 export function SportCardPicker({
   count,
@@ -60,7 +61,9 @@ export function SportCardPicker({
       </div>
 
       <PartnerCardLogos className="mt-3.5 md:mt-4" />
-      <p className="mt-3.5 text-[13px] leading-normal text-grey-cool">{m.sport_cards_check()}</p>
+      <p className="mt-3.5 text-[13px] leading-normal text-grey-cool">
+        {m.sport_cards_check({ max })}
+      </p>
     </section>
   );
 }

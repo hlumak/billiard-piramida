@@ -5,6 +5,7 @@ import {
   hourlyRateGrosz,
   DEFAULT_HOURLY_RATE_GROSZ,
   MAX_SPORT_CARDS_PER_BOOKING,
+  maxSportCardsOnline,
   rentalGrosz,
   spotPriceGrosz,
   SPORT_CARD_DISCOUNT_GROSZ,
@@ -99,6 +100,15 @@ test('discount never exceeds the spot rental', () => {
   // Three cards on a single 30 PLN darts hour still bottoms out at free.
   assert.equal(discountGroszFor(3, dartsHour), dartsHour);
   assert.equal(discountGroszFor(99, billiardHour), billiardHour);
+});
+
+test('online, one sport card per full hour booked', () => {
+  assert.equal(maxSportCardsOnline(60), 1);
+  assert.equal(maxSportCardsOnline(90), 1);
+  assert.equal(maxSportCardsOnline(120), 2);
+  assert.equal(maxSportCardsOnline(150), 2);
+  assert.equal(maxSportCardsOnline(30), 0);
+  assert.equal(maxSportCardsOnline(24 * 60), MAX_SPORT_CARDS_PER_BOOKING);
 });
 
 test('card count is clamped to the per-booking ceiling', () => {
