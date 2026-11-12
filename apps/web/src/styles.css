@@ -549,12 +549,16 @@ html:has(dialog[open]) {
   overflow: hidden;
 }
 
+/* On `scale`, not `transform`: the chip's press already transitions
+   `transform`, and two animations on one property can't both run on the
+   compositor — Chrome then moved the tick, the press and the colour fade to
+   the main thread, where they stalled behind the render the pick starts. */
 @keyframes chip-pick {
   0% {
-    transform: scale(0.92);
+    scale: 0.92;
   }
   60% {
-    transform: scale(1.05);
+    scale: 1.05;
   }
 }
 
