@@ -294,7 +294,6 @@ function CountryPicker(props: CountrySelectProps) {
     >
       {/* The click lands on the group, as on the real trigger; the button
           inside is the keyboard's way in, and its Enter/Space click bubbles here */}
-      {/* react-doctor-disable-next-line react-doctor/no-noninteractive-element-interactions */}
       <div
         data-slot="autocomplete-trigger"
         role="group"
