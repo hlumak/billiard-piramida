@@ -1,0 +1,12 @@
+{
+  "name": "ninja-testing",
+  "displayName": "JavaScript Ninja — Testing Skills",
+  "version": "0.1.2",
+  "description": "Testing harness distilled from the JavaScript Ninja testing course: an interview-driven generator (/ninja-testing:init) that writes AGENTS.md, CLAUDE.md, path-scoped rules, hooks and a test-reviewer subagent tailored to your repo, plus /ninja-testing:review and /ninja-testing:mode, and eight procedures the agent applies on its own (test-as-spec, test-plan-by-level, mutation-loop, legacy-characterize, integration-boundaries, external-contract, e2e-select, flaky-triage).",
+  "author": {
+    "name": "Illya Klymov",
+    "url": "https://javascript.ninja"
+  },
+  "license": "MIT",
+  "keywords": ["testing", "vitest", "playwright", "stryker", "mutation-testing", "msw", "testcontainers", "tdd", "javascript", "typescript"]
+}

@@ -9,5 +9,5 @@
   "singleQuote": true,
   "tabWidth": 2,
   "trailingComma": "none",
-  "ignorePatterns": [".claude/skills/"]
+  "ignorePatterns": [".claude/skills/", ".claude/plugins/"]
 }

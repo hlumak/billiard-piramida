@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "javascript-ninja": {
+      "source": {
+        "source": "directory",
+        "path": "./.claude/plugins/ninja-testing"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "ninja-testing@javascript-ninja": true
+  }
+}

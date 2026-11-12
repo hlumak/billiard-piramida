@@ -1,0 +1,24 @@
+{
+  "name": "javascript-ninja",
+  "owner": {
+    "name": "Illya Klymov",
+    "url": "https://javascript.ninja"
+  },
+  "plugins": [
+    {
+      "name": "ninja-testing",
+      "source": "./",
+      "description": "Testing harness from the JavaScript Ninja testing course: three commands (init, review, mode), eight agent-side testing procedures, test-reviewer subagent and hooks.",
+      "version": "0.1.2",
+      "category": "testing",
+      "keywords": [
+        "testing",
+        "vitest",
+        "playwright",
+        "stryker",
+        "msw"
+      ]
+    }
+  ],
+  "description": "JavaScript Ninja plugins: ninja-testing — testing harness generator and skills distilled from the JavaScript testing course by Illya Klymov."
+}
