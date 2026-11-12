@@ -44,6 +44,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Let an idle socket close, so the next test starts without one
+  vi.runOnlyPendingTimers();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -69,7 +71,28 @@ test('subscribes on open, then hears each change to its date', () => {
 
   stop();
   expect(socket.sent.at(-1)).toEqual({ type: 'unsubscribe', date: '2026-10-12' });
+  expect(socket.closed).toBe(false); // someone may subscribe again right away
+  vi.advanceTimersByTime(10_000);
   expect(socket.closed).toBe(true); // nothing left to watch
+});
+
+test('switching to another date keeps the same socket', () => {
+  const stopFirst = availabilityLive.subscribe('2026-10-12', () => {});
+  const socket = latest();
+  socket.fire('open');
+  // What a date pick does: the old effect cleans up, the new one subscribes
+  stopFirst();
+  const stopSecond = availabilityLive.subscribe('2026-10-13', () => {});
+  vi.advanceTimersByTime(60_000);
+
+  expect(FakeSocket.instances).toHaveLength(1);
+  expect(socket.closed).toBe(false);
+  expect(socket.sent).toEqual([
+    { type: 'subscribe', date: '2026-10-12' },
+    { type: 'unsubscribe', date: '2026-10-12' },
+    { type: 'subscribe', date: '2026-10-13' }
+  ]);
+  stopSecond();
 });
 
 test('one socket for many listeners; it stays open until the last one leaves', () => {
@@ -78,8 +101,10 @@ test('one socket for many listeners; it stays open until the last one leaves', (
   expect(FakeSocket.instances).toHaveLength(1);
   latest().fire('open');
   stopA();
+  vi.advanceTimersByTime(60_000);
   expect(latest().closed).toBe(false);
   stopB();
+  vi.advanceTimersByTime(10_000);
   expect(latest().closed).toBe(true);
 });
 
@@ -134,7 +159,8 @@ test('a socket refused right after it opens keeps backing off', () => {
 test("a replaced socket's late close does not tear down the live one", () => {
   const stop = availabilityLive.subscribe('2026-10-12', () => {});
   const first = latest();
-  stop(); // idle: closes the first socket (its close event comes later)
+  stop();
+  vi.advanceTimersByTime(10_000); // idle: closes the first socket (its close event comes later)
   const stopAgain = availabilityLive.subscribe('2026-10-13', () => {});
   const second = latest();
   expect(second).not.toBe(first);

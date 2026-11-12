@@ -15,12 +15,17 @@ const MAX_RETRY_MS = 30_000;
 /** Open this long before it drops, and a socket counts as having worked: the
  *  next retry starts from the shortest delay again */
 const STABLE_MS = 10_000;
+/** How long a socket nobody listens to stays open. Picking another date, or
+ *  the next step, unsubscribes one date and subscribes the next within the
+ *  same render: closing at once made every pick a new connection. */
+const IDLE_CLOSE_MS = 10_000;
 
 type Listener = (date: IsoDate) => void;
 
 /**
  * One shared WebSocket for the whole app. Dates are refcounted: the socket
- * subscribes on first listener, unsubscribes on last, and closes when idle.
+ * subscribes on first listener, unsubscribes on last, and closes once it has
+ * had no listeners for a while (IDLE_CLOSE_MS).
  * On a reconnect every watched date fires once — events may have been missed
  * while it was down. The first connect does not: the listeners' own queries
  * have only just fetched.
@@ -32,8 +37,13 @@ class AvailabilityLive {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   /** Set while a dropped socket is being replaced */
   private reconnecting = false;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   subscribe(date: IsoDate, listener: Listener): () => void {
+    if (this.idleTimer !== null) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
     const set = this.listeners.get(date);
     if (set) {
       set.add(listener);
@@ -50,7 +60,12 @@ class AvailabilityLive {
       if (current.size === 0) {
         this.listeners.delete(date);
         this.sendIfOpen({ type: 'unsubscribe', date });
-        if (this.listeners.size === 0) this.disconnect();
+        if (this.listeners.size === 0) {
+          this.idleTimer = setTimeout(() => {
+            this.idleTimer = null;
+            this.disconnect();
+          }, IDLE_CLOSE_MS);
+        }
       }
     };
   }
