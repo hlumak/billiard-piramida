@@ -235,12 +235,15 @@ export function newsArticleJsonLd(article: NewsArticleDto, pageUrl: string): str
   });
 }
 
+/** Reads the club's UTC offset; built once, the time zone never changes. */
+const offsetFormat = new Intl.DateTimeFormat('en-US', {
+  timeZone: VENUE_TIMEZONE,
+  timeZoneName: 'longOffset'
+});
+
 /** Warsaw's UTC offset on a date, as "+01:00" / "+02:00". */
 function warsawOffset(isoDate: IsoDate): string {
-  const name = new Intl.DateTimeFormat('en-US', {
-    timeZone: VENUE_TIMEZONE,
-    timeZoneName: 'longOffset'
-  })
+  const name = offsetFormat
     .formatToParts(new Date(`${isoDate}T12:00:00Z`))
     .find(part => part.type === 'timeZoneName')?.value;
   // "GMT+01:00"; a bare "GMT" would mean UTC itself
