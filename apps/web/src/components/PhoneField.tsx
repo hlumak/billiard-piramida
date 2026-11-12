@@ -1,4 +1,13 @@
-import { useDeferredValue, useId, useMemo, useState, type ClipboardEvent } from 'react';
+import {
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent
+} from 'react';
 import {
   Autocomplete,
   Collection,
@@ -105,7 +114,7 @@ function CountryRow({ item }: { item: CountryItem }) {
  * rendered. Rendering all 245 rows and their flags on every open and every
  * keystroke made the picker visibly slow — 150–450 ms to open on a desktop.
  */
-function CountryPicker({ value, onChange, options, disabled, readOnly }: CountrySelectProps) {
+function LiveCountryPicker({ value, onChange, options, disabled, readOnly }: CountrySelectProps) {
   const { contains } = useFilter({ sensitivity: 'base' });
   const [query, setQuery] = useState('');
   // The search box shows each letter at once; the list follows a beat later,
@@ -232,6 +241,110 @@ function CountryPicker({ value, onChange, options, disabled, readOnly }: Country
         </Autocomplete.Filter>
       </Autocomplete.Popover>
     </Autocomplete>
+  );
+}
+
+/** HeroUI's own chevron, so the stand-in can't be told apart from the picker */
+const CHEVRON_PATH =
+  'M2.97 5.47a.75.75 0 0 1 1.06 0L8 9.44l3.97-3.97a.75.75 0 1 1 1.06 1.06l-4.5 4.5a.75.75 0 0 1-1.06 0l-4.5-4.5a.75.75 0 0 1 0-1.06';
+
+/**
+ * The picker arrives a moment after the page: React Aria builds the whole
+ * country collection when it mounts, plus a hidden <select> of all 246
+ * countries for autofill — about half of the work of opening a page with a
+ * phone field, all inside the click that opened it. Until then (a frame or
+ * two after the page paints, as an interruptible transition) the same markup
+ * with HeroUI's classes stands in, so nothing moves when the real one takes
+ * its place. The server HTML carries the stand-in too.
+ */
+function CountryPicker(props: CountrySelectProps) {
+  const [live, setLive] = useState(false);
+  // Whether the stand-in was pressed (or only focused) before the picker came
+  const [pressed, setPressed] = useState(false);
+  // The phone field the stand-in was used in, to find the real trigger after
+  const usedIn = useRef<Element | null>(null);
+
+  useEffect(() => {
+    startTransition(() => setLive(true));
+  }, []);
+
+  // Pass on what happened to the stand-in: a press opens the list (a click on
+  // React Aria's button is a press), focus moves to the real trigger
+  useEffect(() => {
+    if (!live || usedIn.current === null) return;
+    const trigger = usedIn.current.querySelector<HTMLElement>('.PhoneInputCountry button');
+    usedIn.current = null;
+    if (!pressed) {
+      trigger?.focus();
+      return;
+    }
+    // After the click that got here has finished: still in flight, it reached
+    // the document as a click outside the list it had just opened, and shut it
+    const timer = setTimeout(() => trigger?.click());
+    return () => clearTimeout(timer);
+  }, [live, pressed]);
+
+  if (live) return <LiveCountryPicker {...props} />;
+
+  const { value, disabled, readOnly } = props;
+  return (
+    <div
+      data-slot="autocomplete"
+      className="autocomplete autocomplete--primary PhoneInputCountry justify-center"
+    >
+      {/* The click lands on the group, as on the real trigger; the button
+          inside is the keyboard's way in, and its Enter/Space click bubbles here */}
+      {/* react-doctor-disable-next-line react-doctor/no-noninteractive-element-interactions */}
+      <div
+        data-slot="autocomplete-trigger"
+        role="group"
+        onClick={event => {
+          if (disabled === true || readOnly === true) return;
+          usedIn.current = event.currentTarget.closest('.PhoneInput');
+          setPressed(true);
+          setLive(true);
+        }}
+        className="autocomplete__trigger h-auto min-h-0 gap-1.5 rounded-md border-0 bg-transparent py-0 ps-0 pe-5 shadow-none hover:bg-transparent"
+      >
+        <span
+          data-slot="autocomplete-value"
+          className="autocomplete__value flex items-center gap-1.5"
+        >
+          {value ? (
+            <>
+              <Flag country={value} />
+              <span className="PhoneInputCountryCode">+{getCountryCallingCode(value)}</span>
+            </>
+          ) : null}
+        </span>
+        <button
+          type="button"
+          aria-label={m.phone_country_label()}
+          aria-haspopup="listbox"
+          aria-expanded={false}
+          disabled={disabled === true || readOnly === true}
+          onFocus={event => {
+            usedIn.current = event.currentTarget.closest('.PhoneInput');
+          }}
+          onBlur={() => {
+            usedIn.current = null;
+          }}
+          className="react-aria-Button"
+        >
+          <svg
+            aria-hidden="true"
+            fill="none"
+            viewBox="0 0 16 16"
+            width="16"
+            height="16"
+            data-slot="autocomplete-default-indicator"
+            className="autocomplete__indicator end-0 size-3.5 text-grey-cool"
+          >
+            <path clipRule="evenodd" d={CHEVRON_PATH} fill="currentColor" fillRule="evenodd" />
+          </svg>
+        </button>
+      </div>
+    </div>
   );
 }
 
