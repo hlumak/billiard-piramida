@@ -107,9 +107,20 @@ function MyBookingsList({
   retry
 }: Omit<ReturnType<typeof useMyBookings>, 'signedIn'>) {
   if (isLoading) {
+    // As tall as the "no bookings" card that follows for most visitors (the
+    // same text and button, invisible, with the card's border), so its
+    // arrival doesn't push the lookup form down: loading lasts until
+    // hydration, seconds on a slow phone, and the 44px jump was the page's
+    // whole layout shift
     return (
-      <div className="flex justify-center py-16">
-        <Spinner aria-label={m.loading()} />
+      <div className="relative flex flex-col items-center gap-5 border border-transparent px-6 py-12 text-center">
+        <div aria-hidden className="invisible flex flex-col items-center gap-5">
+          <p className="text-lg">{m.no_bookings()}</p>
+          <span className="h-12.5" />
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Spinner aria-label={m.loading()} />
+        </div>
       </div>
     );
   }
