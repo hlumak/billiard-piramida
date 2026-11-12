@@ -112,77 +112,82 @@ export function AuthForms({ onSignedIn }: { onSignedIn: () => void }) {
         tabClassName="segment h-11 text-[15px]"
       />
 
-      <form
+      {/* The panel is its own element: a <form> may not take the tabpanel role */}
+      <div
         id={tabPanelId(idBase)}
         role="tabpanel"
         aria-labelledby={tabId(idBase, tab)}
-        className="fields-roomy mt-6 flex flex-col gap-4.5"
-        onSubmit={event => {
-          event.preventDefault();
-          event.stopPropagation();
-          if (once.claim()) submit.mutate();
-        }}
+        className="mt-6"
       >
-        {tab === 'register' ? (
-          <TextField name="name" value={name} onChange={setName} isRequired>
-            <Label>{m.name_full_label()}</Label>
-            <Input placeholder={m.name_full_placeholder()} autoComplete="name" />
-          </TextField>
-        ) : null}
-
-        <PhoneField
-          name="phone"
-          value={phone}
-          onChange={value => {
-            setPhone(value);
-            submit.reset();
+        <form
+          className="fields-roomy flex flex-col gap-4.5"
+          onSubmit={event => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (once.claim()) submit.mutate();
           }}
-          isRequired
-          isInvalid={phoneError !== null}
-          errorMessage={phoneError ?? undefined}
-        />
-
-        <TextField
-          name="password"
-          type="password"
-          value={password}
-          onChange={value => {
-            setPassword(value);
-            submit.reset();
-          }}
-          isRequired
-          isInvalid={errorText !== null}
-          minLength={8}
         >
-          <Label>{m.auth_password()}</Label>
-          <Input autoComplete={tab === 'login' ? 'current-password' : 'new-password'} />
-          {errorText !== null ? (
-            <FieldError>{errorText}</FieldError>
-          ) : tab === 'register' ? (
-            <p className="text-xs text-grey-cool">{m.auth_password_hint()}</p>
+          {tab === 'register' ? (
+            <TextField name="name" value={name} onChange={setName} isRequired>
+              <Label>{m.name_full_label()}</Label>
+              <Input placeholder={m.name_full_placeholder()} autoComplete="name" />
+            </TextField>
           ) : null}
-        </TextField>
 
-        {tab === 'register' ? <CardFields value={cards} onChange={setCards} /> : null}
-        {tab === 'register' ? <BotCheckWidget check={botCheck} /> : null}
+          <PhoneField
+            name="phone"
+            value={phone}
+            onChange={value => {
+              setPhone(value);
+              submit.reset();
+            }}
+            isRequired
+            isInvalid={phoneError !== null}
+            errorMessage={phoneError ?? undefined}
+          />
 
-        <button
-          type="submit"
-          disabled={missing !== null}
-          // Not disabled while signing in: that would drop keyboard focus
-          aria-disabled={submit.isPending || undefined}
-          aria-busy={submit.isPending}
-          className="btn-gold mt-1.5 h-14 w-full text-base"
-        >
-          {submit.isPending ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : null}
-          {tab === 'login' ? m.auth_tab_login() : m.auth_register_btn()}
-        </button>
-        {missing ? (
-          <p role="status" className="-mt-2 text-center text-sm text-grey-cool">
-            {missing}
-          </p>
-        ) : null}
-      </form>
+          <TextField
+            name="password"
+            type="password"
+            value={password}
+            onChange={value => {
+              setPassword(value);
+              submit.reset();
+            }}
+            isRequired
+            isInvalid={errorText !== null}
+            minLength={8}
+          >
+            <Label>{m.auth_password()}</Label>
+            <Input autoComplete={tab === 'login' ? 'current-password' : 'new-password'} />
+            {errorText !== null ? (
+              <FieldError>{errorText}</FieldError>
+            ) : tab === 'register' ? (
+              <p className="text-xs text-grey-cool">{m.auth_password_hint()}</p>
+            ) : null}
+          </TextField>
+
+          {tab === 'register' ? <CardFields value={cards} onChange={setCards} /> : null}
+          {tab === 'register' ? <BotCheckWidget check={botCheck} /> : null}
+
+          <button
+            type="submit"
+            disabled={missing !== null}
+            // Not disabled while signing in: that would drop keyboard focus
+            aria-disabled={submit.isPending || undefined}
+            aria-busy={submit.isPending}
+            className="btn-gold mt-1.5 h-14 w-full text-base"
+          >
+            {submit.isPending ? <LoaderCircle aria-hidden className="size-5 animate-spin" /> : null}
+            {tab === 'login' ? m.auth_tab_login() : m.auth_register_btn()}
+          </button>
+          {missing ? (
+            <p role="status" className="-mt-2 text-center text-sm text-grey-cool">
+              {missing}
+            </p>
+          ) : null}
+        </form>
+      </div>
     </div>
   );
 }
