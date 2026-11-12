@@ -164,6 +164,11 @@ function BookingWizard() {
   // users land at its start and hear what it asks (not on <body>). While a
   // step is still loading (lazy chunk, availability) the panel holds focus and
   // hands it to the heading once that renders. Not on the first render.
+  //
+  // Only once the new step has painted: React runs this effect inside the
+  // click that changed the step, and focus() there made the browser lay out
+  // the whole new step on the spot — the click's task grew by a third and the
+  // slide-in started that much later.
   const panelRef = useRef<HTMLDivElement>(null);
   const shownStep = useRef(step);
   useEffect(() => {
@@ -177,16 +182,27 @@ function BookingWizard() {
       heading.focus();
       return true;
     };
-    if (focusHeading()) return;
-    panel.tabIndex = -1;
-    panel.focus();
-    const observer = new MutationObserver(() => {
-      // Only while focus is still parked on the panel: never pull it away
-      // from something the guest has moved to meanwhile
-      if (document.activeElement !== panel || focusHeading()) observer.disconnect();
+    let observer: MutationObserver | undefined;
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        // The guest already moved on (a click on the new step): leave it be
+        const active = document.activeElement;
+        if (active !== null && active !== document.body && panel.contains(active)) return;
+        if (focusHeading()) return;
+        panel.tabIndex = -1;
+        panel.focus();
+        observer = new MutationObserver(() => {
+          // Only while focus is still parked on the panel: never pull it away
+          // from something the guest has moved to meanwhile
+          if (document.activeElement !== panel || focusHeading()) observer?.disconnect();
+        });
+        observer.observe(panel, { childList: true, subtree: true });
+      });
     });
-    observer.observe(panel, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
   }, [step]);
 
   return (
