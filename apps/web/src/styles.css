@@ -739,24 +739,34 @@ html:has(dialog[open]) {
 }
 
 /* Header section links: a gold underline grows in on hover and stays on the
-   page you are on (TanStack marks the active link with data-status) */
+   page you are on (TanStack marks the active link with data-status). The line
+   is a pseudo-element scaled with transform, so the compositor draws it: it
+   used to grow by background-size, which repaints on the main thread and froze
+   for the frames the next page took to render — right as it was switching. */
 .nav-link {
+  position: relative;
   padding-block: 6px;
   color: var(--color-creme);
-  background-image: linear-gradient(var(--color-golden), var(--color-golden));
-  background-position: 0 100%;
-  background-repeat: no-repeat;
-  background-size: 0 2px;
-  transition:
-    background-size 250ms cubic-bezier(0.2, 0, 0, 1),
-    color 150ms;
+  transition: color 150ms;
 }
 
-.nav-link:hover {
-  background-size: 100% 2px;
+.nav-link::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2px;
+  background-color: var(--color-golden);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 250ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.nav-link:hover::after,
+.nav-link[data-status='active']::after {
+  transform: scaleX(1);
 }
 
 .nav-link[data-status='active'] {
   color: var(--color-golden);
-  background-size: 100% 2px;
 }
