@@ -7,8 +7,7 @@ Monorepo for the booking site of a billiard club in Poland: nine billiard tables
 ## Business rules
 
 - Bookable spots, hourly rates and opening hours are staff-editable (admin →
-  settings); the seed starts at 50 zł/h (9ft), 70 zł/h (12ft), 30 zł/h (darts) and
-  Mon–Thu 16:00–21:00 · Fri 16:00–23:00 · Sat–Sun 15:00–23:00 (Europe/Warsaw)
+  settings); times are Europe/Warsaw
 - Bookings are 1–8 hours, up to 14 days ahead; a phone number may hold 3 upcoming
   bookings at a time
 - Each booking is managed with a secret returned when it is made (kept by the
@@ -26,7 +25,7 @@ Monorepo for the booking site of a billiard club in Poland: nine billiard tables
   Paraglide JS for i18n (pl default · uk · en; locale = cookie → browser language → pl)
 - **Shared** (`packages/shared`): business rules (hours, pricing, venue) and DTO types
 
-Node 26.12.1 (`.node-version` pins the major, v26), pnpm 12.14.0 (`packageManager`).
+Node 26.13.1 (`.node-version` pins the major, v26), pnpm 12.18.0 (`packageManager`).
 
 Installing pnpm on a dev machine: pnpm's standalone installer, pinned to the
 project's version (without `PNPM_VERSION` it installs the latest):
