@@ -1,13 +1,29 @@
 {
+  "enabledPlugins": {
+    "ninja-testing@javascript-ninja": true,
+    "modern-web-guidance@googlechrome": true,
+    "chrome-devtools-mcp@chrome-devtools-plugins": true
+  },
   "extraKnownMarketplaces": {
     "javascript-ninja": {
       "source": {
         "source": "directory",
         "path": "./.claude/plugins/ninja-testing"
       }
+    },
+    "googlechrome": {
+      "source": {
+        "source": "github",
+        "repo": "GoogleChrome/modern-web-guidance",
+        "ref": "v1.0.0"
+      }
+    },
+    "chrome-devtools-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "ChromeDevTools/chrome-devtools-mcp",
+        "ref": "chrome-devtools-mcp-v1.13.0"
+      }
     }
-  },
-  "enabledPlugins": {
-    "ninja-testing@javascript-ninja": true
   }
 }
