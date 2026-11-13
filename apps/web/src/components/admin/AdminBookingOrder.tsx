@@ -15,10 +15,51 @@ import { QueryError } from '../QueryError';
  * The food tab, staff side. Guests can only ever add to their order; the desk
  * also has to fix a quantity someone misheard over the phone and strike a line
  * that never left the kitchen, which is what the two extra controls here are.
+ *
+ * Every confirmed row of the bookings list has one, up to 200 at a time, so
+ * the row carries only a plain button: the dialog with its menu query and
+ * three mutations is built on the first open (and kept, for its closing
+ * animation). Built up front on every row they were most of the half second
+ * the bookings pane took to open on a slow laptop.
  */
 export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
-  const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
+  const [built, setBuilt] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        // Starts with the visible word, so voice control ("click Bar") still works
+        aria-label={`${m.admin_order_btn()}: ${m.admin_bar_tip()}`}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        onClick={() => {
+          setBuilt(true);
+          setOpen(true);
+        }}
+        // HeroUI's outline button, drawn without it: its press, hover and focus
+        // hooks on every row cost more than the rest of the row together
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] border-[1.5px] border-golden/70 bg-transparent px-3 text-[13px] font-bold whitespace-nowrap text-golden-light transition-[transform,background-color,box-shadow] duration-100 outline-none hover:bg-golden/10 focus-visible:ring-2 focus-visible:ring-golden focus-visible:ring-offset-2 focus-visible:ring-offset-club-green active:scale-[0.97]"
+      >
+        {/* -2px sides, as HeroUI's button set its icons */}
+        <Coffee aria-hidden className="-mx-0.5 size-3.5 flex-none" strokeWidth={2.2} />
+        {m.admin_order_btn()}
+      </button>
+      {built ? <OrderDialog booking={booking} isOpen={isOpen} onOpenChange={setOpen} /> : null}
+    </>
+  );
+}
+
+function OrderDialog({
+  booking,
+  isOpen,
+  onOpenChange
+}: {
+  booking: BookingDto;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const {
     data: menu,
@@ -66,125 +107,114 @@ export function AdminBookingOrder({ booking }: { booking: BookingDto }) {
   const failed = addItems.isError || setQuantity.isError || removeItem.isError;
 
   return (
-    <Modal isOpen={isOpen} onOpenChange={setOpen}>
-      <Button
-        variant="outline"
-        // Starts with the visible word, so voice control ("click Bar") still works
-        aria-label={`${m.admin_order_btn()}: ${m.admin_bar_tip()}`}
-        className="h-9 gap-1.5 rounded-[10px] border-[1.5px] border-golden/70 bg-transparent px-3 text-[13px] font-bold text-golden-light hover:bg-golden/10"
-        onPress={() => setOpen(true)}
-      >
-        <Coffee aria-hidden className="size-3.5" strokeWidth={2.2} />
-        {m.admin_order_btn()}
-      </Button>
-      <Modal.Backdrop>
-        <Modal.Container scroll="inside">
-          <Modal.Dialog className="sm:max-w-lg">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>{m.admin_order_title()}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body>
-              <div className="flex flex-col gap-4">
-                {booking.items.length === 0 ? (
-                  <p className="text-sm text-grey-cool">{m.admin_order_empty()}</p>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {booking.items.map(item => (
-                      <li
-                        key={item.id}
-                        className="flex flex-wrap items-center gap-2 rounded-[10px] bg-club-green p-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-creme">
-                            {nameBySlug.get(item.slug) ?? item.slug}
-                          </p>
-                          {/* The locked unit price, not today's menu price */}
-                          <p className="text-xs text-grey-cool">
-                            {formatPln(item.unitPriceGrosz, intlTag())} ×{item.quantity} ={' '}
-                            {formatPln(item.unitPriceGrosz * item.quantity, intlTag())}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label="−"
-                            isDisabled={busy || item.quantity <= 1}
-                            onPress={() =>
-                              setQuantity.mutate({ itemId: item.id, quantity: item.quantity - 1 })
-                            }
-                          >
-                            −
-                          </Button>
-                          <span className="min-w-6 text-center text-sm text-creme">
-                            {item.quantity}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            aria-label="+"
-                            isDisabled={busy || item.quantity >= MAX_ORDER_ITEM_QUANTITY}
-                            onPress={() =>
-                              setQuantity.mutate({ itemId: item.id, quantity: item.quantity + 1 })
-                            }
-                          >
-                            +
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="danger-soft"
-                            isDisabled={busy}
-                            onPress={() => removeItem.mutate(item.id)}
-                          >
-                            {m.btn_remove()}
-                          </Button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+    // Controlled on the backdrop, as in ConfirmAction: the trigger is a plain button
+    <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container scroll="inside">
+        <Modal.Dialog className="sm:max-w-lg">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Heading>{m.admin_order_title()}</Modal.Heading>
+          </Modal.Header>
+          <Modal.Body>
+            <div className="flex flex-col gap-4">
+              {booking.items.length === 0 ? (
+                <p className="text-sm text-grey-cool">{m.admin_order_empty()}</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {booking.items.map(item => (
+                    <li
+                      key={item.id}
+                      className="flex flex-wrap items-center gap-2 rounded-[10px] bg-club-green p-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-creme">
+                          {nameBySlug.get(item.slug) ?? item.slug}
+                        </p>
+                        {/* The locked unit price, not today's menu price */}
+                        <p className="text-xs text-grey-cool">
+                          {formatPln(item.unitPriceGrosz, intlTag())} ×{item.quantity} ={' '}
+                          {formatPln(item.unitPriceGrosz * item.quantity, intlTag())}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label="−"
+                          isDisabled={busy || item.quantity <= 1}
+                          onPress={() =>
+                            setQuantity.mutate({ itemId: item.id, quantity: item.quantity - 1 })
+                          }
+                        >
+                          −
+                        </Button>
+                        <span className="min-w-6 text-center text-sm text-creme">
+                          {item.quantity}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          aria-label="+"
+                          isDisabled={busy || item.quantity >= MAX_ORDER_ITEM_QUANTITY}
+                          onPress={() =>
+                            setQuantity.mutate({ itemId: item.id, quantity: item.quantity + 1 })
+                          }
+                        >
+                          +
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger-soft"
+                          isDisabled={busy}
+                          onPress={() => removeItem.mutate(item.id)}
+                        >
+                          {m.btn_remove()}
+                        </Button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-                <div className="flex justify-between border-t border-deep-cream/20 pt-3 font-bold text-golden-light">
-                  <span>{m.total()}</span>
-                  <span>{formatPln(booking.totalGrosz, intlTag())}</span>
-                </div>
-
-                <p className="text-sm font-semibold text-golden-light">{m.admin_order_add()}</p>
-                {isError && !menu ? (
-                  <QueryError error={error} onRetry={() => refetch()} />
-                ) : !menu ? (
-                  <div className="flex justify-center py-6">
-                    <Spinner aria-label={m.loading()} />
-                  </div>
-                ) : (
-                  <MenuPicker
-                    items={menu}
-                    quantities={quantities}
-                    onQuantityChange={(foodItemId, quantity) =>
-                      setQuantities(current => ({ ...current, [foodItemId]: quantity }))
-                    }
-                  />
-                )}
-
-                {failed ? (
-                  <p className="text-sm text-danger-soft-foreground">{m.err_generic()}</p>
-                ) : null}
+              <div className="flex justify-between border-t border-deep-cream/20 pt-3 font-bold text-golden-light">
+                <span>{m.total()}</span>
+                <span>{formatPln(booking.totalGrosz, intlTag())}</span>
               </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button
-                className="w-full font-bold"
-                isDisabled={pending === 0}
-                isPending={addItems.isPending}
-                onPress={() => addItems.mutate()}
-              >
-                {m.btn_add()} · {formatPln(pending, intlTag())}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
-    </Modal>
+
+              <p className="text-sm font-semibold text-golden-light">{m.admin_order_add()}</p>
+              {isError && !menu ? (
+                <QueryError error={error} onRetry={() => refetch()} />
+              ) : !menu ? (
+                <div className="flex justify-center py-6">
+                  <Spinner aria-label={m.loading()} />
+                </div>
+              ) : (
+                <MenuPicker
+                  items={menu}
+                  quantities={quantities}
+                  onQuantityChange={(foodItemId, quantity) =>
+                    setQuantities(current => ({ ...current, [foodItemId]: quantity }))
+                  }
+                />
+              )}
+
+              {failed ? (
+                <p className="text-sm text-danger-soft-foreground">{m.err_generic()}</p>
+              ) : null}
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              className="w-full font-bold"
+              isDisabled={pending === 0}
+              isPending={addItems.isPending}
+              onPress={() => addItems.mutate()}
+            >
+              {m.btn_add()} · {formatPln(pending, intlTag())}
+            </Button>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }

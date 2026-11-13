@@ -30,42 +30,50 @@ export function ConfirmAction({
   children
 }: ConfirmActionProps) {
   const [isOpen, setOpen] = useState(false);
+  // Built on the first open and kept (for the closing animation): a list row
+  // per booking or dish each mounted a closed modal it might never show
+  const [built, setBuilt] = useState(false);
   return (
     <>
-      {children(() => setOpen(true))}
+      {children(() => {
+        setBuilt(true);
+        setOpen(true);
+      })}
       {/* Controlled on the backdrop, not through Modal (React Aria's
           DialogTrigger): the row buttons that open it are plain <button>s,
           which DialogTrigger does not count as its trigger and warns about */}
-      <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-100">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>{title}</Modal.Heading>
-            </Modal.Header>
-            {text ? (
-              <Modal.Body>
-                <p className="text-cream-soft">{text}</p>
-              </Modal.Body>
-            ) : null}
-            <Modal.Footer>
-              <Button variant="ghost" slot="close">
-                {m.btn_back()}
-              </Button>
-              <Button
-                variant={tone}
-                className={tone === 'primary' ? 'btn-gold' : ''}
-                onPress={() => {
-                  setOpen(false);
-                  onConfirm();
-                }}
-              >
-                {confirmLabel}
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
+      {built ? (
+        <Modal.Backdrop isOpen={isOpen} onOpenChange={setOpen}>
+          <Modal.Container>
+            <Modal.Dialog className="sm:max-w-100">
+              <Modal.CloseTrigger />
+              <Modal.Header>
+                <Modal.Heading>{title}</Modal.Heading>
+              </Modal.Header>
+              {text ? (
+                <Modal.Body>
+                  <p className="text-cream-soft">{text}</p>
+                </Modal.Body>
+              ) : null}
+              <Modal.Footer>
+                <Button variant="ghost" slot="close">
+                  {m.btn_back()}
+                </Button>
+                <Button
+                  variant={tone}
+                  className={tone === 'primary' ? 'btn-gold' : ''}
+                  onPress={() => {
+                    setOpen(false);
+                    onConfirm();
+                  }}
+                >
+                  {confirmLabel}
+                </Button>
+              </Modal.Footer>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      ) : null}
     </>
   );
 }
