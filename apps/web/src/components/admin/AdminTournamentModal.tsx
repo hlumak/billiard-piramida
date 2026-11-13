@@ -1,24 +1,54 @@
 import { useState } from 'react';
 import { Button, Input, Label, Modal, TextField } from '@heroui/react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { SUPPORTED_LOCALES, TOURNAMENT_STATUSES, type AdminTournamentDto } from '@repo/shared';
-import { adminApi } from '../../lib/admin-api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  SUPPORTED_LOCALES,
+  TOURNAMENT_STATUSES,
+  tournamentHoldsTables,
+  type AdminTournamentDto
+} from '@repo/shared';
+import { adminApi, adminClosureConflictsQuery, type ClosureInput } from '../../lib/admin-api';
 import { ApiError } from '../../lib/api';
+import { tablesQuery } from '../../lib/queries';
 import { adminStatusLabel } from '../../lib/tournaments';
+import { ClosureConflicts, SpotToggles } from './AdminClosures';
 import { isDraftChanged } from './draft';
 import {
   checkTournamentDraft,
+  draftClosureRange,
   tournamentDraftFrom,
   tournamentErrorText,
   type TournamentDraft
 } from './tournament-draft';
 import { m } from '../../paraglide/messages.js';
 
-/** Create (item === null) or edit a tournament: schedule, roster limits, copy. */
-export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null }) {
+/** Stands in for the conflicts query's input while there is nothing to ask about. */
+const NO_CLOSURE: ClosureInput = {
+  startDate: '2000-01-01',
+  startHour: 0,
+  endDate: '2000-01-01',
+  endHour: 1,
+  tableIds: [],
+  reason: null
+};
+
+/**
+ * Create (item === null) or edit a tournament: schedule, the tables it holds,
+ * roster limits, copy. While its tables and hours are filled in it lists the
+ * bookings in their way, as the closure form does; the API closes the tables
+ * itself on save, and refuses while those bookings stand.
+ */
+export function AdminTournamentModal({
+  item,
+  onShowBooking
+}: {
+  item: AdminTournamentDto | null;
+  onShowBooking: (phone: string) => void;
+}) {
   const queryClient = useQueryClient();
   const [isOpen, setOpen] = useState(false);
   const [draft, setDraft] = useState<TournamentDraft>(() => tournamentDraftFrom(item));
+  const { data: spots = [] } = useQuery({ ...tablesQuery(), enabled: isOpen });
 
   const isChanged = isOpen && isDraftChanged(draft, tournamentDraftFrom(item));
 
@@ -28,6 +58,19 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
   };
 
   const check = checkTournamentDraft(draft);
+
+  // The closure the tables would get, as the form now stands
+  const range = draftClosureRange(draft);
+  const holds = tournamentHoldsTables(draft.status);
+  const closure: ClosureInput | null =
+    range !== null && holds && draft.tableIds.length > 0
+      ? { ...range, tableIds: draft.tableIds, reason: null }
+      : null;
+  const conflicts = useQuery({
+    ...adminClosureConflictsQuery(closure ?? NO_CLOSURE),
+    enabled: isOpen && closure !== null
+  });
+  const blocking = closure !== null ? (conflicts.data ?? []) : [];
 
   const save = useMutation({
     mutationFn: () => {
@@ -41,9 +84,23 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
       queryClient.invalidateQueries({ queryKey: ['admin', 'tournaments'] });
       queryClient.invalidateQueries({ queryKey: ['tournaments'] });
       queryClient.invalidateQueries({ queryKey: ['tournament'] });
+      // The tables it holds: the schedule's hatching and guests' slot grids
+      queryClient.invalidateQueries({ queryKey: ['admin', 'closures'] });
+      queryClient.invalidateQueries({ queryKey: ['availability'] });
       setOpen(false);
+    },
+    onError: error => {
+      // A booking came in on its tables while the form was open: show it
+      if (error instanceof ApiError && error.code === 'closure_conflicts') {
+        void conflicts.refetch();
+      }
     }
   });
+
+  const showBooking = (phone: string) => {
+    setOpen(false);
+    onShowBooking(phone);
+  };
 
   const rejected = save.error instanceof ApiError ? save.error.code : null;
   const errorText = tournamentErrorText(check.ok ? null : check.problem, rejected, save.isError);
@@ -101,14 +158,6 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
                     <Input type="date" />
                   </TextField>
                   <TextField
-                    name="startHour"
-                    value={draft.startHour}
-                    onChange={value => setDraft({ ...draft, startHour: value })}
-                  >
-                    <Label>{m.admin_tournament_start_hour()}</Label>
-                    <Input inputMode="numeric" placeholder="18" />
-                  </TextField>
-                  <TextField
                     name="registrationDeadline"
                     value={draft.registrationDeadline}
                     onChange={value => setDraft({ ...draft, registrationDeadline: value })}
@@ -117,12 +166,20 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
                     <Input type="date" />
                   </TextField>
                   <TextField
-                    name="entryFee"
-                    value={draft.entryFee}
-                    onChange={value => setDraft({ ...draft, entryFee: value })}
+                    name="startHour"
+                    value={draft.startHour}
+                    onChange={value => setDraft({ ...draft, startHour: value })}
                   >
-                    <Label>{m.admin_tournament_fee()}</Label>
-                    <Input inputMode="decimal" placeholder="50" />
+                    <Label>{m.admin_tournament_start_hour()}</Label>
+                    <Input inputMode="numeric" placeholder="18" />
+                  </TextField>
+                  <TextField
+                    name="endHour"
+                    value={draft.endHour}
+                    onChange={value => setDraft({ ...draft, endHour: value })}
+                  >
+                    <Label>{m.admin_tournament_end_hour()}</Label>
+                    <Input inputMode="numeric" placeholder="23" />
                   </TextField>
                   <TextField
                     name="minPlayers"
@@ -140,7 +197,51 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
                     <Label>{m.admin_tournament_max_players()}</Label>
                     <Input inputMode="numeric" placeholder="16" />
                   </TextField>
+                  <TextField
+                    name="entryFee"
+                    value={draft.entryFee}
+                    onChange={value => setDraft({ ...draft, entryFee: value })}
+                  >
+                    <Label>{m.admin_tournament_fee()}</Label>
+                    <Input inputMode="decimal" placeholder="50" />
+                  </TextField>
                 </div>
+
+                <fieldset>
+                  <legend className="text-sm font-medium text-creme">
+                    {m.admin_tournament_tables()}
+                  </legend>
+                  <p className="mt-0.5 text-[13px] text-grey-cool">
+                    {m.admin_tournament_tables_hint()}
+                  </p>
+                  <SpotToggles
+                    label={m.admin_tournament_tables()}
+                    tableIds={draft.tableIds}
+                    spots={spots}
+                    onChange={tableIds => setDraft({ ...draft, tableIds })}
+                  />
+                  {draft.tableIds.length === 0 ? null : !holds ? (
+                    <p className="mt-3 text-[13px] text-grey-cool">
+                      {m.admin_tournament_tables_inactive()}
+                    </p>
+                  ) : range === null ? (
+                    <p className="mt-3 text-[13px] text-grey-cool">
+                      {m.admin_tournament_tables_need_time()}
+                    </p>
+                  ) : (
+                    <div className="mt-3">
+                      <ClosureConflicts
+                        conflicts={conflicts}
+                        blocking={blocking}
+                        complete
+                        spots={spots}
+                        startDate={range.startDate}
+                        endDate={range.endDate}
+                        onShowBooking={showBooking}
+                      />
+                    </div>
+                  )}
+                </fieldset>
 
                 <TextField
                   name="imageUrl"
@@ -210,7 +311,9 @@ export function AdminTournamentModal({ item }: { item: AdminTournamentDto | null
             <Modal.Footer>
               <Button
                 className="w-full font-bold"
-                isDisabled={!check.ok}
+                isDisabled={
+                  !check.ok || blocking.length > 0 || (closure !== null && conflicts.isFetching)
+                }
                 isPending={save.isPending}
                 onPress={() => save.mutate()}
               >

@@ -213,6 +213,48 @@ const segment = (active: boolean) =>
     active ? 'bg-golden text-btn-text' : 'text-creme hover:bg-creme/8'
   }`;
 
+/** The venue's spots as toggles; the ticked ones are kept ascending. */
+export function SpotToggles({
+  label,
+  tableIds,
+  spots,
+  onChange
+}: {
+  label: string;
+  tableIds: number[];
+  spots: TableDto[];
+  onChange: (tableIds: number[]) => void;
+}) {
+  const toggleSpot = (id: number) =>
+    onChange(
+      tableIds.includes(id)
+        ? tableIds.filter(t => t !== id)
+        : [...tableIds, id].sort((a, b) => a - b)
+    );
+  return (
+    <div role="group" aria-label={label} className="mt-3 flex flex-wrap gap-2">
+      {spots.map(spot => {
+        const on = tableIds.includes(spot.id);
+        return (
+          <button
+            key={spot.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => toggleSpot(spot.id)}
+            className={`h-10 min-w-22 rounded-[10px] border-[1.5px] px-3 text-sm font-semibold transition-colors ${
+              on
+                ? 'border-golden bg-golden/16 text-golden-light'
+                : 'border-creme/25 text-creme hover:border-creme/45'
+            }`}
+          >
+            {spotName(spot.kind, spot.label)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** The whole club, or the spots ticked from the venue's list. */
 function ClosureScope({
   scope,
@@ -225,11 +267,6 @@ function ClosureScope({
   spots: TableDto[];
   onChange: (patch: Partial<Pick<Draft, 'scope' | 'tableIds'>>) => void;
 }) {
-  const toggleSpot = (id: number) =>
-    onChange({
-      tableIds: tableIds.includes(id) ? tableIds.filter(t => t !== id) : [...tableIds, id]
-    });
-
   return (
     <fieldset>
       <legend className="text-sm font-bold">{m.admin_closure_what()}</legend>
@@ -252,30 +289,12 @@ function ClosureScope({
         </button>
       </div>
       {scope === 'spots' ? (
-        <div
-          role="group"
-          aria-label={m.admin_closure_some_spots()}
-          className="mt-3 flex flex-wrap gap-2"
-        >
-          {spots.map(spot => {
-            const on = tableIds.includes(spot.id);
-            return (
-              <button
-                key={spot.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleSpot(spot.id)}
-                className={`h-10 min-w-22 rounded-[10px] border-[1.5px] px-3 text-sm font-semibold transition-colors ${
-                  on
-                    ? 'border-golden bg-golden/16 text-golden-light'
-                    : 'border-creme/25 text-creme hover:border-creme/45'
-                }`}
-              >
-                {spotName(spot.kind, spot.label)}
-              </button>
-            );
-          })}
-        </div>
+        <SpotToggles
+          label={m.admin_closure_some_spots()}
+          tableIds={tableIds}
+          spots={spots}
+          onChange={next => onChange({ tableIds: next })}
+        />
       ) : null}
       {scope === 'spots' && tableIds.length === 0 ? (
         <p className="mt-2 text-[13px] text-grey-cool">{m.admin_closure_pick_spot()}</p>
@@ -288,7 +307,7 @@ function ClosureScope({
  * The bookings the closure would land on, each with a way to pull it up, or
  * a word that there are none. Says nothing while the form is incomplete.
  */
-function ClosureConflicts({
+export function ClosureConflicts({
   conflicts,
   blocking,
   complete,
@@ -639,6 +658,11 @@ export function AdminClosures({ onShowBooking }: { onShowBooking: (phone: string
                     >
                       {scopeText(closure, spots)}
                     </span>
+                    {closure.tournamentId !== null ? (
+                      <span className="rounded-full bg-golden/18 px-2.5 py-0.5 text-xs font-bold text-golden-light">
+                        {m.admin_closure_tournament()}
+                      </span>
+                    ) : null}
                     {current ? (
                       <span className="rounded-full bg-golden px-2.5 py-0.5 text-xs font-bold text-btn-text">
                         {m.admin_closure_now()}
@@ -653,23 +677,28 @@ export function AdminClosures({ onShowBooking }: { onShowBooking: (phone: string
                     <p className="mt-0.5 text-sm text-grey-cool">{closure.reason}</p>
                   ) : null}
                 </div>
-                <div className="flex gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onPress={() => setEditing({ closure, key: Date.now() })}
-                  >
-                    {m.admin_edit_btn()}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger-soft"
-                    isPending={reopen.isPending && reopen.variables === closure.id}
-                    onPress={() => reopen.mutate(closure.id)}
-                  >
-                    {m.admin_closure_reopen()}
-                  </Button>
-                </div>
+                {closure.tournamentId !== null ? (
+                  // Moves with the tournament: edited there, not here
+                  <p className="text-sm text-grey-cool">{m.admin_closure_tournament_hint()}</p>
+                ) : (
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onPress={() => setEditing({ closure, key: Date.now() })}
+                    >
+                      {m.admin_edit_btn()}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger-soft"
+                      isPending={reopen.isPending && reopen.variables === closure.id}
+                      onPress={() => reopen.mutate(closure.id)}
+                    >
+                      {m.admin_closure_reopen()}
+                    </Button>
+                  </div>
+                )}
               </li>
             );
           })}

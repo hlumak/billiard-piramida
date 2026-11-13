@@ -1,4 +1,5 @@
-import type { IsoDate } from './schedule.ts';
+import type { ClosureDto } from './closures.ts';
+import { addDays, MAX_CLOSE_HOUR, type IsoDate } from './schedule.ts';
 
 /**
  * Club tournaments. The entry fee is paid in person at the reception desk, so a
@@ -97,4 +98,44 @@ export function rosterTarget(tournament: {
   const { minPlayers, maxPlayers } = tournament;
   if (maxPlayers !== null) return maxPlayers;
   return minPlayers > 0 ? minPlayers : null;
+}
+
+/**
+ * Does a tournament in this status hold its tables? A draft is not announced
+ * yet and a cancelled one is not played, so neither closes anything; every
+ * other status keeps the time it was played in closed, past ones included.
+ */
+export function tournamentHoldsTables(status: TournamentStatus): boolean {
+  return status !== 'draft' && status !== 'cancelled';
+}
+
+/**
+ * Is `endHour` a valid end for a tournament starting at `startHour`? On the
+ * club day's scale: after the start, up to MAX_CLOSE_HOUR (02:00 the morning
+ * after), the same reach as the latest closing hour.
+ */
+export function isTournamentEndHour(startHour: number, endHour: number): boolean {
+  return Number.isInteger(endHour) && endHour > startHour && endHour <= MAX_CLOSE_HOUR;
+}
+
+/**
+ * The stretch a tournament closes its tables for, in the closure's terms
+ * (calendar date + hour, end exclusive), or null while its day, start or end
+ * is not set or the end does not come after the start. An end past 24 is the
+ * morning after: 25 is 01:00 of the next date.
+ */
+export function tournamentClosureRange(tournament: {
+  startsOn: IsoDate | null;
+  startHour: number | null;
+  endHour: number | null;
+}): Pick<ClosureDto, 'startDate' | 'startHour' | 'endDate' | 'endHour'> | null {
+  const { startsOn, startHour, endHour } = tournament;
+  if (startsOn === null || startHour === null || endHour === null) return null;
+  if (!isTournamentEndHour(startHour, endHour)) return null;
+  return {
+    startDate: startsOn,
+    startHour,
+    endDate: endHour >= 24 ? addDays(startsOn, 1) : startsOn,
+    endHour: endHour % 24
+  };
 }

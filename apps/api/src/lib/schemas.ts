@@ -113,7 +113,8 @@ export const CLOSURE_RESPONSE = Type.Object({
   endDate: ISO_DATE,
   endHour: Type.Integer(),
   tableIds: Type.Union([Type.Array(Type.Integer()), Type.Null()]),
-  reason: Type.Union([Type.String(), Type.Null()])
+  reason: Type.Union([Type.String(), Type.Null()]),
+  tournamentId: Type.Union([Type.Integer(), Type.Null()])
 });
 
 export const CLOSURE_CONFLICT_RESPONSE = Type.Object({
@@ -310,7 +311,9 @@ export const TOURNAMENT_TRANSLATION = Type.Object({
 
 export const ADMIN_TOURNAMENT_RESPONSE = Type.Object({
   ...TOURNAMENT_RESPONSE.properties,
-  translations: Type.Array(TOURNAMENT_TRANSLATION)
+  translations: Type.Array(TOURNAMENT_TRANSLATION),
+  endHour: Type.Union([Type.Integer(), Type.Null()]),
+  tableIds: Type.Array(Type.Integer())
 });
 
 /** Names and phones live here and nowhere else — the public DTO carries counts only. */

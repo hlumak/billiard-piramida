@@ -13,7 +13,16 @@ import { StaggerGroup, StaggerItem } from '../motion';
 import { AdminTournamentModal } from './AdminTournamentModal';
 import { AdminTournamentRoster } from './AdminTournamentRoster';
 
-function TournamentRow({ item }: { item: AdminTournamentDto }) {
+/** Pulls up a guest's bookings: where a booking in the way of a tournament's tables is moved. */
+type ShowBooking = (phone: string) => void;
+
+function TournamentRow({
+  item,
+  onShowBooking
+}: {
+  item: AdminTournamentDto;
+  onShowBooking: ShowBooking;
+}) {
   const queryClient = useQueryClient();
   const [showRoster, setShowRoster] = useState(false);
   const { label: seats } = rosterProgress(item);
@@ -24,6 +33,9 @@ function TournamentRow({ item }: { item: AdminTournamentDto }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'tournaments'] });
       queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+      // Its tables open again
+      queryClient.invalidateQueries({ queryKey: ['admin', 'closures'] });
+      queryClient.invalidateQueries({ queryKey: ['availability'] });
     }
   });
 
@@ -60,7 +72,7 @@ function TournamentRow({ item }: { item: AdminTournamentDto }) {
           >
             {m.admin_roster()}
           </Button>
-          <AdminTournamentModal item={item} />
+          <AdminTournamentModal item={item} onShowBooking={onShowBooking} />
           <ConfirmAction
             title={m.admin_delete_tournament_confirm()}
             confirmLabel={m.admin_delete_tournament_action()}
@@ -84,7 +96,7 @@ function TournamentRow({ item }: { item: AdminTournamentDto }) {
   );
 }
 
-export function AdminTournaments() {
+export function AdminTournaments({ onShowBooking }: { onShowBooking: ShowBooking }) {
   const { data: items, isPending, isError, error, refetch } = useQuery(adminTournamentsQuery());
 
   if (isError && !items) return <QueryError error={error} onRetry={() => refetch()} />;
@@ -99,7 +111,7 @@ export function AdminTournaments() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
-        <AdminTournamentModal item={null} />
+        <AdminTournamentModal item={null} onShowBooking={onShowBooking} />
       </div>
       {items.length === 0 ? (
         <p className="py-8 text-center text-grey-cool">{m.admin_no_tournaments()}</p>
@@ -108,7 +120,7 @@ export function AdminTournaments() {
           <ul className="flex flex-col gap-2">
             {items.map(item => (
               <StaggerItem key={item.id} as="li">
-                <TournamentRow item={item} />
+                <TournamentRow item={item} onShowBooking={onShowBooking} />
               </StaggerItem>
             ))}
           </ul>

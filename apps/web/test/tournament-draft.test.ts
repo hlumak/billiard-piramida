@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import type { AdminTournamentDto } from '@repo/shared';
 import {
   checkTournamentDraft,
+  draftClosureRange,
   tournamentDraftFrom,
   tournamentErrorText,
   type TournamentDraft
@@ -37,6 +38,8 @@ test('a complete draft becomes the API input, in grosze and trimmed', () => {
       status: 'draft',
       startsOn: '2026-11-14',
       startHour: 18,
+      endHour: null,
+      tableIds: [],
       registrationDeadline: '2026-11-12',
       entryFeeGrosz: 4050,
       minPlayers: 8,
@@ -93,6 +96,9 @@ test('an existing tournament round-trips through the draft unchanged', () => {
     status: 'registration',
     startsOn: '2026-11-14',
     startHour: 18,
+    // 01:00 the morning after, on the club day's scale
+    endHour: 25,
+    tableIds: [10, 11],
     registrationDeadline: '2026-11-12',
     entryFeeGrosz: 4000,
     minPlayers: 8,
@@ -107,9 +113,14 @@ test('an existing tournament round-trips through the draft unchanged', () => {
       { locale: 'en', title: 'Cup', summary: null, details: null }
     ]
   };
-  const check = checkTournamentDraft(tournamentDraftFrom(item));
+  const opened = tournamentDraftFrom(item);
+  // The end opens as the hour it was typed as
+  expect([opened.endHour, opened.tableIds]).toEqual(['1', [10, 11]]);
+  const check = checkTournamentDraft(opened);
   expect(check.ok && check.input).toMatchObject({
     status: 'registration',
+    endHour: 25,
+    tableIds: [10, 11],
     entryFeeGrosz: 4000,
     imageUrl: '/uploads/cup.webp',
     translations: item.translations
@@ -129,4 +140,48 @@ test('the editor says the most specific problem, and echoes the server', () => {
   // Incomplete fields say nothing (Save stays disabled); a failed save does
   expect(tournamentErrorText('incomplete', null, false)).toBeNull();
   expect(tournamentErrorText('incomplete', 'internal_error', true)).toBe(m.err_generic());
+});
+
+const inputOf = (overrides: Partial<TournamentDraft>) => {
+  const check = checkTournamentDraft(draft(overrides));
+  if (!check.ok) throw new Error(check.problem);
+  return check.input;
+};
+
+test('the end is typed as a clock hour; at or before the start it is the night after', () => {
+  expect(inputOf({ endHour: '23' }).endHour).toBe(23);
+  expect(inputOf({ endHour: '0' }).endHour).toBe(24);
+  expect(inputOf({ endHour: '2' }).endHour).toBe(26);
+  expect(inputOf({ endHour: '' }).endHour).toBe(null);
+});
+
+test('an end past 02:00 the morning after, or with no start, is refused with its own message', () => {
+  for (const overrides of [{ endHour: '3' }, { endHour: '18' }, { startHour: '', endHour: '23' }]) {
+    const check = checkTournamentDraft(draft(overrides));
+    expect(check).toEqual({ ok: false, problem: 'end_before_start' });
+  }
+  expect(tournamentErrorText('end_before_start', null, false)).toBe(
+    m.admin_tournament_end_before_start()
+  );
+});
+
+test('ticked tables go to the API ascending', () => {
+  expect(inputOf({ tableIds: [11, 8, 10] }).tableIds).toEqual([8, 10, 11]);
+});
+
+test('the tables close over the date, start and end, even while the copy is unfinished', () => {
+  const unfinished = draft({ endHour: '1', titles: { uk: '', pl: '', en: '' } });
+  expect(checkTournamentDraft(unfinished).ok).toBe(false);
+  expect(draftClosureRange(unfinished)).toEqual({
+    startDate: '2026-11-14',
+    startHour: 18,
+    endDate: '2026-11-15',
+    endHour: 1
+  });
+  expect(draftClosureRange(draft({ endHour: '' }))).toBe(null);
+  expect(draftClosureRange(draft({ startsOn: '', endHour: '23' }))).toBe(null);
+});
+
+test('a booking in the way of the tables, found on save, has its own message', () => {
+  expect(tournamentErrorText(null, 'closure_conflicts', true)).toBe(m.err_closure_conflicts());
 });

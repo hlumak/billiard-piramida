@@ -16,7 +16,7 @@ import type { Db } from '../db/client.ts';
 const FALLBACK_LOCALE: Locale = 'en';
 
 /** Staff read tournaments in uk, same convention as the menu and news tabs. */
-const STAFF_LOCALE: Locale = 'uk';
+export const STAFF_LOCALE: Locale = 'uk';
 
 export type TournamentRow = typeof tournaments.$inferSelect;
 export type TournamentTranslationRow = typeof tournamentTranslations.$inferSelect;
@@ -163,6 +163,8 @@ export function toAdminTournamentDto(
       title: t.title,
       summary: t.summary,
       details: t.details
-    }))
+    })),
+    endHour: row.endHour,
+    tableIds: row.tableIds
   };
 }

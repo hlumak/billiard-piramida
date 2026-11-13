@@ -31,6 +31,11 @@ export interface ClosureDto {
   tableIds: number[] | null;
   /** Shown to guests when the whole club is closed; null when staff gave none */
   reason: string | null;
+  /**
+   * The tournament holding these spots, or null for one staff entered. A
+   * tournament's closure follows the tournament and is not edited on its own.
+   */
+  tournamentId: number | null;
 }
 
 /**

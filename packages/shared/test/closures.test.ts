@@ -20,6 +20,7 @@ const closure = (over: Partial<ClosureDto>): ClosureDto => ({
   endHour: 23,
   tableIds: null,
   reason: 'Приватний захід',
+  tournamentId: null,
   ...over
 });
 

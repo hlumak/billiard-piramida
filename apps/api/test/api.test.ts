@@ -4494,3 +4494,195 @@ test('a seat staff restore to pending is held from the moment it is restored', a
   const page = await app.inject({ method: 'GET', url: '/api/tournaments/restored-seat-cup' });
   assert.equal(page.json().pendingCount, 1);
 });
+
+test('a tournament closes its tables while it runs, and only through the tournament', async () => {
+  const headers = staff('198.51.100.71');
+  // Thursday: the other tests book only hall 1 that day
+  const DAY = nextDate(4);
+  const nextDay = new Date(Date.parse(`${DAY}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const translations = [
+    { locale: 'uk', title: 'Кубок залу 2' },
+    { locale: 'pl', title: 'Puchar sali 2' },
+    { locale: 'en', title: 'Hall 2 Cup' }
+  ];
+  const tournamentClosure = async (id: number) => {
+    const res = await app.inject({ method: 'GET', url: '/api/admin/closures', headers });
+    return res.json().find((c: { tournamentId: number | null }) => c.tournamentId === id);
+  };
+
+  const guest = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 10,
+      date: DAY,
+      startMinute: 16 * 60,
+      durationMinutes: 120,
+      customerName: 'Hall Two Guest',
+      customerPhone: '+48601555071'
+    }
+  });
+  assert.equal(guest.statusCode, 201, guest.body);
+
+  // Its tables are taken: nothing is saved, the tournament included
+  const refused = await app.inject({
+    method: 'POST',
+    url: '/api/admin/tournaments',
+    headers,
+    payload: {
+      slug: 'hall-two-cup',
+      status: 'registration',
+      startsOn: DAY,
+      startHour: 15,
+      endHour: 23,
+      tableIds: [11, 10],
+      translations
+    }
+  });
+  assert.equal(refused.statusCode, 409);
+  assert.equal(refused.json().error, 'closure_conflicts');
+  const list = await app.inject({ method: 'GET', url: '/api/admin/tournaments', headers });
+  assert.ok(!list.json().some((t: { slug: string }) => t.slug === 'hall-two-cup'));
+
+  const cancelled = await app.inject({
+    method: 'PATCH',
+    url: `/api/admin/bookings/${guest.json().id}`,
+    headers,
+    payload: { status: 'cancelled' }
+  });
+  assert.equal(cancelled.statusCode, 200, cancelled.body);
+
+  const created = await createTournament('198.51.100.71', {
+    slug: 'hall-two-cup',
+    startsOn: DAY,
+    startHour: 15,
+    endHour: 23,
+    tableIds: [11, 10],
+    translations
+  });
+  assert.deepEqual([created.endHour, created.tableIds], [23, [10, 11]]);
+  const closure = await tournamentClosure(created.id);
+  assert.deepEqual(
+    [closure.startDate, closure.startHour, closure.endDate, closure.endHour],
+    [DAY, 15, DAY, 23]
+  );
+  assert.deepEqual(closure.tableIds, [10, 11]);
+  assert.equal(closure.reason, 'Кубок залу 2');
+
+  // Guests can't book into it; the hall's other tables stay open
+  const into = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 11,
+      date: DAY,
+      startMinute: 20 * 60,
+      durationMinutes: 60,
+      customerName: 'Too Late',
+      customerPhone: '+48601555072'
+    }
+  });
+  assert.equal(into.statusCode, 409);
+  assert.equal(into.json().error, 'slot_closed');
+  const beside = await app.inject({
+    method: 'POST',
+    url: '/api/bookings',
+    payload: {
+      tableId: 9,
+      date: DAY,
+      startMinute: 20 * 60,
+      durationMinutes: 60,
+      customerName: 'Next Table',
+      customerPhone: '+48601555073'
+    }
+  });
+  assert.equal(beside.statusCode, 201, beside.body);
+
+  // The closure is the tournament's: not edited or reopened on its own
+  const edited = await app.inject({
+    method: 'PUT',
+    url: `/api/admin/closures/${closure.id}`,
+    headers,
+    payload: {
+      startDate: DAY,
+      startHour: 15,
+      endDate: DAY,
+      endHour: 18,
+      tableIds: [10],
+      reason: null
+    }
+  });
+  assert.equal(edited.statusCode, 409);
+  assert.equal(edited.json().error, 'closure_from_tournament');
+  const reopened = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/closures/${closure.id}`,
+    headers
+  });
+  assert.equal(reopened.statusCode, 409);
+  assert.equal(reopened.json().error, 'closure_from_tournament');
+
+  const patch = (payload: Record<string, unknown>) =>
+    app.inject({
+      method: 'PATCH',
+      url: `/api/admin/tournaments/${created.id}`,
+      headers,
+      payload
+    });
+
+  // Past midnight on the club day's scale: 25 is 01:00 the next date
+  assert.equal((await patch({ endHour: 25 })).statusCode, 200);
+  const late = await tournamentClosure(created.id);
+  assert.equal(late.id, closure.id);
+  assert.deepEqual([late.endDate, late.endHour], [nextDay, 1]);
+
+  // An end not after the start is refused, and leaves the closure as it was
+  const backwards = await patch({ endHour: 14 });
+  assert.equal(backwards.statusCode, 422);
+  assert.equal(backwards.json().error, 'end_before_start');
+  // Moving the start past the end is the same slip
+  assert.equal((await patch({ startHour: 23, endHour: 23 })).statusCode, 422);
+  assert.equal((await tournamentClosure(created.id)).endHour, 1);
+
+  // Moving onto the table a guest holds is refused like the first save
+  const blocked = await patch({ tableIds: [9, 10, 11] });
+  assert.equal(blocked.statusCode, 409);
+  assert.deepEqual((await tournamentClosure(created.id)).tableIds, [10, 11]);
+
+  // A new title relabels the hatching
+  const retitled = await patch({
+    translations: [{ locale: 'uk', title: 'Кубок залу 2: фінал' }]
+  });
+  assert.equal(retitled.statusCode, 200, retitled.body);
+  assert.equal((await tournamentClosure(created.id)).reason, 'Кубок залу 2: фінал');
+
+  // Cancelled or back to draft: the tables open; announced again: they close
+  assert.equal((await patch({ status: 'cancelled' })).statusCode, 200);
+  assert.equal(await tournamentClosure(created.id), undefined);
+  assert.equal((await patch({ status: 'draft' })).statusCode, 200);
+  assert.equal(await tournamentClosure(created.id), undefined);
+  assert.equal((await patch({ status: 'registration' })).statusCode, 200);
+  assert.ok(await tournamentClosure(created.id));
+
+  // No tables ticked, or no end: nothing held
+  assert.equal((await patch({ tableIds: [] })).statusCode, 200);
+  assert.equal(await tournamentClosure(created.id), undefined);
+  assert.equal((await patch({ tableIds: [10] })).statusCode, 200);
+  assert.deepEqual((await tournamentClosure(created.id)).tableIds, [10]);
+  assert.equal((await patch({ endHour: null })).statusCode, 200);
+  assert.equal(await tournamentClosure(created.id), undefined);
+
+  // Spots past the venue's ids are refused by the schema
+  assert.equal((await patch({ tableIds: [42] })).statusCode, 400);
+
+  // Deleting the tournament frees its tables
+  assert.equal((await patch({ endHour: 23 })).statusCode, 200);
+  assert.ok(await tournamentClosure(created.id));
+  const removed = await app.inject({
+    method: 'DELETE',
+    url: `/api/admin/tournaments/${created.id}`,
+    headers
+  });
+  assert.equal(removed.statusCode, 200);
+  assert.equal(await tournamentClosure(created.id), undefined);
+});
