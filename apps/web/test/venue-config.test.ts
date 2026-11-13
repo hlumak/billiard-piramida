@@ -60,6 +60,7 @@ test('skips hours and days staff have closed', () => {
     endHour: 21,
     tableIds: null,
     reason: null,
+    tournamentId: null,
     ...over
   });
   // Closed from 18:00: at 12:00 the afternoon is still there; at 16:45 a 17:00

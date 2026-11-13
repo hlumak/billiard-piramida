@@ -66,7 +66,9 @@ const PANES: Record<AdminPaneId, (context: PaneContext) => ReactNode> = {
   blacklist: () => <AdminBlacklist />,
   menu: () => <AdminMenu />,
   news: () => <AdminNews />,
-  tournaments: () => <AdminTournaments />,
+  tournaments: ({ showCustomerBookings }) => (
+    <AdminTournaments onShowBooking={showCustomerBookings} />
+  ),
   settings: ({ showCustomerBookings }) => <AdminVenueConfig onShowBooking={showCustomerBookings} />
 };
 

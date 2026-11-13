@@ -94,6 +94,10 @@ export interface AdminTournamentInput {
   status: TournamentStatus;
   startsOn: IsoDate | null;
   startHour: number | null;
+  /** On the club day's scale: 25 is 01:00 the morning after */
+  endHour: number | null;
+  /** Spots closed to bookings while it runs */
+  tableIds: number[];
   registrationDeadline: IsoDate | null;
   entryFeeGrosz: number | null;
   minPlayers: number;
@@ -313,7 +317,8 @@ export const adminNewsQuery = () =>
   });
 
 /** What staff send for a closure: everything but the id the server gives it. */
-export type ClosureInput = Omit<ClosureDto, 'id'>;
+/** A closure staff enter by hand; a tournament's own is written with the tournament. */
+export type ClosureInput = Omit<ClosureDto, 'id' | 'tournamentId'>;
 
 export const adminClosuresQuery = () =>
   queryOptions({
