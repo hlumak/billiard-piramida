@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { memo, startTransition, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Spinner } from '@heroui/react';
 import { Search } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -179,9 +179,126 @@ function RowActions({ booking }: { booking: BookingDto }) {
   );
 }
 
+/** Rows drawn in the first frame; the rest follow in batches of ROW_BATCH. */
+const FIRST_ROWS = 30;
+const ROW_BATCH = 40;
+
+/**
+ * One booking (and the day heading above it, when it starts a new day).
+ * Memoized on what it shows: the list refetches every minute and keeps the
+ * bookings that did not change as the same objects, so only a row whose
+ * booking changed renders again, not all 200.
+ */
+const BookingRow = memo(function BookingRow({
+  booking,
+  dayHeading,
+  blacklisted,
+  itemsText
+}: {
+  booking: BookingDto;
+  /** The day's heading when this row opens a new day */
+  dayHeading: string | null;
+  blacklisted: boolean;
+  /** The bar order in one line, dish names in the panel's language */
+  itemsText: string | null;
+}) {
+  const voided = booking.phase === 'cancelled' || booking.phase === 'no_show';
+  return (
+    <>
+      {dayHeading !== null ? (
+        <tr className="block border-t border-line bg-club-green-dark/55 first:border-t-0 lg:table-row">
+          <th
+            scope="rowgroup"
+            colSpan={6}
+            className="block px-4 py-2 text-left text-sm font-bold text-golden-light first-letter:uppercase lg:table-cell lg:pl-5"
+          >
+            {dayHeading}
+          </th>
+        </tr>
+      ) : null}
+      <tr className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 border-t border-line px-4 py-3.5 first:border-t-0 lg:table-row lg:first:border-t lg:px-0 lg:py-0">
+        <td className="font-bold whitespace-nowrap tabular-nums lg:py-3.5 lg:pr-3 lg:pl-5">
+          {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)}
+        </td>
+        <td className="self-center justify-self-end lg:hidden">
+          <span
+            className={`inline-block rounded-full px-2.5 py-1 text-center text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
+          >
+            {PHASE_LABELS[booking.phase]()}
+          </span>
+        </td>
+        <td className="col-span-2 whitespace-nowrap lg:px-3 lg:py-3.5">
+          {spotName(booking.kind, booking.tableLabel)}
+          {/* Which balls to rack — the one thing on this row that
+              is an instruction to the person reading it */}
+          {booking.game ? (
+            <span className="text-grey-cool">
+              {' · '}
+              {gameName(booking.game).toLocaleLowerCase(getLocale())}
+            </span>
+          ) : null}
+        </td>
+        <td className="col-span-2 lg:px-3 lg:py-3.5">
+          {booking.customerPhone === null ? (
+            <span className="block font-semibold text-grey-cool">{m.admin_offline_client()}</span>
+          ) : (
+            <>
+              <span className="block font-semibold">
+                {booking.customerName}
+                {blacklisted ? (
+                  <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-soft-foreground">
+                    {m.admin_blacklisted()}
+                  </span>
+                ) : null}
+              </span>
+              <a
+                href={`tel:${booking.customerPhone}`}
+                className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
+              >
+                {formatPhone(booking.customerPhone)}
+              </a>
+            </>
+          )}
+          {itemsText ? (
+            <span className="mt-0.5 block text-xs text-grey-cool">{itemsText}</span>
+          ) : null}
+        </td>
+        <td className="hidden text-center lg:table-cell lg:px-3 lg:py-3.5">
+          <span
+            className={`inline-block min-w-29.5 rounded-full px-2.5 py-1 text-center text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
+          >
+            {PHASE_LABELS[booking.phase]()}
+          </span>
+        </td>
+        <td
+          className={`col-span-2 font-bold whitespace-nowrap tabular-nums lg:px-3 lg:py-3.5 lg:text-right ${
+            voided ? 'text-grey-cool' : 'text-golden-light'
+          } ${booking.phase === 'cancelled' ? 'line-through' : ''}`}
+        >
+          {formatPln(booking.totalGrosz, intlTag())}
+          {booking.discountGrosz > 0 ? (
+            <span className="ml-1 text-xs font-medium text-grey-cool no-underline">
+              (−{formatPln(booking.discountGrosz, intlTag())})
+            </span>
+          ) : null}
+        </td>
+        <td className="col-span-2 lg:py-3.5 lg:pr-5 lg:pl-3">
+          <RowActions booking={booking} />
+        </td>
+      </tr>
+    </>
+  );
+});
+
 /**
  * The list itself: one heading per day, then the rows. Its own component so
  * the list pane above only decides what to show (error, loading, empty, rows).
+ *
+ * Up to 200 rows, each with its actions: built all at once they held the panel
+ * for a third of a second on a slow laptop. The first screenful comes in the
+ * first frame and the rest follows a batch at a time, each its own transition:
+ * React interrupts them for anything the desk clicks meanwhile, and no single
+ * commit inserts more than a batch of rows.
  */
 function BookingsTable({ bookings }: { bookings: BookingDto[] }) {
   const { hours: venueHours } = useVenueConfig();
@@ -194,6 +311,15 @@ function BookingsTable({ bookings }: { bookings: BookingDto[] }) {
   const blacklisted = new Set(blacklist?.map(entry => entry.phone));
   const head = 'px-3 py-3.5 text-xs font-bold tracking-[0.08em] text-grey-cool uppercase';
 
+  const [rowsShown, setRowsShown] = useState(FIRST_ROWS);
+  useEffect(() => {
+    if (bookings.length > rowsShown)
+      startTransition(() => setRowsShown(shown => shown + ROW_BATCH));
+  }, [bookings.length, rowsShown]);
+
+  const shown = bookings.slice(0, rowsShown);
+  // The club day of each row, which is what the list's date filter goes by
+  const days = shown.map(booking => bookingClubDate(booking, venueHours));
   return (
     <div>
       {bookings.length >= ADMIN_BOOKINGS_LIMIT ? (
@@ -226,106 +352,31 @@ function BookingsTable({ bookings }: { bookings: BookingDto[] }) {
             </tr>
           </thead>
           <tbody>
-            {bookings.map((booking, index) => {
-              const voided = booking.phase === 'cancelled' || booking.phase === 'no_show';
-              // The club day, which is what the list's date filter goes by
-              const day = bookingClubDate(booking, venueHours);
-              const previous = bookings[index - 1];
+            {shown.map((booking, index) => {
+              const day = days[index]!;
               // One heading per day, so the rows below only need their hours
-              const newDay = !previous || bookingClubDate(previous, venueHours) !== day;
+              const newDay = index === 0 || days[index - 1] !== day;
               return (
-                <Fragment key={booking.id}>
-                  {newDay ? (
-                    <tr className="block border-t border-line bg-club-green-dark/55 first:border-t-0 lg:table-row">
-                      <th
-                        scope="rowgroup"
-                        colSpan={6}
-                        className="block px-4 py-2 text-left text-sm font-bold text-golden-light first-letter:uppercase lg:table-cell lg:pl-5"
-                      >
-                        {/* The unfiltered list reaches back into earlier years */}
-                        {formatDay(day, { withYear: !day.startsWith(thisYear) })}
-                      </th>
-                    </tr>
-                  ) : null}
-                  <tr className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 border-t border-line px-4 py-3.5 first:border-t-0 lg:table-row lg:first:border-t lg:px-0 lg:py-0">
-                    <td className="font-bold whitespace-nowrap tabular-nums lg:py-3.5 lg:pr-3 lg:pl-5">
-                      {warsawTime(booking.startsAt)}–{warsawTime(booking.endsAt)}
-                    </td>
-                    <td className="self-center justify-self-end lg:hidden">
-                      <span
-                        className={`inline-block rounded-full px-2.5 py-1 text-center text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
-                      >
-                        {PHASE_LABELS[booking.phase]()}
-                      </span>
-                    </td>
-                    <td className="col-span-2 whitespace-nowrap lg:px-3 lg:py-3.5">
-                      {spotName(booking.kind, booking.tableLabel)}
-                      {/* Which balls to rack — the one thing on this row that
-                        is an instruction to the person reading it */}
-                      {booking.game ? (
-                        <span className="text-grey-cool">
-                          {' · '}
-                          {gameName(booking.game).toLocaleLowerCase(getLocale())}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="col-span-2 lg:px-3 lg:py-3.5">
-                      {booking.customerPhone === null ? (
-                        <span className="block font-semibold text-grey-cool">
-                          {m.admin_offline_client()}
-                        </span>
-                      ) : (
-                        <>
-                          <span className="block font-semibold">
-                            {booking.customerName}
-                            {blacklisted.has(booking.customerPhone) ? (
-                              <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-soft-foreground">
-                                {m.admin_blacklisted()}
-                              </span>
-                            ) : null}
-                          </span>
-                          <a
-                            href={`tel:${booking.customerPhone}`}
-                            className="text-golden-light underline decoration-golden-light/45 underline-offset-2 hover:decoration-golden-light"
-                          >
-                            {formatPhone(booking.customerPhone)}
-                          </a>
-                        </>
-                      )}
-                      {booking.items.length > 0 ? (
-                        <span className="mt-0.5 block text-xs text-grey-cool">
-                          {booking.items
-                            .map(
-                              item => `${nameBySlug.get(item.slug) ?? item.slug} × ${item.quantity}`
-                            )
-                            .join(', ')}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="hidden text-center lg:table-cell lg:px-3 lg:py-3.5">
-                      <span
-                        className={`inline-block min-w-29.5 rounded-full px-2.5 py-1 text-center text-xs font-bold ${PHASE_STYLES[booking.phase]}`}
-                      >
-                        {PHASE_LABELS[booking.phase]()}
-                      </span>
-                    </td>
-                    <td
-                      className={`col-span-2 font-bold whitespace-nowrap tabular-nums lg:px-3 lg:py-3.5 lg:text-right ${
-                        voided ? 'text-grey-cool' : 'text-golden-light'
-                      } ${booking.phase === 'cancelled' ? 'line-through' : ''}`}
-                    >
-                      {formatPln(booking.totalGrosz, intlTag())}
-                      {booking.discountGrosz > 0 ? (
-                        <span className="ml-1 text-xs font-medium text-grey-cool no-underline">
-                          (−{formatPln(booking.discountGrosz, intlTag())})
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="col-span-2 lg:py-3.5 lg:pr-5 lg:pl-3">
-                      <RowActions booking={booking} />
-                    </td>
-                  </tr>
-                </Fragment>
+                <BookingRow
+                  key={booking.id}
+                  booking={booking}
+                  dayHeading={
+                    // The unfiltered list reaches back into earlier years
+                    newDay ? formatDay(day, { withYear: !day.startsWith(thisYear) }) : null
+                  }
+                  blacklisted={
+                    booking.customerPhone !== null && blacklisted.has(booking.customerPhone)
+                  }
+                  itemsText={
+                    booking.items.length > 0
+                      ? booking.items
+                          .map(
+                            item => `${nameBySlug.get(item.slug) ?? item.slug} × ${item.quantity}`
+                          )
+                          .join(', ')
+                      : null
+                  }
+                />
               );
             })}
           </tbody>
