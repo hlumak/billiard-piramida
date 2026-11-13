@@ -208,11 +208,20 @@ export const closures = pgTable(
     tableIds: integer('table_ids').array(),
     /** Shown to guests when the whole club is closed */
     reason: text('reason'),
+    /**
+     * Set when a tournament holds these spots: the closure is written, moved
+     * and removed with the tournament (admin-tournaments), never by hand.
+     */
+    tournamentId: integer('tournament_id').references(() => tournaments.id, {
+      onDelete: 'cascade'
+    }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   t => [
     // Every reader asks for the ones not over yet
     index('closures_ends_at_idx').on(t.endsAt),
+    // One closure per tournament; also the lookup when it is synced
+    uniqueIndex('closures_tournament_id_idx').on(t.tournamentId),
     check('closures_ends_after_start', sql`${t.endsAt} > ${t.startsAt}`)
   ]
 );
@@ -297,6 +306,17 @@ export const tournaments = pgTable(
     startsOn: date('starts_on'),
     /** Venue-local start hour, same convention as a booking slot */
     startHour: integer('start_hour'),
+    /**
+     * Venue-local end hour on the club day's scale: past 24 is the morning
+     * after (25 = 01:00), as with the weekly closing hour. Always after
+     * `start_hour`; the spots in `table_ids` are closed in between.
+     */
+    endHour: integer('end_hour'),
+    /** Spots the tournament is played on; closed to bookings while it runs */
+    tableIds: integer('table_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::integer[]`),
     /** Last day sign-ups are accepted, inclusive */
     registrationDeadline: date('registration_deadline'),
     /** Paid in person at the reception desk — the site never takes money */
@@ -315,6 +335,7 @@ export const tournaments = pgTable(
     index('tournaments_status_starts_on_idx').on(t.status, t.startsOn),
     check('tournaments_min_players_non_negative', sql`${t.minPlayers} >= 0`),
     check('tournaments_start_hour_range', sql`${t.startHour} between 0 and 23`),
+    check('tournaments_end_hour_range', sql`${t.endHour} between 1 and 26`),
     check('tournaments_entry_fee_non_negative', sql`${t.entryFeeGrosz} >= 0`)
   ]
 );

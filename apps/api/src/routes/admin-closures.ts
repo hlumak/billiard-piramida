@@ -6,7 +6,7 @@ import {
   MAX_SPOT_ID,
   type ClosureDto
 } from '@repo/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { closures, tables } from '../db/schema.ts';
 import {
   CLOSURE_CONFLICT_RESPONSE,
@@ -25,6 +25,7 @@ import {
 } from '../services/closures.ts';
 import type { Db } from '../db/client.ts';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
+import type { FastifyInstance } from 'fastify';
 
 const HOUR = Type.Integer({ minimum: 0, maximum: 23 });
 
@@ -76,18 +77,27 @@ async function parseClosure(db: Pick<Db, 'select'>, body: ClosureBody): Promise<
 }
 
 /**
+ * Guests see a closure change at once: the venue config (whole-club closures)
+ * and the availability grids of every date the old or new span touches.
+ */
+export function announceClosures(
+  app: Pick<FastifyInstance, 'venueConfig' | 'availabilityHub'>,
+  ...ranges: { startsAt: Date; endsAt: Date }[]
+): void {
+  app.venueConfig.invalidate();
+  const dates = new Set(ranges.flatMap(r => datesTouched(r.startsAt, r.endsAt)));
+  for (const date of dates) app.availabilityHub.notify(date);
+}
+
+/**
  * Closing the club, or some spots, for a while. A closure never lands on a
  * booking: the write is refused while any confirmed one is in its way, and
  * staff move or cancel those first (the conflicts endpoint lists them as the
  * form is filled in). Registered inside the admin scope, behind its token.
  */
 export const adminClosureRoutes: FastifyPluginAsyncTypebox = async admin => {
-  /** Guests see the change at once: availability grids and the venue config. */
-  const announce = (...ranges: { startsAt: Date; endsAt: Date }[]) => {
-    admin.venueConfig.invalidate();
-    const dates = new Set(ranges.flatMap(r => datesTouched(r.startsAt, r.endsAt)));
-    for (const date of dates) admin.availabilityHub.notify(date);
-  };
+  const announce = (...ranges: { startsAt: Date; endsAt: Date }[]) =>
+    announceClosures(admin, ...ranges);
 
   admin.get(
     '/api/admin/closures',
@@ -160,6 +170,10 @@ export const adminClosureRoutes: FastifyPluginAsyncTypebox = async admin => {
       }
       const [previous] = await tx.select().from(closures).where(eq(closures.id, id));
       if (!previous) return { ok: false as const, status: 404 as const, error: 'not_found' };
+      // A tournament's closure moves with the tournament, never on its own
+      if (previous.tournamentId !== null) {
+        return { ok: false as const, status: 409 as const, error: 'closure_from_tournament' };
+      }
       const [row] = await tx.update(closures).set(values).where(eq(closures.id, id)).returning();
       if (!row) throw new Error('update returned no row');
       return { ok: true as const, row, previous };
@@ -211,9 +225,17 @@ export const adminClosureRoutes: FastifyPluginAsyncTypebox = async admin => {
     async (request, reply) => {
       const [removed] = await admin.db
         .delete(closures)
-        .where(eq(closures.id, request.params.id))
+        .where(and(eq(closures.id, request.params.id), isNull(closures.tournamentId)))
         .returning();
-      if (!removed) return reply.code(404).send({ error: 'not_found' });
+      if (!removed) {
+        const [held] = await admin.db
+          .select({ id: closures.id })
+          .from(closures)
+          .where(eq(closures.id, request.params.id));
+        return held
+          ? reply.code(409).send({ error: 'closure_from_tournament' })
+          : reply.code(404).send({ error: 'not_found' });
+      }
       announce(removed);
       return { deleted: true };
     }

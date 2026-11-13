@@ -336,6 +336,10 @@ export interface TournamentTranslationDto {
 /** Tournament row for staff: includes drafts (uk display copy) + all translations. */
 export interface AdminTournamentDto extends TournamentDto {
   translations: TournamentTranslationDto[];
+  /** On the club day's scale (25 = 01:00 the morning after); null until staff set it */
+  endHour: number | null;
+  /** Spots the tournament is played on, ascending; empty = none held */
+  tableIds: number[];
 }
 
 /** One roster entry, staff view — the only place sign-up names and phones appear. */

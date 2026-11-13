@@ -1,10 +1,24 @@
 import assert from 'node:assert';
 import { Type } from 'typebox';
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { MAX_TOURNAMENT_PLAYERS, isIsoDate, isSafeUrl } from '@repo/shared';
+import {
+  MAX_CLOSE_HOUR,
+  MAX_SPOT_ID,
+  MAX_TOURNAMENT_PLAYERS,
+  isIsoDate,
+  isSafeUrl,
+  isTournamentEndHour
+} from '@repo/shared';
 import { normalizePhone } from '@repo/shared/phone';
 import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
-import { tournamentRegistrations, tournaments, tournamentTranslations } from '../db/schema.ts';
+import type { Db } from '../db/client.ts';
+import {
+  closures,
+  tables,
+  tournamentRegistrations,
+  tournaments,
+  tournamentTranslations
+} from '../db/schema.ts';
 import {
   ADMIN_TOURNAMENT_REGISTRATION_RESPONSE,
   ADMIN_TOURNAMENT_RESPONSE,
@@ -17,7 +31,17 @@ import {
 } from '../lib/schemas.ts';
 import { UNIQUE_VIOLATION, pgErrorCode } from '../lib/errors.ts';
 import { insertWithFreeSlug, slugify } from '../lib/slug.ts';
-import { seatCountsFor, toAdminTournamentDto } from '../services/tournaments.ts';
+import { syncTournamentClosure } from '../services/closures.ts';
+import {
+  STAFF_LOCALE,
+  copyFor,
+  seatCountsFor,
+  toAdminTournamentDto
+} from '../services/tournaments.ts';
+import { announceClosures } from './admin-closures.ts';
+
+type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+type ClosureRow = typeof closures.$inferSelect;
 
 const TRANSLATIONS_BODY = Type.Array(
   Type.Object(
@@ -48,6 +72,15 @@ const nullableInteger = (limits: { minimum: number; maximum: number }) =>
   Type.Unsafe<number | null>({ type: ['integer', 'null'], ...limits });
 
 const OPTIONAL_HOUR = Type.Optional(nullableInteger({ minimum: 0, maximum: 23 }));
+/** On the club day's scale: past 24 is the morning after, as with closing hours */
+const OPTIONAL_END_HOUR = Type.Optional(nullableInteger({ minimum: 1, maximum: MAX_CLOSE_HOUR }));
+/** The spots the tournament holds; an empty list holds none */
+const OPTIONAL_TABLE_IDS = Type.Optional(
+  Type.Array(Type.Integer({ minimum: 1, maximum: MAX_SPOT_ID }), {
+    maxItems: 50,
+    uniqueItems: true
+  })
+);
 const OPTIONAL_FEE = Type.Optional(nullableInteger({ minimum: 0, maximum: 1_000_00 }));
 const OPTIONAL_MAX_PLAYERS = Type.Optional(
   nullableInteger({ minimum: 2, maximum: MAX_TOURNAMENT_PLAYERS })
@@ -60,12 +93,14 @@ const OPTIONAL_URL = Type.Optional(Type.Union([Type.String({ maxLength: 500 }), 
 const ID_PARAMS = Type.Object({ id: INT_ID });
 const REGISTRATION_PARAMS = Type.Object({ id: INT_ID, registrationId: UUID });
 
-/** Thrown inside the PATCH transaction so a refused merged row rolls back. */
+/** Thrown inside a write's transaction so a refused row rolls back. */
 class RefusedEdit extends Error {
   readonly code: string;
-  constructor(code: string) {
+  readonly status: 409 | 422;
+  constructor(code: string, status: 409 | 422 = 422) {
     super(code);
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -77,10 +112,19 @@ function hasImpossibleDate(...values: (string | null | undefined)[]): boolean {
 /** Cross-field rules every stored tournament must satisfy; null when it does. */
 function rowProblem(row: {
   startsOn: string | null;
+  startHour: number | null;
+  endHour: number | null;
   registrationDeadline: string | null;
   minPlayers: number;
   maxPlayers: number | null;
 }): string | null {
+  // An end needs a start to come after; one at or before it is a slip, and
+  // with tables ticked it would close nothing
+  if (row.endHour !== null) {
+    if (row.startHour === null || !isTournamentEndHour(row.startHour, row.endHour)) {
+      return 'end_before_start';
+    }
+  }
   // A dated tournament that shuts sign-ups after it starts is a data entry
   // slip, not something to discover once nobody can register.
   if (row.startsOn !== null && row.registrationDeadline !== null) {
@@ -96,6 +140,32 @@ function cleanText(value: string | null | undefined): string | null | undefined 
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }
+
+/** Spots that don't exist would close nothing and confuse the schedule. */
+async function hasUnknownTable(db: Pick<Db, 'select'>, ids: number[] | undefined) {
+  if (ids === undefined || ids.length === 0) return false;
+  const known = new Set((await db.select({ id: tables.id }).from(tables)).map(t => t.id));
+  return ids.some(id => !known.has(id));
+}
+
+/**
+ * Writes, moves or drops the closure the tournament holds its tables with,
+ * inside the tournament's own transaction: refused, and rolled back with the
+ * edit, while bookings stand in the way. Labelled with the staff title.
+ * Returns the closure rows to announce (as they were and as they are).
+ */
+async function syncClosureOf(tx: Tx, row: typeof tournaments.$inferSelect): Promise<ClosureRow[]> {
+  const translations = await tx
+    .select()
+    .from(tournamentTranslations)
+    .where(eq(tournamentTranslations.tournamentId, row.id));
+  const title = copyFor(translations, STAFF_LOCALE)?.title ?? row.slug;
+  const sync = await syncTournamentClosure(tx, row, title);
+  if (!sync.ok) throw new RefusedEdit('closure_conflicts', 409);
+  return [sync.before, sync.after].filter(closure => closure !== null);
+}
+
+const sortedIds = (ids: number[]) => [...ids].sort((a, b) => a - b);
 
 /**
  * Staff-side tournaments: the announcement itself and the roster behind it.
@@ -150,6 +220,8 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
             status: Type.Optional(TOURNAMENT_STATUS),
             startsOn: OPTIONAL_DATE,
             startHour: OPTIONAL_HOUR,
+            endHour: OPTIONAL_END_HOUR,
+            tableIds: OPTIONAL_TABLE_IDS,
             registrationDeadline: OPTIONAL_DATE,
             entryFeeGrosz: OPTIONAL_FEE,
             minPlayers: OPTIONAL_MIN_PLAYERS,
@@ -164,7 +236,7 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
     },
     async (request, reply) => {
       const { status, startsOn, startHour, registrationDeadline, translations } = request.body;
-      const { entryFeeGrosz, minPlayers, maxPlayers } = request.body;
+      const { endHour, tableIds, entryFeeGrosz, minPlayers, maxPlayers } = request.body;
 
       const imageUrl = cleanText(request.body.imageUrl) ?? null;
       if (imageUrl !== null && !isSafeUrl(imageUrl)) {
@@ -175,50 +247,65 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
       }
       const problem = rowProblem({
         startsOn: startsOn ?? null,
+        startHour: startHour ?? null,
+        endHour: endHour ?? null,
         registrationDeadline: registrationDeadline ?? null,
         minPlayers: minPlayers ?? 0,
         maxPlayers: maxPlayers ?? null
       });
       if (problem !== null) return reply.code(422).send({ error: problem });
+      if (await hasUnknownTable(admin.db, tableIds)) {
+        return reply.code(422).send({ error: 'unknown_table' });
+      }
 
       // An all-Cyrillic title slugifies to nothing; `slugify`'s fallback owns that
       const en = translations.find(t => t.locale === 'en');
       const titleForSlug = en?.title ?? translations[0]?.title ?? '';
       const base = slugify(request.body.slug ?? titleForSlug, 'tournament');
 
-      const created = await admin.db.transaction(async tx => {
-        // Unique slug: base, then base-2, base-3… (atomic, see insertWithFreeSlug)
-        const row = await insertWithFreeSlug(base, async slug => {
-          const [inserted] = await tx
-            .insert(tournaments)
-            .values({
-              slug,
-              imageUrl,
-              ...(status !== undefined ? { status } : {}),
-              ...(startsOn !== undefined ? { startsOn } : {}),
-              ...(startHour !== undefined ? { startHour } : {}),
-              ...(registrationDeadline !== undefined ? { registrationDeadline } : {}),
-              ...(entryFeeGrosz !== undefined ? { entryFeeGrosz } : {}),
-              ...(minPlayers !== undefined ? { minPlayers } : {}),
-              ...(maxPlayers !== undefined ? { maxPlayers } : {})
-            })
-            .onConflictDoNothing({ target: tournaments.slug })
-            .returning();
-          return inserted;
-        });
-        assert(row, 'insert returned no row');
+      let result: { created: typeof tournaments.$inferSelect; touched: ClosureRow[] };
+      try {
+        result = await admin.db.transaction(async tx => {
+          // Unique slug: base, then base-2, base-3… (atomic, see insertWithFreeSlug)
+          const row = await insertWithFreeSlug(base, async slug => {
+            const [inserted] = await tx
+              .insert(tournaments)
+              .values({
+                slug,
+                imageUrl,
+                ...(status !== undefined ? { status } : {}),
+                ...(startsOn !== undefined ? { startsOn } : {}),
+                ...(startHour !== undefined ? { startHour } : {}),
+                ...(endHour !== undefined ? { endHour } : {}),
+                ...(tableIds !== undefined ? { tableIds: sortedIds(tableIds) } : {}),
+                ...(registrationDeadline !== undefined ? { registrationDeadline } : {}),
+                ...(entryFeeGrosz !== undefined ? { entryFeeGrosz } : {}),
+                ...(minPlayers !== undefined ? { minPlayers } : {}),
+                ...(maxPlayers !== undefined ? { maxPlayers } : {})
+              })
+              .onConflictDoNothing({ target: tournaments.slug })
+              .returning();
+            return inserted;
+          });
+          assert(row, 'insert returned no row');
 
-        await tx.insert(tournamentTranslations).values(
-          translations.map(t => ({
-            tournamentId: row.id,
-            locale: t.locale,
-            title: t.title.trim(),
-            summary: cleanText(t.summary) ?? null,
-            details: cleanText(t.details) ?? null
-          }))
-        );
-        return row;
-      });
+          await tx.insert(tournamentTranslations).values(
+            translations.map(t => ({
+              tournamentId: row.id,
+              locale: t.locale,
+              title: t.title.trim(),
+              summary: cleanText(t.summary) ?? null,
+              details: cleanText(t.details) ?? null
+            }))
+          );
+          return { created: row, touched: await syncClosureOf(tx, row) };
+        });
+      } catch (err) {
+        if (err instanceof RefusedEdit) return reply.code(err.status).send({ error: err.code });
+        throw err;
+      }
+      const { created, touched } = result;
+      if (touched.length > 0) announceClosures(admin, ...touched);
 
       const dto = await loadAdminDto(created.id);
       assert(dto, 'tournament vanished after insert');
@@ -236,6 +323,8 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
             status: Type.Optional(TOURNAMENT_STATUS),
             startsOn: OPTIONAL_DATE,
             startHour: OPTIONAL_HOUR,
+            endHour: OPTIONAL_END_HOUR,
+            tableIds: OPTIONAL_TABLE_IDS,
             registrationDeadline: OPTIONAL_DATE,
             entryFeeGrosz: OPTIONAL_FEE,
             minPlayers: OPTIONAL_MIN_PLAYERS,
@@ -250,10 +339,13 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
     },
     async (request, reply) => {
       const { status, startsOn, startHour, registrationDeadline, translations } = request.body;
-      const { entryFeeGrosz, minPlayers, maxPlayers } = request.body;
+      const { endHour, tableIds, entryFeeGrosz, minPlayers, maxPlayers } = request.body;
 
       if (hasImpossibleDate(startsOn, registrationDeadline)) {
         return reply.code(422).send({ error: 'invalid_date' });
+      }
+      if (await hasUnknownTable(admin.db, tableIds)) {
+        return reply.code(422).send({ error: 'unknown_table' });
       }
 
       // undefined = leave the column alone, null = clear it
@@ -266,6 +358,8 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
         ...(status !== undefined ? { status } : {}),
         ...(startsOn !== undefined ? { startsOn } : {}),
         ...(startHour !== undefined ? { startHour } : {}),
+        ...(endHour !== undefined ? { endHour } : {}),
+        ...(tableIds !== undefined ? { tableIds: sortedIds(tableIds) } : {}),
         ...(registrationDeadline !== undefined ? { registrationDeadline } : {}),
         ...(entryFeeGrosz !== undefined ? { entryFeeGrosz } : {}),
         ...(minPlayers !== undefined ? { minPlayers } : {}),
@@ -274,6 +368,7 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
       };
 
       let updated: typeof tournaments.$inferSelect | null;
+      let touched: ClosureRow[] = [];
       try {
         updated = await admin.db.transaction(async tx => {
           // A translations-only PATCH touches no tournaments column; Drizzle refuses
@@ -316,13 +411,16 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
           // the other as it now stands — and a refusal must roll the edit back.
           const problem = rowProblem(row);
           if (problem !== null) throw new RefusedEdit(problem);
+          // After the copy: the closure is labelled with the title as it now is
+          touched = await syncClosureOf(tx, row);
           return row;
         });
       } catch (err) {
-        if (err instanceof RefusedEdit) return reply.code(422).send({ error: err.code });
+        if (err instanceof RefusedEdit) return reply.code(err.status).send({ error: err.code });
         throw err;
       }
       if (!updated) return reply.code(404).send({ error: 'not_found' });
+      if (touched.length > 0) announceClosures(admin, ...touched);
 
       const dto = await loadAdminDto(updated.id);
       assert(dto, 'tournament vanished after update');
@@ -352,11 +450,17 @@ export const adminTournamentRoutes: FastifyPluginAsyncTypebox = async admin => {
         );
       if ((live?.n ?? 0) > 0) return reply.code(409).send({ error: 'has_registrations' });
 
+      // Its closure goes with it (on delete cascade): the tables open to guests
+      const [held] = await admin.db
+        .select()
+        .from(closures)
+        .where(eq(closures.tournamentId, request.params.id));
       const [deleted] = await admin.db
         .delete(tournaments)
         .where(eq(tournaments.id, request.params.id))
         .returning({ id: tournaments.id });
       if (!deleted) return reply.code(404).send({ error: 'not_found' });
+      if (held) announceClosures(admin, held);
       return { deleted: true };
     }
   );

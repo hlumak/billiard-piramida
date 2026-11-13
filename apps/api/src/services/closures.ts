@@ -1,14 +1,17 @@
 import {
   addDays,
+  isIsoDate,
   MAX_CLOSURE_DAYS,
+  tournamentClosureRange,
+  tournamentHoldsTables,
   type ClosureConflictDto,
   type ClosureDto,
   type IsoDate
 } from '@repo/shared';
 import { and, asc, eq, gt, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/client.ts';
-import { bookings, closures } from '../db/schema.ts';
-import { warsawDateOf, warsawHourOf } from '../lib/time.ts';
+import { bookings, closures, type tournaments } from '../db/schema.ts';
+import { warsawDateOf, warsawHourOf, warsawInstant } from '../lib/time.ts';
 
 /**
  * One advisory lock keys "the closures": a closure write holds it exclusively
@@ -63,7 +66,8 @@ export function toClosureDto(row: ClosureRow): ClosureDto {
     endDate: warsawDateOf(row.endsAt),
     endHour: warsawHourOf(row.endsAt),
     tableIds: row.tableIds,
-    reason: row.reason
+    reason: row.reason,
+    tournamentId: row.tournamentId
   };
 }
 
@@ -146,4 +150,66 @@ export function datesTouched(startsAt: Date, endsAt: Date): IsoDate[] {
     if (dates.length > MAX_CLOSURE_DAYS + 1) break;
   }
   return dates;
+}
+
+type Writer = Pick<Db, 'select' | 'execute' | 'insert' | 'update' | 'delete'>;
+
+export type TournamentClosureSync =
+  /** The closure as it was and as it now is, either null: what to announce */
+  | { ok: true; before: ClosureRow | null; after: ClosureRow | null }
+  | { ok: false; conflicts: ClosureConflictDto[] };
+
+/**
+ * Brings the closure a tournament holds in line with the tournament as it now
+ * stands: written when it gets its day, hours and tables, moved with them,
+ * removed when it loses one of them, goes back to draft or is cancelled. Call
+ * inside the transaction that writes the tournament, so a refusal rolls the
+ * edit back; it takes the exclusive lock itself. Like a closure entered by
+ * hand, it refuses while confirmed bookings stand in the way, and writes
+ * nothing then. `reason` is what the staff schedule shows on the hatching.
+ */
+export async function syncTournamentClosure(
+  tx: Writer,
+  tournament: Pick<
+    typeof tournaments.$inferSelect,
+    'id' | 'status' | 'startsOn' | 'startHour' | 'endHour' | 'tableIds'
+  >,
+  reason: string
+): Promise<TournamentClosureSync> {
+  await lockClosuresExclusive(tx);
+  const [before = null] = await tx
+    .select()
+    .from(closures)
+    .where(eq(closures.tournamentId, tournament.id));
+
+  const startsOn =
+    tournament.startsOn !== null && isIsoDate(tournament.startsOn) ? tournament.startsOn : null;
+  const range = tournamentClosureRange({ ...tournament, startsOn });
+  if (
+    range === null ||
+    tournament.tableIds.length === 0 ||
+    !tournamentHoldsTables(tournament.status)
+  ) {
+    if (before !== null) await tx.delete(closures).where(eq(closures.id, before.id));
+    return { ok: true, before, after: null };
+  }
+
+  const values = {
+    startsAt: warsawInstant(range.startDate, range.startHour),
+    endsAt: warsawInstant(range.endDate, range.endHour),
+    tableIds: [...tournament.tableIds].sort((a, b) => a - b),
+    reason,
+    tournamentId: tournament.id
+  };
+  // Only ever bookings not over yet: a tournament played last week can still
+  // have its copy fixed without tripping over the games around it
+  const conflicts = await findClosureConflicts(tx, values.startsAt, values.endsAt, values.tableIds);
+  if (conflicts.length > 0) return { ok: false, conflicts };
+
+  const [after] =
+    before === null
+      ? await tx.insert(closures).values(values).returning()
+      : await tx.update(closures).set(values).where(eq(closures.id, before.id)).returning();
+  if (!after) throw new Error('tournament closure write returned no row');
+  return { ok: true, before, after };
 }
