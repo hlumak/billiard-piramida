@@ -108,3 +108,77 @@
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* Montserrat's stand-ins while it loads: the system's Arial (Windows, macOS,
+   iOS) or Roboto (Android), scaled to Montserrat's width and given its
+   ascent and descent. Plain, they set the same text 7–15% narrower, so a
+   paragraph had a line fewer until Montserrat arrived and everything below
+   it jumped (up to 114px on a phone's home page). size-adjust is measured
+   against the site's own text in all three languages; the regular face
+   matches weight 400, the bold one 600/700 (both used). Overrides are scaled
+   by size-adjust, hence Montserrat's 0.97/0.25 divided by it. Only the
+   characters Montserrat itself covers (its three subsets): anything else, such
+   as an arrow, keeps falling through to the system font, as it always did. */
+@font-face {
+  font-family: 'Montserrat Fallback';
+  font-weight: 100 549;
+  unicode-range:
+    U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116, U+0100-02BA, U+02BD-02C5, U+02C7-02CC,
+    U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF, U+0000-00FF, U+0131, U+0152-0153,
+    U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+  src: local('Arial'), local('ArialMT');
+  size-adjust: 109.8%;
+  ascent-override: 88.34%;
+  descent-override: 22.77%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Montserrat Fallback';
+  font-weight: 550 900;
+  unicode-range:
+    U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116, U+0100-02BA, U+02BD-02C5, U+02C7-02CC,
+    U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF, U+0000-00FF, U+0131, U+0152-0153,
+    U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+  src: local('Arial Bold'), local('Arial-BoldMT');
+  size-adjust: 108.1%;
+  ascent-override: 89.73%;
+  descent-override: 23.13%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Montserrat Fallback Roboto';
+  font-weight: 100 549;
+  unicode-range:
+    U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116, U+0100-02BA, U+02BD-02C5, U+02C7-02CC,
+    U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF, U+0000-00FF, U+0131, U+0152-0153,
+    U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+  src: local('Roboto'), local('Roboto-Regular');
+  size-adjust: 110.35%;
+  ascent-override: 87.9%;
+  descent-override: 22.66%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Montserrat Fallback Roboto';
+  font-weight: 550 900;
+  unicode-range:
+    U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116, U+0100-02BA, U+02BD-02C5, U+02C7-02CC,
+    U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF, U+0000-00FF, U+0131, U+0152-0153,
+    U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+  src: local('Roboto Bold'), local('Roboto-Bold');
+  size-adjust: 113.66%;
+  ascent-override: 85.34%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}

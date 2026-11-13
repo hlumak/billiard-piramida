@@ -12,7 +12,9 @@
 @import 'react-phone-number-input/style.css';
 
 @theme {
-  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-sans:
+    'Montserrat', 'Montserrat Fallback', 'Montserrat Fallback Roboto', ui-sans-serif, system-ui,
+    sans-serif;
   --font-script: 'Great Vibes', cursive;
   --font-alt: 'Montserrat Alternates', sans-serif;
 
