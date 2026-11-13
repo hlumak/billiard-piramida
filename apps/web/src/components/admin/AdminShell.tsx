@@ -182,7 +182,8 @@ export function AdminShell({
   const sessionProps = { onLogout, isLoggingOut, logoutFailed };
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
+    // data-admin-panel: styles.css gives the panel a stable scrollbar gutter
+    <div data-admin-panel className="min-h-dvh lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
       {/* The column carries the ground all the way down; the sidebar inside rides along */}
       <div className="hidden border-r border-creme/10 bg-club-green-dark lg:block">
         <aside className="sticky top-0 flex h-dvh flex-col gap-6 overflow-y-auto px-4 py-6">

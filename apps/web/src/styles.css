@@ -308,6 +308,17 @@ html {
  * reproduced on Windows. A staff-only 6px tab-switch jump is not worth a
  * visible seam on the first screen every customer sees. */
 
+/* The staff panel has no full-bleed photo, so there the gutter is back, and
+   it earns its place twice: no tab-switch jump, and a cheap modal. A dialog
+   locks the page's scroll by setting overflow: hidden and
+   scrollbar-gutter: stable on <html> (React Aria); going from auto to stable
+   made the browser restyle and lay out the whole panel, about 100ms each
+   way on a slow laptop over the 200-row bookings list. Already stable, it
+   costs about 1ms. */
+html:has([data-admin-panel]) {
+  scrollbar-gutter: stable;
+}
+
 /* Tailwind v4's preflight leaves buttons on the default arrow; here anything
    that can be pressed shows the hand, like a link does. In the base layer, so
    a disabled state's `not-allowed` (and any utility) still wins. */
