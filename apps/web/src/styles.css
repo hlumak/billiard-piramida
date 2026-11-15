@@ -15,6 +15,12 @@
   --font-sans:
     'Montserrat', 'Montserrat Fallback', 'Montserrat Fallback Roboto', ui-sans-serif, system-ui,
     sans-serif;
+  /* The switcher's Ukrainian label on a page in another language: its three
+     letters from their own small file (src/fonts.css). Any other letter, were
+     the label to change, falls through to Montserrat as before. */
+  --font-ukr-label:
+    'Montserrat UKR', 'Montserrat', 'Montserrat Fallback', 'Montserrat Fallback Roboto',
+    ui-sans-serif, system-ui, sans-serif;
   --font-script: 'Great Vibes', cursive;
   --font-alt: 'Montserrat Alternates', sans-serif;
 
