@@ -78,6 +78,10 @@ export function LocaleSwitcher({
           className={`flex items-center justify-center rounded-[9px] px-3.5 transition-colors ${
             stretch ? 'h-11 text-sm' : 'h-9 text-[13px]'
           } ${
+            // Off the Ukrainian pages this label is the only Cyrillic on screen:
+            // three letters from a 1.6 kB file instead of the 21 kB Cyrillic font
+            locale === 'uk' && current !== 'uk' ? 'font-ukr-label' : ''
+          } ${
             locale === current
               ? 'bg-golden font-bold text-btn-text'
               : 'font-semibold text-creme hover:bg-club-green-light'
