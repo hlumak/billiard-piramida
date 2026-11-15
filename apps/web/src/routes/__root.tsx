@@ -16,10 +16,11 @@ import type { Locale } from '@repo/shared';
 /**
  * Montserrat (every weight: it is a variable font) in the subsets this
  * locale's copy needs, fetched alongside the stylesheet rather than after it
- * is parsed. The script and alternate faces still load on demand.
+ * is parsed. The script and alternate faces still load on demand. Polish
+ * needs its sixteen own letters, not all of latin-ext (see src/fonts.css).
  */
 const FONT_PRELOADS: Record<Locale, string[]> = {
-  pl: ['montserrat-latin', 'montserrat-latin-ext'],
+  pl: ['montserrat-latin', 'montserrat-pl'],
   uk: ['montserrat-latin', 'montserrat-cyrillic'],
   en: ['montserrat-latin']
 };
