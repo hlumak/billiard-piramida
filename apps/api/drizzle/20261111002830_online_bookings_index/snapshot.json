@@ -1,6 +1,6 @@
 {
   "type": "diff",
-  "version": "9",
+  "version": "10",
   "dialect": "postgres",
   "id": "6dff5b89-56e2-4b8f-9eec-3acb30cebe88",
   "prevIds": ["0ad9c55f-8226-4bb1-82ea-a9b40eb6e77a"],
@@ -38,7 +38,6 @@
         "where": "\"manage_token_hash\" is not null",
         "with": "",
         "method": "btree",
-        "concurrently": false,
         "entityType": "indexes"
       }
     }
