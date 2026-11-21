@@ -113,8 +113,32 @@ the key, swap the public half on the server and the secret.
 
 nginx listens on `127.0.0.1:8080`; put the TLS-terminating proxy in front of it.
 The API and web containers run as an unprivileged user on read-only filesystems;
-staff uploads live in the `uploads` volume, the database in `pgdata`. A staging
-deploy can set `ROBOTS_DISALLOW_ALL=1`.
+staff uploads live in the `uploads` volume, the database in `pgdata19` (one volume
+per PostgreSQL major). A staging deploy can set `ROBOTS_DISALLOW_ALL=1`.
+
+### PostgreSQL major upgrade
+
+The image will not start on another major's data, and the automatic deploy would
+leave the database down, so the commit that changes the image and the volume name
+in `docker-compose.yaml` (and the CI service image) carries `[skip deploy]` and
+goes live by hand, with the club closed. On the server, once CI is green:
+
+```bash
+cd /root/billiard-piramida
+c() { docker compose --profile app "$@"; }
+c stop api web                                   # no writes from here on
+c exec -T postgres sh -c 'pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"'   > /root/backups/piramida-before-pg-upgrade.dump
+c stop postgres
+git fetch origin main && git reset --hard <sha>  # the new compose file
+c up -d --wait postgres                          # empty server, new volume
+c exec -T postgres sh -c 'pg_restore --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB"'   < /root/backups/piramida-before-pg-upgrade.dump
+c exec -T postgres sh -c 'vacuumdb --analyze-only -U "$POSTGRES_USER" "$POSTGRES_DB"'
+scripts/deploy.sh <sha>                          # migrate (no-op), up, health check
+```
+
+Compare row counts before and after the restore. The old volume is untouched:
+to go back, `git reset --hard` to the previous commit and `up -d --wait`. Remove
+it (`docker volume rm`) once the new server has run for a few days.
 
 ## Checks
 

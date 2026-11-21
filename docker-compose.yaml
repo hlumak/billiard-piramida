@@ -18,10 +18,12 @@ x-database-url: &database-url postgres://${POSTGRES_USER:-piramida}:${POSTGRES_P
 
 services:
   postgres:
-    # Pinned to the minor release. The pgdata volume uses the PostgreSQL 18+
-    # layout (/var/lib/postgresql); a major upgrade needs pg_upgrade or a
-    # dump/restore, and a switch to an Alpine image needs one too (collation).
-    image: postgres:18.6-trixie
+    # Pinned to the minor release. One volume per major (pgdata19): the image
+    # refuses to start on another major's data, so a major upgrade is a pg_dump
+    # from the old server, a new volume name here, and a pg_restore into it
+    # (README, "PostgreSQL major upgrade"). A switch to an Alpine image needs a
+    # dump/restore too (collation).
+    image: postgres:19.0-trixie
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-piramida}
@@ -32,7 +34,7 @@ services:
       # Loopback only: for host tooling (pnpm dev, db:migrate, tests)
       - '127.0.0.1:5432:5432'
     volumes:
-      - pgdata:/var/lib/postgresql
+      - pgdata19:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
@@ -134,5 +136,5 @@ services:
     logging: *logging
 
 volumes:
-  pgdata:
+  pgdata19:
   uploads:
