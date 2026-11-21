@@ -309,7 +309,7 @@ export interface TournamentDto {
   confirmedCount: number;
   /** Signed up online, fee not paid yet */
   pendingCount: number;
-  /** Derived from status + deadline + capacity — see `registrationStateOf` */
+  /** Derived from status + play day + deadline + capacity — see `registrationStateOf` */
   registrationState: TournamentRegistrationState;
 }
 

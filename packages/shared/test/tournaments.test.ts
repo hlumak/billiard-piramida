@@ -20,9 +20,22 @@ test('sign-up stays open up to and on the play day', () => {
   assert.equal(registrationStateOf(open, '2026-10-20'), 'open');
 });
 
-test('a tournament whose day is over closes, even with no deadline', () => {
-  assert.equal(registrationStateOf(open, '2026-10-21'), 'closed');
+test('a tournament whose day is over is completed, whatever status staff left it in', () => {
+  assert.equal(registrationStateOf(open, '2026-10-21'), 'completed');
+  assert.equal(registrationStateOf({ ...open, status: 'closed' }, '2026-10-21'), 'completed');
   assert.equal(registrationStateOf({ ...open, startsOn: null }, '2026-10-21'), 'open');
+});
+
+test('sign-ups shut ahead of the play day read as closed, not completed', () => {
+  assert.equal(registrationStateOf({ ...open, status: 'closed' }, '2026-10-20'), 'closed');
+  assert.equal(
+    registrationStateOf({ ...open, status: 'closed', startsOn: null }, '2026-10-21'),
+    'closed'
+  );
+});
+
+test('a cancelled tournament stays cancelled after its day', () => {
+  assert.equal(registrationStateOf({ ...open, status: 'cancelled' }, '2026-10-21'), 'cancelled');
 });
 
 test('the deadline and the cap still close it first', () => {

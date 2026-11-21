@@ -62,8 +62,8 @@ export interface RegistrationWindow {
 }
 
 /**
- * A deadline passes and a roster fills with nobody touching the row, so the
- * state a visitor sees cannot be a stored column. Both sides derive it from the
+ * A deadline passes, a roster fills and the play day goes by with nobody
+ * touching the row, so the state a visitor sees cannot be a stored column. Both sides derive it from the
  * same function: the API sends its verdict in the DTO, the client renders it.
  *
  * `today` is the venue-local calendar date. YYYY-MM-DD sorts lexicographically
@@ -76,10 +76,11 @@ export function registrationStateOf(
   const { status, startsOn, registrationDeadline, maxPlayers, takenSeats } = tournament;
   if (status === 'cancelled') return 'cancelled';
   if (status === 'completed') return 'completed';
+  // Played, and staff have not moved it on yet: it is over all the same, so
+  // the site stops listing it as ahead. A walk-in can still sign up on the
+  // day itself, never after it
+  if (startsOn !== null && today > startsOn) return 'completed';
   if (status !== 'registration') return 'closed';
-  // Played, and staff have not moved it on yet: a walk-in can still sign up on
-  // the day itself, never after it
-  if (startsOn !== null && today > startsOn) return 'closed';
   if (maxPlayers !== null && takenSeats >= maxPlayers) return 'full';
   // Inclusive: "до 30.08" means a sign-up still lands on the 30th
   if (registrationDeadline !== null && today > registrationDeadline) return 'deadline_passed';

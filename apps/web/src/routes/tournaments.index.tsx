@@ -20,9 +20,17 @@ export const Route = createFileRoute('/tournaments/')({
   component: TournamentsPage
 });
 
-/** Played or called off: these go under "past", the rest are still ahead. */
+/**
+ * Played or called off: these go under "past", the rest are still ahead.
+ * `completed` covers a tournament whose day has gone by too, whatever status
+ * staff left it in — see `registrationStateOf`.
+ */
 const isOver = (tournament: TournamentDto) =>
   tournament.registrationState === 'completed' || tournament.registrationState === 'cancelled';
+
+/** The API lists by stored status, which says nothing inside "past": latest first. */
+const latestFirst = (a: TournamentDto, b: TournamentDto) =>
+  (b.startsOn ?? '').localeCompare(a.startsOn ?? '');
 
 function TournamentGroup({ title, tournaments }: { title: string; tournaments: TournamentDto[] }) {
   if (tournaments.length === 0) return null;
@@ -69,7 +77,10 @@ function TournamentList() {
         title={m.tournaments_upcoming()}
         tournaments={tournaments.filter(tournament => !isOver(tournament))}
       />
-      <TournamentGroup title={m.tournaments_past()} tournaments={tournaments.filter(isOver)} />
+      <TournamentGroup
+        title={m.tournaments_past()}
+        tournaments={tournaments.filter(isOver).sort(latestFirst)}
+      />
     </div>
   );
 }
