@@ -139,7 +139,7 @@ function BookingWizard() {
       const day = firstOpenDay(today, now.minute, hours, closures);
       if (day !== null) selectDate(day);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react/exhaustive-effect-dependencies
   }, []);
 
   const step = permittedStep(state);

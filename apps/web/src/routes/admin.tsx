@@ -111,7 +111,7 @@ function useAdminSession(queryClient: QueryClient) {
       dropLocal();
     });
     return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react/exhaustive-effect-dependencies
   }, [queryClient]);
 
   return {

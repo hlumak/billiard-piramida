@@ -13,19 +13,16 @@ import { m } from '../../paraglide/messages.js';
 export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
   const queryClient = useQueryClient();
   const { data: profile, isPending, error, refetch } = useQuery(profileQuery());
-  const [cards, setCards] = useState<CardsState | null>(null);
+  // The user's edits; until the first one the form shows the saved profile
+  const [edited, setCards] = useState<CardsState | null>(null);
+  const cards: CardsState | null =
+    edited ??
+    (profile
+      ? { sportCardType: profile.sportCardType, sportCardNumber: profile.sportCardNumber ?? '' }
+      : null);
   // Only an auth failure means the token is dead; a network blip / 5xx must not
   // silently sign the user out and delete their token.
   const isAuthError = error instanceof ApiError && error.status === 401;
-
-  useEffect(() => {
-    if (profile && cards === null) {
-      setCards({
-        sportCardType: profile.sportCardType,
-        sportCardNumber: profile.sportCardNumber ?? ''
-      });
-    }
-  }, [profile, cards]);
 
   const save = useMutation({
     mutationFn: (next: CardsState) =>
@@ -51,7 +48,7 @@ export function ProfileView({ onSignedOut }: { onSignedOut: () => void }) {
     void authApi.logout().catch(() => undefined);
     dropSessionData(queryClient);
     onSignedOut();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react/exhaustive-effect-dependencies
   }, [isAuthError]);
 
   // Non-auth failure: keep the session, offer a retry instead of signing out
