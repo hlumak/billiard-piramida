@@ -2,6 +2,7 @@ import { useRouterState } from '@tanstack/react-router';
 import type { MouseEvent } from 'react';
 import { getLocale, locales, setLocale, type Locale } from '../paraglide/runtime.js';
 import { m } from '../paraglide/messages.js';
+import { rememberLocaleChoice } from '../lib/locale-choice';
 import { localizedPath } from '../lib/seo';
 
 const LABELS = { uk: 'УКР', pl: 'PL', en: 'EN' } as const;
@@ -23,6 +24,8 @@ function switchTo(locale: Locale) {
   setTimeout(() => {
     switching = false;
   }, 3000);
+  // The one place a language is remembered: an explicit pick, never a visit
+  rememberLocaleChoice(locale);
   setLocale(locale);
 }
 
@@ -37,7 +40,7 @@ const NAMES = { uk: 'Українська', pl: 'Polski', en: 'English' } as con
  * only follow `<a href>`, and with buttons the other languages were reachable
  * only through hreflang and the sitemap (the Ukrainian home page sat
  * "discovered, not indexed" for weeks). A plain click still goes through
- * setLocale, which also remembers the choice in the locale cookie.
+ * switchTo, which also remembers the choice for the bare domain.
  */
 export function LocaleSwitcher({
   stretch = false,

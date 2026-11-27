@@ -1,9 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import handler from '@tanstack/react-start/server-entry';
 import { paraglideMiddleware } from './paraglide/server.js';
-import { baseLocale, cookieName, isLocale } from './paraglide/runtime.js';
 import { PUBLIC_API_URL } from './lib/api';
 import { canonicalPath } from './lib/canonical-path';
+import { chosenHome, expiredLegacyCookie } from './lib/locale-choice';
 import { REQUEST_CONTEXT_KEY, type RequestContext } from './lib/request-context';
 import { contentSecurityPolicy, createNonce, withSecurityHeaders } from './lib/security-headers';
 
@@ -13,25 +13,26 @@ const requestContext = new AsyncLocalStorage<RequestContext>();
   requestContext;
 
 /**
- * The bare domain in the language this browser picked before. The address
- * decides the language everywhere else (a shared /uk/... link stays
+ * The bare domain in the language this browser picked in the switcher. The
+ * address decides the language everywhere else (a shared /uk/... link stays
  * Ukrainian); only "/" — what people type — honours an explicit earlier
  * choice. Crawlers carry no cookie, so they still get the Polish home page.
  */
 function chosenLocaleRedirect(request: Request): Response | null {
-  const url = new URL(request.url);
-  if (url.pathname !== '/') return null;
-  const cookie = request.headers.get('cookie') ?? '';
-  const chosen = new RegExp(`(?:^|;\\s*)${cookieName}=([^;]+)`).exec(cookie)?.[1];
-  if (chosen === undefined || chosen === baseLocale || !isLocale(chosen)) return null;
+  const location = chosenHome(new URL(request.url), request.headers.get('cookie'));
+  if (location === null) return null;
   return new Response(null, {
     status: 302,
-    headers: {
-      location: `/${chosen}/${url.search}`,
-      vary: 'Cookie',
-      'cache-control': 'private, no-store'
-    }
+    headers: { location, vary: 'Cookie', 'cache-control': 'private, no-store' }
   });
+}
+
+/** The hardening headers, and the old language cookie taken back where a browser still sends it. */
+function harden(response: Response, request: Request, csp: string | null): Response {
+  const hardened = withSecurityHeaders(response, request, csp);
+  const expired = expiredLegacyCookie(request.headers.get('cookie'));
+  if (expired !== null) hardened.headers.append('set-cookie', expired);
+  return hardened;
 }
 
 export default {
@@ -51,7 +52,7 @@ export default {
     // (a trailing slash, "/" with a language chosen earlier) got no HSTS
     const canonical = page ? canonicalPath(new URL(request.url)) : null;
     if (canonical !== null) {
-      return withSecurityHeaders(
+      return harden(
         new Response(null, { status: 308, headers: { location: canonical } }),
         request,
         null
@@ -59,7 +60,7 @@ export default {
     }
 
     const chosen = page ? chosenLocaleRedirect(request) : null;
-    if (chosen !== null) return withSecurityHeaders(chosen, request, null);
+    if (chosen !== null) return harden(chosen, request, null);
 
     return requestContext.run({ nonce, forwardedFor }, async () => {
       // The router de-localizes the URL itself (rewrite in router.tsx), so it
@@ -67,7 +68,7 @@ export default {
       // copy as well would strip the prefix twice and loop on redirects.
       const response = await paraglideMiddleware(request, () => handler.fetch(request));
       const apiOrigin = PUBLIC_API_URL ? new URL(PUBLIC_API_URL).origin : '';
-      return withSecurityHeaders(
+      return harden(
         response,
         request,
         nonce === undefined ? null : contentSecurityPolicy(nonce, request.url, apiOrigin)

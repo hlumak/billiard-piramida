@@ -50,10 +50,14 @@ const config = defineConfig(({ mode }) => {
         // The language is part of the address: Polish (the base) at /, the
         // others under /uk and /en. Each language is then its own crawlable
         // page with hreflang alternates; before, all three shared one URL and
-        // search engines only ever saw the Polish one. The cookie and the
-        // browser's preference still decide where the URL can't (API calls).
+        // search engines only ever saw the Polish one. The browser's
+        // preference still decides where the URL can't (API calls).
+        // No 'cookie' strategy: with it the runtime wrote its cookie on the
+        // first page view in any language, unasked, and a shared /uk/… link
+        // then counted as choosing Ukrainian. The switcher keeps the choice
+        // itself (src/lib/locale-choice.ts).
         // Keep in step with the "generate" script in package.json.
-        strategy: ['url', 'cookie', 'preferredLanguage', 'baseLocale'],
+        strategy: ['url', 'preferredLanguage', 'baseLocale'],
         // Real files on disk, as Paraglide 2 wrote them and as the CLI
         // ("generate") still does. Paraglide 3's Vite default,
         // 'virtual-modules', left the server build with two runtimes: the
