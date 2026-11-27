@@ -27,3 +27,21 @@ test('never sends anyone to another host', () => {
   expect(at('//evil.example/')).toBe('/evil.example');
   expect(at('///evil.example//')).toBe('/evil.example');
 });
+
+test('the Polish prefix goes in the same single step: Polish pages have none', () => {
+  expect(at('/pl')).toBe('/');
+  expect(at('/pl/')).toBe('/');
+  expect(at('/pl/prices')).toBe('/prices');
+  expect(at('/pl/prices/?from=menu')).toBe('/prices?from=menu');
+  expect(at('/pl/uk')).toBe('/uk/');
+});
+
+test('a page that merely starts with the letters of a language is not prefixed', () => {
+  expect(at('/places')).toBeNull();
+  expect(at('/plan/')).toBe('/plan');
+});
+
+test('dropping the prefix cannot leave an address on another host', () => {
+  expect(at('/pl//evil.example')).toBe('/evil.example');
+  expect(at('/pl//evil.example/')).toBe('/evil.example');
+});
