@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { serve } from 'srvx';
 import { staticMiddleware } from 'srvx/static';
 import handler from './dist/server/server.js';
+import { noSniff } from './static-headers.mjs';
 
 const server = serve({
   port: Number(process.env.PORT ?? 3000),
@@ -12,7 +13,10 @@ const server = serve({
   fetch: handler.fetch,
   // Next to this file, not relative to the working directory: started from
   // anywhere else, SSR used to work while every asset 404'd
-  middleware: [staticMiddleware({ dir: fileURLToPath(new URL('./dist/client', import.meta.url)) })]
+  middleware: [
+    noSniff,
+    staticMiddleware({ dir: fileURLToPath(new URL('./dist/client', import.meta.url)) })
+  ]
 });
 
 await server.ready();

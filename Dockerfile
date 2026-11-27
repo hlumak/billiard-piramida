@@ -81,7 +81,7 @@ RUN cd apps/web/dist \
 # runtime needs only the build output, the server entry and srvx (which has no
 # dependencies of its own) — not ~340 MB of node_modules.
 RUN mkdir -p /runtime/node_modules \
-  && cp -r apps/web/dist apps/web/server.mjs /runtime/ \
+  && cp -r apps/web/dist apps/web/server.mjs apps/web/static-headers.mjs /runtime/ \
   && cp -rL apps/web/node_modules/srvx /runtime/node_modules/srvx \
   && echo '{"type":"module","private":true}' > /runtime/package.json
 

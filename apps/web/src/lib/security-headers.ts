@@ -47,6 +47,12 @@ export function baseSecurityHeaders(https: boolean): Record<string, string> {
     'x-frame-options': 'DENY',
     'referrer-policy': 'strict-origin-when-cross-origin',
     'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+    // A page that opened this one, or that this one opened, on another origin
+    // keeps no window handle to it; other sites cannot pull these responses
+    // into their own process as subresources. The site opens no pop-ups that
+    // report back, and its pictures are not hot-linked from elsewhere.
+    'cross-origin-opener-policy': 'same-origin',
+    'cross-origin-resource-policy': 'same-site',
     // Only meaningful (and only honoured) over https
     ...(https ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {})
   };
@@ -65,8 +71,12 @@ export function withSecurityHeaders(
   for (const [name, value] of Object.entries(baseSecurityHeaders(https))) {
     if (!headers.has(name)) headers.set(name, value);
   }
-  if (csp !== null && (headers.get('content-type') ?? '').startsWith('text/html')) {
-    headers.set('content-security-policy', csp);
+  if ((headers.get('content-type') ?? '').startsWith('text/html')) {
+    if (csp !== null) headers.set('content-security-policy', csp);
+    // Said outright rather than left to each cache's guess: a page carries a
+    // per-request nonce and "/" answers by the language cookie, so no shared
+    // cache may keep one, and a browser asks again before showing its copy.
+    if (!headers.has('cache-control')) headers.set('cache-control', 'private, no-cache');
   }
   return new Response(response.body, {
     status: response.status,

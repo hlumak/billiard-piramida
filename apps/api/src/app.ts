@@ -159,7 +159,9 @@ export async function buildApp({
 
   // Await plugin registration so their hooks exist BEFORE routes are defined —
   // hooks only apply to routes registered after them.
-  await app.register(helmet);
+  // X-XSS-Protection is off: Helmet's default sends "0", a header no browser
+  // has read since 2022; the CSP is what stops injected script.
+  await app.register(helmet, { xXssProtection: false });
   await app.register(cors, {
     // Never "reflect any origin": with credentials that would let any site
     // read authenticated responses

@@ -38,6 +38,43 @@ describe('security headers', () => {
     expect(json.headers.get('strict-transport-security')).toBeNull();
   });
 
+  test('a page is revalidated on every visit and never kept by a shared cache', () => {
+    // Its CSP nonce is per request, and "/" answers by the language cookie
+    const page = withSecurityHeaders(
+      new Response('<html></html>', { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+      new Request('https://club.example/'),
+      null
+    );
+    expect(page.headers.get('cache-control')).toBe('private, no-cache');
+  });
+
+  test('a response that set its own caching keeps it', () => {
+    const sitemap = withSecurityHeaders(
+      new Response('<urlset/>', {
+        headers: { 'content-type': 'application/xml', 'cache-control': 'public, max-age=3600' }
+      }),
+      new Request('https://club.example/sitemap.xml'),
+      null
+    );
+    expect(sitemap.headers.get('cache-control')).toBe('public, max-age=3600');
+    const redirect = withSecurityHeaders(
+      new Response(null, { status: 308, headers: { location: '/prices' } }),
+      new Request('https://club.example/prices/'),
+      null
+    );
+    expect(redirect.headers.get('cache-control')).toBeNull();
+  });
+
+  test('other origins get no handle on a page and cannot embed its responses', () => {
+    const page = withSecurityHeaders(
+      new Response('<html></html>', { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+      new Request('https://club.example/'),
+      null
+    );
+    expect(page.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+    expect(page.headers.get('cross-origin-resource-policy')).toBe('same-site');
+  });
+
   test('nonces are fresh per call', () => {
     expect(createNonce()).not.toBe(createNonce());
   });

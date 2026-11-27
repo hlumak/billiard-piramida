@@ -112,6 +112,13 @@ test('health check responds', async () => {
   assert.deepEqual(res.json(), { status: 'ok' });
 });
 
+test('responses carry nosniff and no dead X-XSS-Protection header', async () => {
+  const res = await app.inject({ method: 'GET', url: '/api/tables' });
+  assert.equal(res.headers['x-content-type-options'], 'nosniff');
+  // No browser reads it any more; Helmet's default still sends "0"
+  assert.equal(res.headers['x-xss-protection'], undefined);
+});
+
 test('lists every bookable spot with its kind', async () => {
   const res = await app.inject({ method: 'GET', url: '/api/tables' });
   assert.equal(res.statusCode, 200);
