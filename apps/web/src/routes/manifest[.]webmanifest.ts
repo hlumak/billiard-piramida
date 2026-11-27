@@ -1,11 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { baseLocale, isLocale, localizeHref } from '../paraglide/runtime.js';
-import { m } from '../paraglide/messages.js';
+import { baseLocale, isLocale } from '../paraglide/runtime.js';
+import { webManifest } from '../lib/manifest';
 
 /**
  * The web app manifest in the visitor's language: the root links it with
- * `?locale=`, so the name an installed app shows matches the site it came
- * from (the static file was Ukrainian for everyone).
+ * `?locale=` (the static file was Ukrainian for everyone).
  */
 export const Route = createFileRoute('/manifest.webmanifest')({
   server: {
@@ -13,28 +12,7 @@ export const Route = createFileRoute('/manifest.webmanifest')({
       GET: ({ request }) => {
         const requested = new URL(request.url).searchParams.get('locale');
         const locale = isLocale(requested) ? requested : baseLocale;
-        const manifest = {
-          name: m.app_name({}, { locale }),
-          short_name: 'Piramida',
-          description: m.app_description({}, { locale }),
-          lang: locale,
-          // An installed app opens in the language it was installed from
-          start_url: localizeHref('/', { locale }),
-          display: 'standalone',
-          background_color: '#0a4730',
-          theme_color: '#0a4730',
-          icons: [
-            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-            {
-              src: '/icons/icon-maskable-512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable'
-            }
-          ]
-        };
-        return new Response(JSON.stringify(manifest), {
+        return new Response(JSON.stringify(webManifest(locale)), {
           headers: {
             'content-type': 'application/manifest+json; charset=utf-8',
             'cache-control': 'public, max-age=3600'
