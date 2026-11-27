@@ -71,9 +71,12 @@ export function TournamentSpotlight({
       <div className="mt-4 flex items-center gap-3.5 lg:mt-5 lg:gap-4.5">
         {tournament.startsOn !== null ? <DateTile date={tournament.startsOn} /> : null}
         <div className="min-w-0">
-          <h2 id={headingId} className="text-[19px] leading-tight font-bold lg:text-2xl">
+          {/* Not a heading: on a phone the card stands above the page's h1, and
+              an h2 there made the outline start at level 2. It still names
+              the card (aria-labelledby on the article). */}
+          <p id={headingId} className="text-[19px] leading-tight font-bold lg:text-2xl">
             {tournament.title}
-          </h2>
+          </p>
           {tournament.summary ? (
             <p className="mt-1.5 line-clamp-2 text-[13px] text-grey-cool lg:text-[15px]">
               {tournament.summary}
