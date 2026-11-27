@@ -228,6 +228,12 @@
 :root,
 [data-theme='light'],
 [data-theme='dark'] {
+  /* HeroUI's default theme declares `light`, so the browser drew what it
+     paints itself for a light page: a white scrollbar down every green page
+     and black calendar glyphs on the green date fields. The site's own
+     colours do not depend on this (they are the tokens below). */
+  color-scheme: dark;
+
   --radius: 0.625rem; /* 10px per Figma buttons */
 
   --background: #0a4730;

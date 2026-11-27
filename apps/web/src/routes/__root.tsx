@@ -40,6 +40,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { name: 'theme-color', content: '#0a4730' },
+      // The one theme is dark. Said here as well as in styles.css, because the
+      // meta is read before any stylesheet: the browser paints its own parts
+      // (scrollbars, date and select controls) to suit from the first frame.
+      { name: 'color-scheme', content: 'dark' },
       { title: m.app_title() },
       { property: 'og:site_name', content: 'Piramida' },
       { property: 'og:type', content: 'website' },
