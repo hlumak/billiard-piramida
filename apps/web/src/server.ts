@@ -3,6 +3,7 @@ import handler from '@tanstack/react-start/server-entry';
 import { paraglideMiddleware } from './paraglide/server.js';
 import { PUBLIC_API_URL } from './lib/api';
 import { canonicalPath } from './lib/canonical-path';
+import { llmsLinkHeader } from './lib/llms';
 import { chosenHome, expiredLegacyCookie } from './lib/locale-choice';
 import { REQUEST_CONTEXT_KEY, type RequestContext } from './lib/request-context';
 import { contentSecurityPolicy, createNonce, withSecurityHeaders } from './lib/security-headers';
@@ -27,11 +28,18 @@ function chosenLocaleRedirect(request: Request): Response | null {
   });
 }
 
-/** The hardening headers, and the old language cookie taken back where a browser still sends it. */
+/**
+ * What every response of this server gets on its way out: the hardening
+ * headers, the old language cookie taken back where a browser still sends
+ * it, and on pages the pointer to llms.txt.
+ */
 function harden(response: Response, request: Request, csp: string | null): Response {
   const hardened = withSecurityHeaders(response, request, csp);
   const expired = expiredLegacyCookie(request.headers.get('cookie'));
   if (expired !== null) hardened.headers.append('set-cookie', expired);
+  if ((hardened.headers.get('content-type') ?? '').startsWith('text/html')) {
+    hardened.headers.append('link', llmsLinkHeader(new URL(request.url).pathname));
+  }
   return hardened;
 }
 

@@ -7,3 +7,12 @@ test('the document declares its one dark scheme before any stylesheet loads', as
   const head = await Route.options.head?.({} as never);
   expect(head?.meta).toContainEqual({ name: 'color-scheme', content: 'dark' });
 });
+
+test('the document points agents at llms.txt instead of leaving them to guess the path', async () => {
+  const head = await Route.options.head?.({} as never);
+  expect(head?.links).toContainEqual({
+    rel: 'describedby',
+    href: '/llms.txt',
+    type: 'text/markdown'
+  });
+});

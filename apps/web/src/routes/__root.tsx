@@ -2,8 +2,9 @@ import { Suspense } from 'react';
 import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 
 import { m } from '../paraglide/messages.js';
-import { getLocale } from '../paraglide/runtime.js';
+import { getLocale, localizeHref } from '../paraglide/runtime.js';
 import { SITE_URL } from '../lib/seo';
+import { llmsTxtPath } from '../lib/llms';
 import { venueConfigQuery } from '../lib/queries';
 import { DevTools } from '../integrations/devtools';
 import { NavigationProgress } from '../components/NavigationProgress';
@@ -73,7 +74,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16.png' },
       { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' },
       { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
-      { rel: 'manifest', href: `/manifest.webmanifest?locale=${getLocale()}` }
+      { rel: 'manifest', href: `/manifest.webmanifest?locale=${getLocale()}` },
+      // The site's index for AI assistants, in this page's language
+      {
+        rel: 'describedby',
+        href: llmsTxtPath(localizeHref('/')),
+        type: 'text/markdown'
+      }
     ]
   }),
   shellComponent: RootDocument
