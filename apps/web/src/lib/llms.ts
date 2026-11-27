@@ -8,6 +8,7 @@ import { m } from '../paraglide/messages.js';
 import { baseLocale, getLocale, locales } from '../paraglide/runtime.js';
 import { formatHour, weekdayName } from './format';
 import { clampDescription, localizedPageUrl, tournamentDescription } from './seo';
+import { isOver, whenLabel } from './tournaments';
 import { VENUE, VENUE_ADDRESS } from './venue';
 import { groupWeeklyHours } from './venue-config';
 
@@ -47,6 +48,21 @@ function link(title: string, path: string, about: string | null): string {
   return `- [${linkText(title)}](${url})${note}`;
 }
 
+/**
+ * What to say about a tournament: when it is played, then the staff's own
+ * line. An assistant asked "when is the next tournament" reads this file, not
+ * the page, so the date cannot be left to the summary. A summary that is
+ * empty or only repeats the title gives way to the built description, which
+ * already carries the date.
+ */
+function tournamentNote(tournament: TournamentDto): string {
+  const when = whenLabel(tournament);
+  const summary = tournament.summary?.trim() ?? '';
+  const repeatsTitle = summary.toLocaleLowerCase() === tournament.title.trim().toLocaleLowerCase();
+  if (summary === '' || repeatsTitle) return tournamentDescription(tournament);
+  return when === null ? summary : `${when}. ${summary}`;
+}
+
 /** "poniedziałek – czwartek 16:00–21:00; piątek 16:00–23:00": the contacts page's rows as one line. */
 function openingHours(config: VenueConfigDto): string {
   return groupWeeklyHours(config.hours)
@@ -82,7 +98,8 @@ export function llmsTxt({
 }): string {
   const locale = getLocale();
   const articles = news.filter(item => item.hasArticle).slice(0, LIST_LIMIT);
-  const events = tournaments.filter(item => item.status !== 'cancelled').slice(0, LIST_LIMIT);
+  // Only what is still ahead: a played tournament listed here reads as an invitation
+  const events = tournaments.filter(item => !isOver(item)).slice(0, LIST_LIMIT);
   const section = (title: string, lines: string[]) =>
     lines.length === 0 ? [] : [`## ${title}`, '', ...lines, ''];
 
@@ -104,11 +121,7 @@ export function llmsTxt({
     ...section(
       m.menu_tournaments(),
       events.map(item =>
-        link(
-          item.title,
-          `/tournaments/${encodeURIComponent(item.slug)}`,
-          tournamentDescription(item)
-        )
+        link(item.title, `/tournaments/${encodeURIComponent(item.slug)}`, tournamentNote(item))
       )
     ),
     ...section(

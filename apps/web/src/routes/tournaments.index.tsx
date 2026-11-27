@@ -7,6 +7,7 @@ import { QueryError } from '../components/QueryError';
 import { TournamentCard } from '../components/TournamentCard';
 import { tournamentsQuery } from '../lib/queries';
 import { pageHead } from '../lib/seo';
+import { isOver } from '../lib/tournaments';
 import { m } from '../paraglide/messages.js';
 import { getLocale } from '../paraglide/runtime.js';
 
@@ -19,14 +20,6 @@ export const Route = createFileRoute('/tournaments/')({
     pageHead(m.seo_title_tournaments(), m.seo_desc_tournaments(), match.pathname),
   component: TournamentsPage
 });
-
-/**
- * Played or called off: these go under "past", the rest are still ahead.
- * `completed` covers a tournament whose day has gone by too, whatever status
- * staff left it in — see `registrationStateOf`.
- */
-const isOver = (tournament: TournamentDto) =>
-  tournament.registrationState === 'completed' || tournament.registrationState === 'cancelled';
 
 /** The API lists by stored status, which says nothing inside "past": latest first. */
 const latestFirst = (a: TournamentDto, b: TournamentDto) =>

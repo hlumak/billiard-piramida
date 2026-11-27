@@ -59,11 +59,15 @@ test('links the public pages by their canonical addresses', () => {
   }
 });
 
+/** The list line that links one address, if the file has it. */
+const lineAbout = (text: string, path: string) =>
+  text.split('\n').find(line => line.includes(`${SITE_URL}${path})`));
+
 test('lists tournaments and articles, each with a line about it', () => {
   const text = file();
-  expect(text).toContain(
-    `- [Autumn Cup](${SITE_URL}/tournaments/autumn-cup): Dwie drabinki, do 3 wygranych`
-  );
+  const cupLine = lineAbout(text, '/tournaments/autumn-cup');
+  expect(cupLine?.startsWith(`- [Autumn Cup](${SITE_URL}/tournaments/autumn-cup): `)).toBe(true);
+  expect(cupLine).toContain('Dwie drabinki, do 3 wygranych');
   expect(text).toContain(
     `- [Druga sala otwarta](${SITE_URL}/news/second-hall-open): Cztery nowe stoły 12ft.`
   );
@@ -71,13 +75,23 @@ test('lists tournaments and articles, each with a line about it', () => {
   expect(text).not.toContain('sport-card');
 });
 
-test('a cancelled tournament is not offered', () => {
-  const text = llmsTxt({
-    news: [],
-    tournaments: [{ ...cup, status: 'cancelled' }],
-    config: FALLBACK_VENUE_CONFIG
-  });
-  expect(text).not.toContain('autumn-cup');
+test('a tournament is listed with the day and hour it is played', () => {
+  const cupLine = lineAbout(file(), '/tournaments/autumn-cup');
+  // An assistant asked "when is the next tournament" must not have to guess
+  expect(cupLine).toContain('15 grudnia');
+  expect(cupLine).toContain('12:00');
+});
+
+test('a tournament already played or called off is not offered', () => {
+  // Whatever status staff left it in: the state is derived from the play day
+  for (const registrationState of ['completed', 'cancelled'] as const) {
+    const text = llmsTxt({
+      news: [],
+      tournaments: [{ ...cup, registrationState }],
+      config: FALLBACK_VENUE_CONFIG
+    });
+    expect(text).not.toContain('autumn-cup');
+  }
 });
 
 test('never points at the private app pages robots.txt closes', () => {

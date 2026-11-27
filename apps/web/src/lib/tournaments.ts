@@ -30,6 +30,17 @@ export function isLive(state: TournamentRegistrationState): boolean {
   return state === 'open';
 }
 
+/**
+ * Played or called off: these go under "past", the rest are still ahead.
+ * `completed` covers a tournament whose day has gone by too, whatever status
+ * staff left it in — see `registrationStateOf`.
+ */
+export function isOver(tournament: Pick<TournamentDto, 'registrationState'>): boolean {
+  return (
+    tournament.registrationState === 'completed' || tournament.registrationState === 'cancelled'
+  );
+}
+
 /** "четвер, 3 вересня · 18:00" — null while the date waits on the roster. */
 export function whenLabel(
   tournament: Pick<TournamentDto, 'startsOn' | 'startHour'>
