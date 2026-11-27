@@ -35,14 +35,10 @@ const tournament: TournamentDto = {
 /** The card needs a router for its links; the pages they lead to stay empty. */
 async function renderOnHome(card: ReactNode) {
   const root = createRootRoute();
-  const page = (path: string, component?: () => ReactNode) =>
-    createRoute({ getParentRoute: () => root, path, component });
+  const page = (path: string) => createRoute({ getParentRoute: () => root, path });
+  const home = createRoute({ getParentRoute: () => root, path: '/', component: () => card });
   const router = createRouter({
-    routeTree: root.addChildren([
-      page('/', () => card),
-      page('/tournaments'),
-      page('/tournaments/$slug')
-    ]),
+    routeTree: root.addChildren([home, page('/tournaments'), page('/tournaments/$slug')]),
     history: createMemoryHistory({ initialEntries: ['/'] })
   });
   render(<RouterProvider router={router} />);
