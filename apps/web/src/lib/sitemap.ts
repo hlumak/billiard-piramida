@@ -58,15 +58,13 @@ export function sitemapXml(
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">',
     ...pages.flatMap(page =>
-      SUPPORTED_LOCALES.flatMap(locale => [
-        `  <url>`,
-        `    <loc>${escapeXml(localizedPageUrl(page.path, locale))}</loc>`,
-        ...alternates(page.path),
-        ...(page.lastmod === undefined
-          ? []
-          : [`    <lastmod>${escapeXml(page.lastmod)}</lastmod>`]),
-        `  </url>`
-      ])
+      SUPPORTED_LOCALES.flatMap(locale =>
+        ['  <url>', `    <loc>${escapeXml(localizedPageUrl(page.path, locale))}</loc>`].concat(
+          alternates(page.path),
+          page.lastmod === undefined ? [] : [`    <lastmod>${escapeXml(page.lastmod)}</lastmod>`],
+          '  </url>'
+        )
+      )
     ),
     '</urlset>',
     ''
